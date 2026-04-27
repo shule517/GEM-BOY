@@ -14,9 +14,9 @@
 /.dragonruby/
 
 # Game Boy ROM files
-/data/*.gb
-/data/*.gbc
-/data/*.bin
+/data/**/*.gb
+/data/**/*.gbc
+/data/**/*.bin
 
 # macOS
 .DS_Store
