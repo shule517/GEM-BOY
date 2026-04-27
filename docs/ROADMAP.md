@@ -53,10 +53,12 @@ GEM-BOY/
 │   └── core_ext/            # ビルトインクラス拡張(blank? など)
 ├── data/
 │   ├── tobu.gb              # 動作確認用 ROM
-│   ├── 06-ld_r_r.gb         # Blarggテスト
-│   ├── 04-op_r_imm.gb
-│   ├── 05-op_rp.gb
-│   ├── 11-op_a_hl.gb
+│   ├── cpu_instrs/          # Blargg 個別 ROM(オリジナル配布構造のまま)
+│   │   ├── 06-ld r,r.gb     # B-3
+│   │   ├── 04-op r,imm.gb   # C-1
+│   │   ├── 05-op rp.gb      # C-2
+│   │   ├── 11-op a,(hl).gb  # C-3
+│   │   └── ... (他 7 個は完走後の追加検証用)
 │   ├── hello.gb             # HelloWorld
 │   └── dmg_boot.bin         # ブートROM(SameBoot)
 ├── spec/                    # MRI Ruby で実行する RSpec
@@ -257,7 +259,7 @@ def tick(args)
 end
 
 def setup(args)
-  args.state.rom_path = 'data/06-ld_r_r.gb'
+  args.state.rom_path = 'data/cpu_instrs/06-ld r,r.gb'
   args.state.cartridge = Cartridge.new(args, args.state.rom_path)
   args.state.mmu = MMU.new(args.state.cartridge)
 end
@@ -377,7 +379,7 @@ end
 require 'app/cpu.rb'
 
 def setup(args)
-  args.state.rom_path = 'data/06-ld_r_r.gb'
+  args.state.rom_path = 'data/cpu_instrs/06-ld r,r.gb'
   args.state.cartridge = Cartridge.new(args, args.state.rom_path)
   args.state.mmu = MMU.new(args.state.cartridge)
   args.state.cpu = CPU.new(args.state.mmu)
@@ -852,7 +854,7 @@ ROMを切り替え:
 
 ```ruby
 def setup(args)
-  args.state.rom_path = 'data/04-op_r_imm.gb'
+  args.state.rom_path = 'data/cpu_instrs/04-op r,imm.gb'
   args.state.cartridge = Cartridge.new(args, args.state.rom_path)
   args.state.mmu = MMU.new(args.state.cartridge)
   args.state.cpu = CPU.new(args.state.mmu)

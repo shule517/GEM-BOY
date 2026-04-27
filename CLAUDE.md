@@ -35,7 +35,12 @@ GEM-BOY/
 │       └── blank.rb
 ├── data/
 │   ├── tobu.gb              # 動作確認用 ROM
-│   ├── 06-ld_r_r.gb など    # Blarggテストの個別ROM
+│   ├── cpu_instrs/          # Blargg 個別 ROM(オリジナル配布構造のまま)
+│   │   ├── 06-ld r,r.gb     # B-3 で使用
+│   │   ├── 04-op r,imm.gb   # C-1
+│   │   ├── 05-op rp.gb      # C-2
+│   │   ├── 11-op a,(hl).gb  # C-3
+│   │   └── ... (他 7 個は完走後の追加検証用)
 │   ├── hello.gb             # HelloWorld
 │   └── dmg_boot.bin         # SameBoot等の互換ブートROM
 ├── spec/                    # RSpec(MRI Ruby で実行)
