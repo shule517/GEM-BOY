@@ -21,20 +21,32 @@ PPUより先にCPUの正しさをBlarggテストで担保する。シリアル�
 ## ディレクトリ構造(最終形)
 
 ```
-mygame/
+GEM-BOY/
 ├── app/
-│   ├── main.rb          # tickエントリポイント
-│   ├── emulator.rb      # CPU/MMU/PPUの統合
-│   ├── cpu.rb           # CPU実装
-│   ├── mmu.rb           # メモリ管理 + シリアル出力
-│   ├── ppu.rb           # 描画
-│   ├── boot_rom.rb      # ブートROM(フェーズEで追加)
-│   └── cartridge.rb     # カートリッジ
-└── data/
-    ├── 06-ld_r_r.gb など # Blarggテストの個別ROM
-    ├── hello.gb          # HelloWorld
-    └── dmg_boot.bin      # SameBoot等の互換ブートROM
+│   ├── main.rb              # DragonRuby tick エントリ / 画面描画 / 入力(args 依存はここだけ)
+│   ├── emulator/            # 純 Ruby のエミュレータコア(args 非依存、MRI Ruby + RSpec でテスト可能)
+│   │   ├── cartridge.rb     # カートリッジ
+│   │   ├── mmu.rb           # メモリ管理 + シリアル出力
+│   │   ├── cpu.rb           # CPU
+│   │   ├── ppu.rb           # 描画
+│   │   ├── boot_rom.rb      # ブートROM(フェーズEで追加)
+│   │   └── emulator.rb      # CPU/MMU/PPU の統合
+│   └── core_ext/            # ビルトインクラスへの拡張(blank?, present? など)
+│       └── blank.rb
+├── data/
+│   ├── tobu.gb              # 動作確認用 ROM
+│   ├── 06-ld_r_r.gb など    # Blarggテストの個別ROM
+│   ├── hello.gb             # HelloWorld
+│   └── dmg_boot.bin         # SameBoot等の互換ブートROM
+├── spec/                    # RSpec(MRI Ruby で実行)
+└── docs/                    # ROADMAP.md, CONVENTIONS.md など
 ```
+
+**3 層分離の意図:**
+
+- `app/main.rb` は DragonRuby (mruby) 専用 — `args.outputs`, `args.gtk` などのエンジン API はこのファイルだけが触る
+- `app/emulator/` は純 Ruby に保つ。args を引数で受けない。これにより MRI Ruby + RSpec で単体テストできる(Blargg の前段の安全網)
+- `app/core_ext/` は Object/String/Array などへの monkey patch。Rails の `active_support/core_ext/` と同じ位置づけ
 
 ## 必要なROM・テスト素材
 
@@ -45,10 +57,17 @@ mygame/
 ## 起動方法
 
 ```
-./dragonruby mygame
+./dragonruby .
 ```
 
-ROMの切り替えは `app/main.rb` の `setup` 内 `args.state.rom_path` を変更するだけにする。
+ROM の切り替えは `app/main.rb` トップレベルの `ROM_PATH` 定数を書き換えるだけにする。
+
+## テスト方針
+
+- `app/emulator/` と `app/core_ext/` は **純 Ruby に保つ**(`args` を受けない、DragonRuby API を呼ばない)
+- テストは **MRI Ruby + RSpec** で実行する(`bundle exec rspec`)。DragonRuby (mruby) を起動せずに CPU 命令やメモリ挙動を高速検証できる
+- 使用 Ruby は `.ruby-version` で固定(現状 4.0.3)。`Gemfile` で RSpec を管理
+- テスト規約は `docs/CONVENTIONS.md` を参照
 
 ## 実装上の重要ポイント
 
@@ -61,6 +80,7 @@ ROMの切り替えは `app/main.rb` の `setup` 内 `args.state.rom_path` を変
   - `ADD SP,r8` (0xE8) のH/Cフラグは下位ニブル/バイトでの計算
   - `INC r` / `DEC r` は C フラグを保持する(他のフラグは更新)
 - **MBCはまだ非対応**。32KB以下のROMのみ動く
+- **DragonRuby は mruby ベース** — `Regexp` クラスや bundler 経由の gem(ActiveSupport 等)は使えない。汎用ヘルパーは `app/core_ext/` に手書きで足す。テスト時のみ MRI Ruby が使える
 
 ## 参考リンク
 

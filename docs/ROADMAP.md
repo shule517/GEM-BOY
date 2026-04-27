@@ -40,23 +40,30 @@ PPU実装より先にCPUの正しさを Blargg テストで担保する。シリ
 ## ディレクトリ構造(最終形)
 
 ```
-mygame/
+GEM-BOY/
 ├── app/
-│   ├── main.rb          # tickエントリポイント
-│   ├── emulator.rb      # 統合
-│   ├── cpu.rb           # CPU
-│   ├── mmu.rb           # メモリ管理 + シリアル出力
-│   ├── ppu.rb           # 描画(後半で追加)
-│   ├── boot_rom.rb      # ブートROM(フェーズEで追加)
-│   └── cartridge.rb     # カートリッジ
-└── data/
-    ├── 06-ld_r_r.gb     # Blarggテスト
-    ├── 04-op_r_imm.gb
-    ├── 05-op_rp.gb
-    ├── 11-op_a_hl.gb
-    ├── hello.gb         # HelloWorld
-    └── dmg_boot.bin     # ブートROM(SameBoot)
+│   ├── main.rb              # DragonRuby tick エントリ(args 依存はここだけ)
+│   ├── emulator/            # 純 Ruby のエミュレータコア
+│   │   ├── cartridge.rb     # カートリッジ
+│   │   ├── mmu.rb           # メモリ管理 + シリアル出力
+│   │   ├── cpu.rb           # CPU
+│   │   ├── ppu.rb           # 描画(後半で追加)
+│   │   ├── boot_rom.rb      # ブートROM(フェーズEで追加)
+│   │   └── emulator.rb      # 統合
+│   └── core_ext/            # ビルトインクラス拡張(blank? など)
+├── data/
+│   ├── tobu.gb              # 動作確認用 ROM
+│   ├── 06-ld_r_r.gb         # Blarggテスト
+│   ├── 04-op_r_imm.gb
+│   ├── 05-op_rp.gb
+│   ├── 11-op_a_hl.gb
+│   ├── hello.gb             # HelloWorld
+│   └── dmg_boot.bin         # ブートROM(SameBoot)
+├── spec/                    # MRI Ruby で実行する RSpec
+└── docs/
 ```
+
+**3 層分離**: `app/main.rb`(DragonRuby 依存) / `app/emulator/`(純 Ruby、args 非依存) / `app/core_ext/`(ビルトイン拡張)。`app/emulator/` は MRI Ruby + RSpec で単体テスト可能。
 
 ---
 
@@ -90,7 +97,7 @@ end
 
 ### 動作確認
 
-`./dragonruby mygame` で起動。グレー背景に「GEM BOY」の文字が中央に出れば成功。
+`./dragonruby .` で起動。グレー背景に「GEM BOY」の文字が中央に出れば成功。
 
 ---
 
@@ -100,18 +107,22 @@ end
 
 ### 作業
 
+**設計方針**: `Cartridge` は `args` に依存せず、バイト配列だけを受け取る純 Ruby クラスにする(MRI Ruby + RSpec で単体テスト可能にするため)。ファイル I/O は呼び出し側 (`main.rb`) の責務。
+
 ```ruby
-# app/cartridge.rb
+# app/emulator/cartridge.rb
 class Cartridge
-  def initialize(args, path)
-    @data = args.gtk.read_file(path).bytes
-    raise "Failed to load ROM: #{path}" if @data.nil? || @data.empty?
+  def initialize(data)
+    raise "Empty ROM data" if data.nil? || data.empty?
+    @data = data
   end
 
   def read(address)
     @data[address] || 0xFF
   end
 
+  # https://gbdev.io/pandocs/The_Cartridge_Header.html
+  # 0134-0143 — Title
   def title
     @data[0x0134..0x0143].pack('C*').strip.delete("\x00")
   end
@@ -124,32 +135,36 @@ end
 
 ```ruby
 # app/main.rb
-require 'app/cartridge.rb'
+require 'app/core_ext/blank.rb'
+require 'app/emulator/cartridge.rb'
+
+ROM_PATH = 'data/tobu.gb'
 
 def tick(args)
   setup(args) if args.state.tick_count == 0
   args.outputs.background_color = [30, 30, 30]
-  
+
   cartridge = args.state.cartridge
   args.outputs.labels << { x: 20, y: 700, text: "GEM BOY", r: 255, g: 255, b: 255, size_enum: 2 }
-  args.outputs.labels << { x: 20, y: 660, text: "ROM: #{File.basename(args.state.rom_path)}", r: 200, g: 200, b: 200 }
+  args.outputs.labels << { x: 20, y: 660, text: "ROM: #{File.basename(ROM_PATH)}", r: 200, g: 200, b: 200 }
   args.outputs.labels << { x: 20, y: 630, text: "Title: #{cartridge.title}", r: 200, g: 200, b: 200 }
   args.outputs.labels << { x: 20, y: 600, text: "Size: #{cartridge.size} bytes", r: 200, g: 200, b: 200 }
   args.outputs.labels << { x: 20, y: 570, text: "ROM[0x0100]: 0x#{cartridge.read(0x0100).to_s(16)}", r: 200, g: 200, b: 200 }
 end
 
 def setup(args)
-  args.state.rom_path = 'data/06-ld_r_r.gb'
-  args.state.cartridge = Cartridge.new(args, args.state.rom_path)
+  args.state.cartridge = Cartridge.new(args.gtk.read_file(ROM_PATH).bytes)
 end
 ```
 
+ROM の切り替えは `ROM_PATH` 定数を書き換えるだけ。
+
 ### 動作確認
 
-画面に以下のような情報が表示される:
-- `ROM: 06-ld_r_r.gb`
-- `Title:` (Blarggテストの名前、例: `cpu_instrs`)
-- `Size: 32768 bytes` 程度
+画面に以下のような情報が表示される(`tobu.gb` の例):
+- `ROM: tobu.gb`
+- `Title: TOBU`
+- `Size: 262144 bytes` (Blargg 個別 ROM なら 32768 bytes 程度)
 - `ROM[0x0100]: 0x0` または `0xC3`(JP命令)
 
 ---
