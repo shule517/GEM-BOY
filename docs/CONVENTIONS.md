@@ -3,10 +3,23 @@
 ## 言語・コメント
 
 - **コメント・テストの説明文(`it` / `describe` / `context`)は日本語で書く**
+- **Game Boy の仕様をコメントに書くときは、必ず Pan Docs の該当ページ URL を併記する**。引用元が辿れないと「これが正しいのか実装側のクセなのか」が後で判別できなくなるため。複数の仕様セクションを 1 つのクラスにまとめている場合は、各セクションの直前に対応する URL を置く
+  ```ruby
+  # === メモリマップ ===
+  # Pan Docs: https://gbdev.io/pandocs/Memory_Map.html
+  #
+  #   0x8000-0x9FFF  VRAM
+  #   ...
+
+  # シリアルポート送信プロトコル
+  # Pan Docs: https://gbdev.io/pandocs/Serial_Data_Transfer_(Link_Cable).html
+  ```
+  Pan Docs に該当ページがない補助情報(gbops オペコード表など)は別 URL でも可。出典そのものを略さない
 
 ## RSpec
 
-- **メソッドごとに `describe '#メソッド名'` を定義する**。複数メソッドを 1 つの `context` でまとめてラップしない。ネスト順は **`describe > context > it`** を守る(`describe` = 何をテストするか、`context` = どういう状態で)。共通 setup は `RSpec.describe ClassName` 直下に `let` で置く
+- **メソッドごとに `describe '#メソッド名'` を定義する**。複数メソッドを 1 つの `context` でまとめてラップしない。ネスト順は **`describe > context > it`** を守る(`describe` = 何をテストするか、`context` = どういう状態で)
+- **`let` / `before` は `describe '#メソッド名'` の中に書く**。`RSpec.describe ClassName` 直下に共通 `let` を置かない。**メソッドごとのテストを完全に独立させる**ためで、上位スコープに置くと暗黙のグローバル状態のように振る舞い、別メソッドのテストが意図せず依存してしまう。同じ setup が複数 describe で必要なら、その setup ごと describe 内に書き写すこと(DRY より独立性を優先)
 - **`subject` は `describe '#メソッド名'` の直下に書く**(`let` よりも上)。各メソッドのテストはそのメソッド呼び出しを `subject` として定義し、入力のバリエーションは `context` + `let` で切り替える
 - **`subject` は名前を付けず匿名形式 `subject { ... }` を使う**。参照は `is_expected.to ...`(値) または `expect { subject }.to raise_error(...)`(ブロック)で行う
 - **`eq` は括弧を付けずに書く**(`eq(0)` ではなく `eq 0`)。読みやすさを揃えるため、`be`, `include`, `match` など他のマッチャも値を 1 つだけ取る場合は同様に括弧を省く
@@ -14,15 +27,15 @@
 
 ### サンプル
 
-共通 setup を `RSpec.describe` 直下に置き、メソッドごとに `describe` を切る:
+メソッドごとに `describe` を切り、各 `describe` 内に必要な `let` をそのまま書き下す。同じ setup が必要でも上位に括り出さない:
 
 ```ruby
 RSpec.describe Cartridge do
-  let(:cartridge) { described_class.new(File.binread(rom_path).bytes) }
-  let(:rom_path) { File.expand_path('../../../../data/tobu.gb', __FILE__) }
-
   describe '#title' do
     subject { cartridge.title }
+    let(:cartridge) { described_class.new(File.binread(rom_path).bytes) }
+    let(:rom_path) { File.expand_path('../../../../data/tobu.gb', __FILE__) }
+
     it '"TOBU" を返す' do
       is_expected.to eq 'TOBU'
     end
@@ -30,6 +43,9 @@ RSpec.describe Cartridge do
 
   describe '#size' do
     subject { cartridge.size }
+    let(:cartridge) { described_class.new(File.binread(rom_path).bytes) }
+    let(:rom_path) { File.expand_path('../../../../data/tobu.gb', __FILE__) }
+
     it '262144 (256KB) を返す' do
       is_expected.to eq 262144
     end
