@@ -1,4 +1,5 @@
-require 'app/cartridge.rb'
+require 'app/core_ext/blank.rb'
+require 'app/emulator/cartridge.rb'
 
 ROM_PATH = 'data/tobu.gb'
 
