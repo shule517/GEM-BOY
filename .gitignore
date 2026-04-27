@@ -25,3 +25,8 @@
 .idea/
 .vscode/
 *.swp
+
+# Bundler / RSpec
+/.bundle/
+/vendor/bundle/
+/Gemfile.lock

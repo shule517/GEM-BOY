@@ -2,6 +2,10 @@
 
 DragonRuby Game Toolkit 上で動く Ruby 製 Game Boy (DMG) エミュレータ。
 
+## コーディング規約
+
+詳細は @CONVENTIONS.md を参照。
+
 ## 開発戦略
 
 PPUより先にCPUの正しさをBlarggテストで担保する。シリアル出力経由でテスト結果が"Passed"として見えるので、画面実装ゼロでも合格判定が得られる。CPUが固まってからPPUに進むので、HelloWorld表示で詰まるリスクが小さい。
