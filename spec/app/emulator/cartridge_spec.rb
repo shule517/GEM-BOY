@@ -1,9 +1,6 @@
 require 'app/emulator/cartridge'
 
 RSpec.describe Cartridge do
-  let(:cartridge) { described_class.new(File.binread(rom_path).bytes) }
-  let(:rom_path) { File.expand_path('../../../../data/tobu.gb', __FILE__) }
-
   describe '#initialize' do
     subject { described_class.new(data) }
 
@@ -51,6 +48,9 @@ RSpec.describe Cartridge do
 
   describe '#title' do
     subject { cartridge.title }
+    let(:cartridge) { described_class.new(File.binread(rom_path).bytes) }
+    let(:rom_path) { File.expand_path('../../../../data/tobu.gb', __FILE__) }
+
     it '"TOBU" を返す' do
       is_expected.to eq 'TOBU'
     end
@@ -58,6 +58,9 @@ RSpec.describe Cartridge do
 
   describe '#size' do
     subject { cartridge.size }
+    let(:cartridge) { described_class.new(File.binread(rom_path).bytes) }
+    let(:rom_path) { File.expand_path('../../../../data/tobu.gb', __FILE__) }
+
     it '262144 (256KB) を返す' do
       is_expected.to eq 262144
     end
