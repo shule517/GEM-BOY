@@ -12,19 +12,19 @@ PPU実装より先にCPUの正しさを Blargg テストで担保する。シリ
 
 | フェーズ | ステップ数 | 想定時間 | 到達点 | 進捗 |
 |---|---|---|---|---|
-| A. 土台 | 3 | 3〜4h | ROMが読める、シリアル出力が動く | 2/3 |
+| A. 土台 | 3 | 3〜4h | ROMが読める、シリアル出力が動く | 3/3 |
 | B. CPU基礎 + Blargg初級 | 3 | 4〜6h | `06-ld r,r` Passed | 0/3 |
 | C. CPU拡張 + Blargg中級 | 3 | 4〜6h | `04`, `05`, `11` Passed | 0/3 |
-| D. PPU実装 + HelloWorld | 3 | 3〜5h | **HelloWorld表示** | 0/3 |
+| D. PPU実装 + HelloWorld | 4 | 4〜6h | **HelloWorld表示**(途中で Nintendo ロゴ仮挑戦スパイク) | 0/4 |
 | E. ブートROM対応 | 3 | 4〜7h | **Nintendoロゴ表示** | 0/3 |
 
-合計 15ステップ、18〜28時間。**現在 2 ステップ完了**。
+合計 16ステップ、19〜29時間。**現在 3 ステップ完了(フェーズ A 完走)**。
 
 ## 進捗チェックリスト
 
 - [x] A-1: プロジェクト初期化と画面表示
 - [x] A-2: ROM読み込み
-- [ ] A-3: MMU骨組み + シリアル出力
+- [x] A-3: MMU骨組み + シリアル出力
 - [ ] B-1: CPUの骨組み
 - [ ] B-2: 制御フロー命令の実装
 - [ ] B-3: LD命令群 → `06-ld r,r.gb` パス
@@ -33,7 +33,8 @@ PPU実装より先にCPUの正しさを Blargg テストで担保する。シリ
 - [ ] C-3: メモリ間接ALU → `11-op a,(hl).gb` パス
 - [ ] D-1: PPU骨組みとLY
 - [ ] D-2: タイル描画
-- [ ] D-3: 画面表示 → HelloWorld表示
+- [ ] D-3: (任意) スパイク - ブート ROM 仮接続で Nintendo ロゴ挑戦
+- [ ] D-4: 画面表示 → HelloWorld表示
 - [ ] E-1: ブートROM対応とMMU切り替え
 - [ ] E-2: CB ビット操作命令
 - [ ] E-3: ブートROM完走 → Nintendoロゴ表示
@@ -42,7 +43,7 @@ PPU実装より先にCPUの正しさを Blargg テストで担保する。シリ
 
 **第一の達成感: Blargg `06-ld r,r.gb` の "Passed" がターミナルに出る** (ステップB-3完了時)
 
-**第二の達成感: HelloWorldが画面に表示される** (ステップD-3完了時)
+**第二の達成感: HelloWorldが画面に表示される** (ステップD-4完了時)
 
 **第三の達成感: Nintendoロゴが画面にスクロールインする** (ステップE-3完了時)
 
@@ -195,7 +196,7 @@ ROM の切り替えは `ROM_PATH` 定数を書き換えるだけ。
 
 ---
 
-## ステップ A-3: MMU骨組み + シリアル出力 (1時間半)
+## ステップ A-3: MMU骨組み + シリアル出力 (1時間半) [完了]
 
 **目標**: メモリ領域別のread/writeができ、Blarggがシリアル出力に書き込んだ文字をターミナルに表示できること。これは後の全フェーズの土台。
 
@@ -1301,7 +1302,59 @@ args.outputs.labels << { x: 20, y: 480, text: "Non-zero pixels: #{non_zero_count
 
 ---
 
-## ステップ D-3: 画面表示 → HelloWorld表示 (1時間半)
+## ステップ D-3: (任意) スパイク - ブート ROM 仮接続で Nintendo ロゴ挑戦 (1時間)
+
+**目的**: 本筋の D-4 / E に進む前に、現状の CPU + 最小 PPU でブート ROM を走らせると **何が壊れるか** を視覚的に把握する。直す目的ではなく **観察のためだけ** のタイムボックススパイク。
+
+**前提**: CPU は Blargg `04`/`05`/`06`/`11` で固まっている(C-3 完了)+ タイル描画と SCY スクロールが動く(D-2 完了)状態。この組み合わせ以外でやっても収穫が乏しい。
+
+### 作業
+
+捨てブランチで以下を仮実装:
+
+```ruby
+# app/emulator/mmu.rb(一時改造、後でロールバック)
+def initialize(cartridge, boot_rom: nil)
+  @cartridge = cartridge
+  @boot_rom = boot_rom
+  @boot_rom_active = !boot_rom.nil?
+  # ... 既存の初期化
+end
+
+def read(address)
+  return @boot_rom[address] if @boot_rom_active && address < 0x0100
+  # ... 既存のルーティング
+end
+```
+
+```ruby
+# app/main.rb(一時)
+boot_rom = args.gtk.read_file('data/dmg_boot.bin').bytes
+args.state.mmu = MMU.new(args.state.cartridge, boot_rom: boot_rom)
+```
+
+`./dragonruby .` で起動して観察するだけ。
+
+### 観察チェックリスト
+
+| 現象 | 推定原因 |
+|---|---|
+| 即クラッシュ(未実装オペコード `CB xx`) | CB-prefix BIT/RL 命令が未実装(E-2 で実装) |
+| 黒画面のまま無反応 | LCDC の ON 検知が出来ていない / LY が進まない |
+| ロゴの一部だけ出る | タイル描画 OK、SCY のスクロールタイミング不足 |
+| 崩れたロゴが出る | 2bpp デコードのビット操作が違う(CB 系疑い) |
+| 正しいロゴがスクロールイン | 既に半分動いている。E-2/E-3 のデバッグが軽くなる |
+
+### ルール(これを守らないとスパイクが沼化する)
+
+- **1 時間で打ち切る**。直したくなっても我慢
+- **見つけた問題は `docs/SPIKE_NOTES.md` に箇条書きでメモ**
+- **観察が終わったら main は D-2 完了状態に戻す**(改造を退避ブランチに残す)
+- メモは E-2 / E-3 のデバッグ時に参照する
+
+---
+
+## ステップ D-4: 画面表示 → HelloWorld表示 (1時間半)
 
 **目標**: フレームバッファをDragonRubyの画面に描画して、Hello World! を目視できること。
 
