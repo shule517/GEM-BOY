@@ -1,0 +1,27 @@
+# DragonRuby engine (do not redistribute — license-restricted)
+/dragonruby
+/dragonruby-bind
+/dragonruby-publish
+/font.ttf
+/console-logo.png
+
+# DragonRuby runtime output
+/logs/
+/tmp/
+/errors/
+/exceptions/
+/builds/
+/.dragonruby/
+
+# Game Boy ROM files
+/data/*.gb
+/data/*.gbc
+/data/*.bin
+
+# macOS
+.DS_Store
+
+# Editors / IDE
+.idea/
+.vscode/
+*.swp
