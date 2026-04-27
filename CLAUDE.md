@@ -55,9 +55,22 @@ GEM-BOY/
 
 ## 必要なROM・テスト素材
 
-- Blarggテスト: https://github.com/retrio/gb-test-roms (`cpu_instrs/individual/` の個別ROMを使う。`cpu_instrs.gb` 単体はMBCを使うのでまだ動かない)
-- HelloWorld: https://github.com/gitendo/helloworld の DMG用 `hello.gb`
-- ブートROM: https://github.com/LIJI32/SameBoot
+ROADMAP 完走に必須のもの:
+
+- **Blargg 個別 ROM**(フェーズ B/C): https://github.com/retrio/gb-test-roms — `cpu_instrs/individual/` をそのまま `data/cpu_instrs/` に置く。`cpu_instrs.gb` 単体は MBC を使うのでまだ動かない。実際に使うのは `06-ld r,r.gb` (B-3), `04-op r,imm.gb` (C-1), `05-op rp.gb` (C-2), `11-op a,(hl).gb` (C-3) の 4 個
+- **HelloWorld**(フェーズ D-3): https://github.com/gitendo/helloworld の DMG 用 `hello.gb` を `data/hello.gb`
+- **ブートROM**(フェーズ E): SameBoy リリース版に同梱の `dmg_boot.bin`(SameBoot 互換実装)を `data/dmg_boot.bin` に配置。256 バイト。取得手順:
+  ```bash
+  curl -L -o /tmp/sameboy.zip https://github.com/LIJI32/SameBoy/releases/download/v1.0.3/sameboy_cocoa_v1.0.3.zip
+  unzip -p /tmp/sameboy.zip 'SameBoy.app/Contents/Resources/dmg_boot.bin' > data/dmg_boot.bin
+  ```
+  検証用 SHA256: `6f64da4cecd7e54e2f928eb3e3ba7810a7a567d0d247cc71737d1771e073a916`(SameBoy v1.0.3 / SameBoot)。バージョンを上げる場合は SHA256 が変わるので留意
+
+ROADMAP 外の任意の追加検証用(完走後に正確性を上げたいとき):
+
+- **dmg-acid2.gb**: https://github.com/mattcurrie/dmg-acid2/releases — PPU の 1px 精度テスト
+- **Mooneye Test Suite**: https://gekkio.fi/files/mooneye-test-suite/ — MBC やタイミングの精密テスト
+- **instr_timing.gb**: 上記 retrio/gb-test-roms 配下 — 命令サイクル数の検証
 
 ## 起動方法
 

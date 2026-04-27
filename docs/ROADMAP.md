@@ -33,9 +33,15 @@ PPU実装より先にCPUの正しさを Blargg テストで担保する。シリ
 - DragonRuby Game Toolkit がインストール済み
 - Pan Docs(https://gbdev.io/pandocs/)を別タブで開いておく
 - gbops オペコード表(https://izik1.github.io/gbops/)を別タブで開いておく
-- Blargg テストROM(https://github.com/retrio/gb-test-roms)を入手 — `cpu_instrs/individual/` の個別ROMを使う(`cpu_instrs.gb` 単体はMBCを使うのでまだダメ)
-- HelloWorld ROM(https://github.com/gitendo/helloworld)を入手 — DMG用の `hello.gb` を使う
-- 互換ブートROM(https://github.com/LIJI32/SameBoot)を入手 — フェーズEで使用
+- Blargg テストROM(https://github.com/retrio/gb-test-roms)を入手 — `cpu_instrs/individual/` の中身を `data/cpu_instrs/` に配置(`cpu_instrs.gb` 単体は MBC を使うのでまだダメ)。実際に使うのは `06-ld r,r.gb` (B-3), `04-op r,imm.gb` (C-1), `05-op rp.gb` (C-2), `11-op a,(hl).gb` (C-3)
+- HelloWorld ROM(https://github.com/gitendo/helloworld)を入手 — DMG用の `hello.gb` を `data/hello.gb` に配置
+- 互換ブートROM(SameBoy リリース版に同梱の SameBoot 実装)を入手 — `dmg_boot.bin` (256 バイト) を `data/dmg_boot.bin` に配置(フェーズ E で使用)。取得手順は `CLAUDE.md` 参照
+
+任意(ROADMAP 完走後の追加検証用):
+
+- dmg-acid2.gb(https://github.com/mattcurrie/dmg-acid2)— PPU の 1px 精度テスト
+- Mooneye Test Suite(https://gekkio.fi/files/mooneye-test-suite/)— MBC やタイミングの精密テスト
+- instr_timing.gb(retrio/gb-test-roms 配下)— 命令サイクル数の検証
 
 ## ディレクトリ構造(最終形)
 
