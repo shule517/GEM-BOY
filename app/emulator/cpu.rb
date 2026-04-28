@@ -37,7 +37,8 @@ class CPU
                 :pc, # プログラムカウンタ 今メモリのどこを読んでいるか
                 :ime, # Interrupt Master Enable(割り込みマスタ有効フラグ) 1の時に処理を割り込む https://gbdev.io/pandocs/Interrupts.html
                 :halted, # CPUの一時停止中フラグ https://gbdev.io/pandocs/halt.html
-                :opcodes # CPUの命令一覧 https://izik1.github.io/gbops/
+                :opcodes, # CPUの命令一覧 https://izik1.github.io/gbops/
+                :mmu
 
   def initialize(mmu)
     @mmu = mmu
@@ -81,8 +82,8 @@ class CPU
     byte
   end
 
-  # PC が指す 2 バイトをリトルエンディアンで読む(下位バイトが先)。
-  # Game Boy のメモリレイアウトはリトルエンディアン(Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html)
+  # PC が指す 2バイトをリトルエンディアンで読む(下位バイトが先)。
+  # Game Boy のメモリレイアウトはリトルエンディアン(https://gbdev.io/pandocs/CPU_Instruction_Set.html)
   def fetch_word
     lo = fetch_byte
     hi = fetch_byte
@@ -91,9 +92,14 @@ class CPU
 
   # opcodeテーブル
   # CPUの命令一覧 https://izik1.github.io/gbops/
+  # GB CPU 命令リファレンス(RGBDS 公式マニュアル) https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
   def build_opcode_table
     table = Array.new(256, nil)
     table[0x00] = -> { 4 }  # NOP: 何もしない。4サイクル進む。
+    table[0x21] = -> { @l = fetch_byte; @h = fetch_byte; 12 }  # LD HL,u16: 8bitをL。8bitをHに設定
+    # TODO: table[0x22] = -> { mmu.write(@hl, @a); 8 } # LD (HL+),A
+    table[0x31] = -> { @sp = fetch_word; 12 }  # LD SP,u16: 16bitをSPに設定
+    table[0xAF] = -> { @a = 0; @f = 0b10000000; 4 } # XOR A,A
     table
   end
 end

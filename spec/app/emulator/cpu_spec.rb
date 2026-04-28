@@ -84,5 +84,25 @@ RSpec.describe CPU do
       is_expected.to eq 16
       expect(cpu.pc).to eq 4
     end
+
+    # ブート ROM (256 バイト) を ROM 先頭に重ねて、tobu.gb の本体側 (Nintendo ロゴ + ヘッダ含む)
+    # と組み合わせて流す。ブート ROM はカートリッジヘッダのロゴ照合を通らないと 0x0100 へ
+    # ジャンプしないため、tobu.gb の正規ロゴを 0x0104-0x0133 に置く必要がある。
+    # D-1 で MMU 側にブート ROM 重畳の正規実装が入るが、B-2/B-3 の進捗確認用にここでは
+    # Cartridge 配列の先頭を直接書き換える簡易セットアップを使う。
+    context 'ブート ROM (data/dmg_boot.bin) と tobu.gb を重ねて実行したとき' do
+      let(:boot_rom) { File.binread(File.expand_path('../../../../data/dmg_boot.bin', __FILE__)).bytes }
+      let(:tobu)     { File.binread(File.expand_path('../../../../data/tobu.gb', __FILE__)).bytes }
+      let(:rom_data) { boot_rom + tobu[boot_rom.size..] }
+
+      it 'PC が 0x0100 に到達してブート ROM を完走する' do
+        # ブート ROM は実機で約 70,000 T-cycle 程度で完走する。
+        # 上限 200,000 T-cycle まで run を繰り返し、PC が 0x0100 (カートリッジ先頭) に到達するか確認する。
+        elapsed = 0
+        elapsed += cpu.run(1000) while cpu.pc < 0x0100 && elapsed < 200_000
+
+        expect(cpu.pc).to eq 0x0100
+      end
+    end
   end
 end
