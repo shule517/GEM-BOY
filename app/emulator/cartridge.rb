@@ -1,8 +1,5 @@
 # Cartridge
-#
 # Game Boy のカートリッジ ROM を表す純 Ruby クラス。
-# args (DragonRuby) には依存せず、バイト配列だけを受け取って構築するので、
-# MRI Ruby + RSpec で単体テストできる(Blargg を回す前段の安全網)。
 #
 # === カートリッジヘッダ (0x0100-0x014F の 80 バイト) ===
 # Pan Docs: https://gbdev.io/pandocs/The_Cartridge_Header.html

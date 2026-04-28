@@ -1,0 +1,213 @@
+require 'app/emulator/cartridge'
+require 'app/emulator/mmu'
+
+RSpec.describe MMU do
+  describe '#read' do
+    subject { mmu.read(address) }
+    let(:mmu) { described_class.new(cartridge) }
+    let(:cartridge) { Cartridge.new(rom_data) }
+    let(:rom_data) do
+      data = Array.new(0x8000, 0)
+      # 0x0100 = カートリッジのエントリポイント、0xC3 = JP 命令のオペコード。
+      # 実 ROM の先頭にも現れる典型的な値で、ここに「ゼロ初期値ではない目印」を置くことで
+      # ROM 読み込みが正しく振り分けられたか / ROM 書き込みが無視されるかをテストできる。
+      data[0x0100] = 0xC3
+      data
+    end
+
+    context 'ROM領域 (0x0000-0x7FFF) を読んだとき' do
+      let(:address) { 0x0100 }
+      it 'カートリッジの値 0xC3 を返す' do
+        is_expected.to eq 0xC3
+      end
+    end
+
+    context 'VRAM領域 (0x8000-0x9FFF) を読んだとき' do
+      let(:address) { 0x8000 }
+      it '初期値 0 を返す' do
+        is_expected.to eq 0
+      end
+    end
+
+    context 'WRAM領域 (0xC000-0xDFFF) を読んだとき' do
+      let(:address) { 0xC000 }
+      it '初期値 0 を返す' do
+        is_expected.to eq 0
+      end
+    end
+
+    context 'OAM領域 (0xFE00-0xFE9F) を読んだとき' do
+      let(:address) { 0xFE00 }
+      it '初期値 0 を返す' do
+        is_expected.to eq 0
+      end
+    end
+
+    context 'I/O領域 (0xFF00-0xFF7F) を読んだとき' do
+      let(:address) { 0xFF00 }
+      it '初期値 0 を返す' do
+        is_expected.to eq 0
+      end
+    end
+
+    context 'HRAM領域 (0xFF80-0xFFFE) を読んだとき' do
+      let(:address) { 0xFF80 }
+      it '初期値 0 を返す' do
+        is_expected.to eq 0
+      end
+    end
+
+    context 'IEレジスタ (0xFFFF) を読んだとき' do
+      let(:address) { 0xFFFF }
+      it '初期値 0 を返す' do
+        is_expected.to eq 0
+      end
+    end
+
+    context '使用禁止領域 (0xFEA0-0xFEFF) を読んだとき' do
+      let(:address) { 0xFEA0 }
+      it '0xFF を返す' do
+        is_expected.to eq 0xFF
+      end
+    end
+  end
+
+  describe '#write' do
+    let(:mmu) { described_class.new(cartridge) }
+    let(:cartridge) { Cartridge.new(rom_data) }
+    let(:rom_data) do
+      data = Array.new(0x8000, 0)
+      # 0x0100 = カートリッジのエントリポイント、0xC3 = JP 命令のオペコード。
+      # 実 ROM の先頭にも現れる典型的な値で、ここに「ゼロ初期値ではない目印」を置くことで
+      # ROM 読み込みが正しく振り分けられたか / ROM 書き込みが無視されるかをテストできる。
+      data[0x0100] = 0xC3
+      data
+    end
+
+    before do
+      allow($stdout).to receive(:print)
+      allow($stdout).to receive(:flush)
+    end
+
+    context 'VRAM領域に書き込んだとき' do
+      subject do
+        mmu.write(0x8000, 0x42)
+        mmu.read(0x8000)
+      end
+      it '読み戻すと 0x42 になる' do
+        is_expected.to eq 0x42
+      end
+    end
+
+    context 'WRAM領域に書き込んだとき' do
+      subject do
+        mmu.write(0xC000, 0x42)
+        mmu.read(0xC000)
+      end
+      it '読み戻すと 0x42 になる' do
+        is_expected.to eq 0x42
+      end
+    end
+
+    context 'HRAM領域に書き込んだとき' do
+      subject do
+        mmu.write(0xFF80, 0x42)
+        mmu.read(0xFF80)
+      end
+      it '読み戻すと 0x42 になる' do
+        is_expected.to eq 0x42
+      end
+    end
+
+    context 'IEレジスタに書き込んだとき' do
+      subject do
+        mmu.write(0xFFFF, 0x1F)
+        mmu.read(0xFFFF)
+      end
+      it '読み戻すと 0x1F になる' do
+        is_expected.to eq 0x1F
+      end
+    end
+
+    context '0xFF を超える値を書き込んだとき' do
+      subject do
+        mmu.write(0xC000, 0x1FF)
+        mmu.read(0xC000)
+      end
+      it '下位 8bit に切り詰められた 0xFF になる' do
+        is_expected.to eq 0xFF
+      end
+    end
+
+    context 'ROM領域に書き込んだとき' do
+      subject do
+        mmu.write(0x0100, 0x42)
+        mmu.read(0x0100)
+      end
+      it '書き込みは無視され、ROM の値 0xC3 のまま' do
+        is_expected.to eq 0xC3
+      end
+    end
+  end
+
+  describe '#serial_buffer' do
+    subject { mmu.serial_buffer }
+    let(:mmu) { described_class.new(cartridge) }
+    let(:cartridge) { Cartridge.new(rom_data) }
+    let(:rom_data) { Array.new(0x8000, 0) }
+
+    before do
+      allow($stdout).to receive(:print)
+      allow($stdout).to receive(:flush)
+    end
+
+    context '初期状態' do
+      it '空文字列' do
+        is_expected.to eq ''
+      end
+    end
+
+    context 'SB に文字を置いて SC に SC_TRANSFER_START を書いたとき' do
+      before do
+        mmu.write(MMU::SB, 'A'.ord)
+        mmu.write(MMU::SC, MMU::SC_TRANSFER_START)
+      end
+      it '"A" が追記される' do
+        is_expected.to eq 'A'
+      end
+    end
+
+    context '複数文字を順次送信したとき' do
+      before do
+        %w(G B).each do |c|
+          mmu.write(MMU::SB, c.ord)
+          mmu.write(MMU::SC, MMU::SC_TRANSFER_START)
+        end
+      end
+      it '"GB" の順で連結される' do
+        is_expected.to eq 'GB'
+      end
+    end
+
+    context 'SC に SC_TRANSFER_START 以外を書いたとき' do
+      before do
+        mmu.write(MMU::SB, 'A'.ord)
+        mmu.write(MMU::SC, 0x80)
+      end
+      it 'serial_buffer は空のまま' do
+        is_expected.to eq ''
+      end
+    end
+
+    context 'シリアル送信後の SC を読んだとき' do
+      subject do
+        mmu.write(MMU::SB, 'A'.ord)
+        mmu.write(MMU::SC, MMU::SC_TRANSFER_START)
+        mmu.read(MMU::SC)
+      end
+      it '転送完了シグナル 0x01 (bit7 が落ちている) になる' do
+        is_expected.to eq 0x01
+      end
+    end
+  end
+end
