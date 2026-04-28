@@ -2,6 +2,7 @@ require 'app/core_ext/blank.rb'
 require 'app/core_ext/last.rb'
 require 'app/emulator/cartridge.rb'
 require 'app/emulator/mmu.rb'
+require 'app/emulator/cpu.rb'
 
 ROM_PATH = 'data/tobu.gb'
 
