@@ -95,11 +95,15 @@ class CPU
   # GB CPU 命令リファレンス(RGBDS 公式マニュアル) https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
   def build_opcode_table
     table = Array.new(256, nil)
-    table[0x00] = -> { 4 }  # NOP: 何もしない。4サイクル進む。
+    table[0x00] = -> { 4 } # NOP: 何もしない。4サイクル進む。
     table[0x21] = -> { @l = fetch_byte; @h = fetch_byte; 12 }  # LD HL,u16: 8bitをL。8bitをHに設定
+    table[0x22] = -> { 8 } # LD (HL+),A
+    table[0x28] = -> { 8 } # JR Z,i8 # TODO: 8 or 12
     # TODO: table[0x22] = -> { mmu.write(@hl, @a); 8 } # LD (HL+),A
     table[0x31] = -> { @sp = fetch_word; 12 }  # LD SP,u16: 16bitをSPに設定
+    table[0x6C] = -> { 4 } # LD L,H
     table[0xAF] = -> { @a = 0; @f = 0b10000000; 4 } # XOR A,A
+    table[0xCB] = -> { 4 } # PREFIX CB
     table
   end
 end
