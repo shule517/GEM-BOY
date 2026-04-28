@@ -23,19 +23,19 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 | フェーズ | ステップ数 | 想定時間 | 到達点 | 進捗 |
 |---|---|---|---|---|
 | A. 土台 | 3 | 3〜4h | ROM が読める、シリアル出力動く | 3/3 [完了] |
-| B. CPU 必要命令の実装 | 3 | 4h | ブート ROM の命令を踏める | 0/3 |
+| B. CPU 必要命令の実装 | 3 | 4h | ブート ROM の命令を踏める | 1/3 |
 | C. PPU 最小実装 | 2 | 2.5h | タイル + SCY 描画 | 0/2 |
 | D. Nintendo ロゴ挑戦 | 5 | 2〜6h | **正しい Nintendo ロゴ表示 + ブートチャイム** | 0/5 |
 | E. tobu.gb タイトル | 5 | 6.5〜10h | **tobu.gb タイトル表示** | 0/5 |
 
-合計 18 ステップ、想定 17.5〜26.5h。**現在 3 ステップ完了(フェーズ A 完走)**。
+合計 18 ステップ、想定 17.5〜26.5h。**現在 4 ステップ完了(フェーズ A 完走 + B-1 完了)**。
 
 ## 進捗チェックリスト
 
 - [x] A-1: プロジェクト初期化と画面表示
 - [x] A-2: ROM読み込み
 - [x] A-3: MMU骨組み + シリアル出力
-- [ ] B-1: CPU 骨組み
+- [x] B-1: CPU 骨組み
 - [ ] B-2: ブート ROM が使う命令一式
 - [ ] B-3: CB-prefix BIT / RL
 - [ ] C-1: PPU 骨組み(LCDC, LY, モード)
@@ -82,7 +82,7 @@ GEM-BOY/
 │   ├── emulator/            # 純 Ruby のエミュレータコア
 │   │   ├── cartridge.rb     # カートリッジ
 │   │   ├── mmu.rb           # メモリ管理 + シリアル出力
-│   │   ├── cpu.rb           # CPU(B フェーズで作成)
+│   │   ├── cpu.rb           # CPU(B-1 完了:骨組み + NOP のみ。B-2 で命令拡充)
 │   │   ├── ppu.rb           # 描画(C フェーズで作成)
 │   │   ├── boot_rom.rb      # ブート ROM(D フェーズで作成)
 │   │   ├── mbc1.rb          # MBC1 バンク切り替え(E フェーズで作成)
@@ -117,9 +117,19 @@ CPU リファレンス:
 - Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html
 - gbops オペコード表: https://izik1.github.io/gbops/
 
-## ステップ B-1: CPU 骨組み (1時間)
+## ステップ B-1: CPU 骨組み (1時間) [完了]
 
 **目標**: CPU クラスの土台を作り、未実装命令を踏むと例外で停止する状態にする。
+
+実装内容:
+
+- `app/emulator/cpu.rb` に CPU クラスを追加(レジスタ A/B/C/D/E/H/L/F + SP/PC + IME/halted、すべて初期値 0 / false)
+- `step` / `run(cycles_target)` / `fetch_byte` / `fetch_word` を実装。HALT 中は fetch せず 4 サイクルだけ消費する分岐込み
+- 256 要素の `@opcodes` テーブルを用意し、現状は **NOP (0x00) のみ** 実装。それ以外を踏むと `Unimplemented opcode 0xXX at PC=0xYYYY` で例外停止
+- `spec/app/emulator/cpu_spec.rb` で `#initialize` / `#step` (NOP / 未実装 / halted / PC wrap) / `#run` を検証
+- 仕様根拠コメント: PC = Pan Docs CPU_Registers_and_Flags.html、HALT = Pan Docs halt.html、命令長 = gbops を参照
+
+詳細は `git log` を参照。
 
 ### 作業
 
