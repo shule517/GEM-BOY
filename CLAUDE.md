@@ -32,8 +32,9 @@ GEM-BOY/
 │   │   ├── boot_rom.rb      # ブートROM(フェーズDで追加)
 │   │   ├── mbc1.rb          # MBC1 バンク切り替え(フェーズEで追加)
 │   │   └── emulator.rb      # CPU/MMU/PPU の統合
-│   └── core_ext/            # ビルトインクラスへの拡張(blank?, present? など)
-│       └── blank.rb
+│   └── core_ext/            # ビルトインクラスへの拡張(blank?, present?, String#last など)
+│       ├── blank.rb         # Object#blank? / #present?, String#blank? など
+│       └── last.rb          # String#last(n)(ActiveSupport 互換、シリアルバッファ切り詰めで使用)
 ├── data/
 │   ├── tobu.gb              # 動作確認用 ROM(フェーズEのタイトル画面で使用)
 │   ├── cpu_instrs/          # Blargg 個別 ROM(オリジナル配布構造のまま)
