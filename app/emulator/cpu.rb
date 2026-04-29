@@ -213,54 +213,54 @@ class CPU
     # ============================================================
     # 8bit ロード - LD r,r' (レジスタ間転送)
     # ============================================================
-    # table[0x40] = -> { 4 }  # LD B,B
-    # table[0x41] = -> { 4 }  # LD B,C
-    # table[0x42] = -> { 4 }  # LD B,D
-    # table[0x43] = -> { 4 }  # LD B,E
-    # table[0x44] = -> { 4 }  # LD B,H
-    # table[0x45] = -> { 4 }  # LD B,L
+    table[0x40] = -> { 4 } # LD B,B → 無意味な処理のため何もしない
+    table[0x41] = -> { self.b = c; 4 }  # LD B,C
+    table[0x42] = -> { self.b = d; 4 }  # LD B,D
+    table[0x43] = -> { self.b = e; 4 }  # LD B,E
+    table[0x44] = -> { self.b = h; 4 }  # LD B,H
+    table[0x45] = -> { self.b = l; 4 }  # LD B,L
     # table[0x46] = -> { 8 }  # LD B,(HL)
-    # table[0x47] = -> { 4 }  # LD B,A
-    # table[0x48] = -> { 4 }  # LD C,B
-    # table[0x49] = -> { 4 }  # LD C,C
-    # table[0x4A] = -> { 4 }  # LD C,D
-    # table[0x4B] = -> { 4 }  # LD C,E
-    # table[0x4C] = -> { 4 }  # LD C,H
-    # table[0x4D] = -> { 4 }  # LD C,L
+    table[0x47] = -> { self.b = a; 4 }  # LD B,A
+    table[0x48] = -> { self.c = b; 4 }  # LD C,B
+    table[0x49] = -> { 4 }  # LD C,C → 無意味な処理のため何もしない
+    table[0x4A] = -> { self.c = d; 4 }  # LD C,D
+    table[0x4B] = -> { self.c = e; 4 }  # LD C,E
+    table[0x4C] = -> { self.c = h; 4 }  # LD C,H
+    table[0x4D] = -> { self.c = l; 4 }  # LD C,L
     # table[0x4E] = -> { 8 }  # LD C,(HL)
-    # table[0x4F] = -> { 4 }  # LD C,A
-    # table[0x50] = -> { 4 }  # LD D,B
-    # table[0x51] = -> { 4 }  # LD D,C
-    # table[0x52] = -> { 4 }  # LD D,D
-    # table[0x53] = -> { 4 }  # LD D,E
-    # table[0x54] = -> { 4 }  # LD D,H
-    # table[0x55] = -> { 4 }  # LD D,L
+    table[0x4F] = -> { self.c = a; 4 }  # LD C,A
+    table[0x50] = -> { self.d = b; 4 }  # LD D,B
+    table[0x51] = -> { self.d = c; 4 }  # LD D,C
+    table[0x52] = -> { 4 }  # LD D,D → 無意味な処理のため何もしない
+    table[0x53] = -> { self.d = e; 4 }  # LD D,E
+    table[0x54] = -> { self.d = h; 4 }  # LD D,H
+    table[0x55] = -> { self.d = l; 4 }  # LD D,L
     # table[0x56] = -> { 8 }  # LD D,(HL)
-    # table[0x57] = -> { 4 }  # LD D,A
-    # table[0x58] = -> { 4 }  # LD E,B
-    # table[0x59] = -> { 4 }  # LD E,C
-    # table[0x5A] = -> { 4 }  # LD E,D
-    # table[0x5B] = -> { 4 }  # LD E,E
-    # table[0x5C] = -> { 4 }  # LD E,H
-    # table[0x5D] = -> { 4 }  # LD E,L
+    table[0x57] = -> { self.d = a; 4 }  # LD D,A
+    table[0x58] = -> { self.e = b; 4 }  # LD E,B
+    table[0x59] = -> { self.e = c; 4 }  # LD E,C
+    table[0x5A] = -> { self.e = d; 4 }  # LD E,D
+    table[0x5B] = -> { 4 }  # LD E,E → 無意味な処理のため何もしない
+    table[0x5C] = -> { self.e = h; 4 }  # LD E,H
+    table[0x5D] = -> { self.e = l; 4 }  # LD E,L
     # table[0x5E] = -> { 8 }  # LD E,(HL)
-    # table[0x5F] = -> { 4 }  # LD E,A
-    # table[0x60] = -> { 4 }  # LD H,B
-    # table[0x61] = -> { 4 }  # LD H,C
-    # table[0x62] = -> { 4 }  # LD H,D
-    # table[0x63] = -> { 4 }  # LD H,E
-    # table[0x64] = -> { 4 }  # LD H,H
-    # table[0x65] = -> { 4 }  # LD H,L
+    table[0x5F] = -> { self.e = a; 4 }  # LD E,A
+    table[0x60] = -> { self.h = b; 4 }  # LD H,B
+    table[0x61] = -> { self.h = c; 4 }  # LD H,C
+    table[0x62] = -> { self.h = d; 4 }  # LD H,D
+    table[0x63] = -> { self.h = e; 4 }  # LD H,E
+    table[0x64] = -> { 4 }  # LD H,H → 無意味な処理のため何もしない
+    table[0x65] = -> { self.h = l; 4 }  # LD H,L
     # table[0x66] = -> { 8 }  # LD H,(HL)
-    # table[0x67] = -> { 4 }  # LD H,A
-    # table[0x68] = -> { 4 }  # LD L,B
-    # table[0x69] = -> { 4 }  # LD L,C
-    # table[0x6A] = -> { 4 }  # LD L,D
-    # table[0x6B] = -> { 4 }  # LD L,E
-    # table[0x6C] = -> { 4 }  # LD L,H
-    # table[0x6D] = -> { 4 }  # LD L,L
+    table[0x67] = -> { self.h = a; 4 }  # LD H,A
+    table[0x68] = -> { self.l = b; 4 }  # LD L,B
+    table[0x69] = -> { self.l = c; 4 }  # LD L,C
+    table[0x6A] = -> { self.l = d; 4 }  # LD L,D
+    table[0x6B] = -> { self.l = e; 4 }  # LD L,E
+    table[0x6C] = -> { self.l = h; 4 }  # LD L,H
+    table[0x6D] = -> { 4 }  # LD L,L → 無意味な処理のため何もしない
     # table[0x6E] = -> { 8 }  # LD L,(HL)
-    # table[0x6F] = -> { 4 }  # LD L,A
+    table[0x6F] = -> { self.l = a; 4 }  # LD L,A
     # table[0x70] = -> { 8 }  # LD (HL),B
     # table[0x71] = -> { 8 }  # LD (HL),C
     # table[0x72] = -> { 8 }  # LD (HL),D
@@ -268,14 +268,14 @@ class CPU
     # table[0x74] = -> { 8 }  # LD (HL),H
     # table[0x75] = -> { 8 }  # LD (HL),L
     # table[0x77] = -> { 8 }  # LD (HL),A
-    # table[0x78] = -> { 4 }  # LD A,B
-    # table[0x79] = -> { 4 }  # LD A,C
-    # table[0x7A] = -> { 4 }  # LD A,D
-    # table[0x7B] = -> { 4 }  # LD A,E
-    # table[0x7C] = -> { 4 }  # LD A,H
-    # table[0x7D] = -> { 4 }  # LD A,L
+    table[0x78] = -> { self.a = b; 4 }  # LD A,B
+    table[0x79] = -> { self.a = c; 4 }  # LD A,C
+    table[0x7A] = -> { self.a = d; 4 }  # LD A,D
+    table[0x7B] = -> { self.a = e; 4 }  # LD A,E
+    table[0x7C] = -> { self.a = h; 4 }  # LD A,H
+    table[0x7D] = -> { self.a = l; 4 }  # LD A,L
     # table[0x7E] = -> { 8 }  # LD A,(HL)
-    # table[0x7F] = -> { 4 }  # LD A,A
+    table[0x7F] = -> { 4 }  # LD A,A → 無意味な処理のため何もしない
 
     # ============================================================
     # 8bit ロード - LD A,(rr) / LD (rr),A (レジスタペア間接)
@@ -311,7 +311,7 @@ class CPU
     table[0x21] = -> { self.hl = fetch_u16; 12 } # LD HL,u16
     table[0x31] = -> { self.sp = fetch_u16; 12 } # LD SP,u16
     # table[0x08] = -> { 20 } # LD (u16),SP
-    # table[0xF8] = -> { 12 } # LD HL,SP+i8
+    table[0xF8] = -> { self.hl = wrap_u16(sp + fetch_i8); self.negative = 0; self.negative = 0; self.half_carry = 1; self.carry = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
     table[0xF9] = -> { self.sp = hl; 8 } # LD SP,HL
 
     # ============================================================
