@@ -86,6 +86,102 @@ RSpec.describe CPU do
     end
   end
 
+  describe '#high_byte' do
+    # 16bit 値から上位 8bit を取り出す。レジスタペア setter で使う。
+    subject { cpu.high_byte(value) }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context '0x1234 を渡したとき' do
+      let(:value) { 0x1234 }
+
+      it '上位 8bit (0x12) を返す' do
+        is_expected.to eq 0x12
+      end
+    end
+
+    context '0x0000 を渡したとき' do
+      let(:value) { 0x0000 }
+
+      it '0x00 を返す' do
+        is_expected.to eq 0x00
+      end
+    end
+
+    context '0xFFFF を渡したとき' do
+      let(:value) { 0xFFFF }
+
+      it '0xFF を返す' do
+        is_expected.to eq 0xFF
+      end
+    end
+
+    context '0x00FF (上位がゼロ) を渡したとき' do
+      # 下位だけに値があるケース。上位 8bit は 0 になる。
+      let(:value) { 0x00FF }
+
+      it '0x00 を返す' do
+        is_expected.to eq 0x00
+      end
+    end
+
+    context '0xFF00 (下位がゼロ) を渡したとき' do
+      # 上位だけに値があるケース。シフトで下位の位置に降りる。
+      let(:value) { 0xFF00 }
+
+      it '0xFF を返す' do
+        is_expected.to eq 0xFF
+      end
+    end
+  end
+
+  describe '#low_byte' do
+    # 16bit 値から下位 8bit を取り出す。レジスタペア setter で使う。
+    subject { cpu.low_byte(value) }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context '0x1234 を渡したとき' do
+      let(:value) { 0x1234 }
+
+      it '下位 8bit (0x34) を返す' do
+        is_expected.to eq 0x34
+      end
+    end
+
+    context '0x0000 を渡したとき' do
+      let(:value) { 0x0000 }
+
+      it '0x00 を返す' do
+        is_expected.to eq 0x00
+      end
+    end
+
+    context '0xFFFF を渡したとき' do
+      let(:value) { 0xFFFF }
+
+      it '0xFF を返す' do
+        is_expected.to eq 0xFF
+      end
+    end
+
+    context '0x00FF (上位がゼロ) を渡したとき' do
+      let(:value) { 0x00FF }
+
+      it '0xFF を返す' do
+        is_expected.to eq 0xFF
+      end
+    end
+
+    context '0xFF00 (下位がゼロ) を渡したとき' do
+      let(:value) { 0xFF00 }
+
+      it '0x00 を返す' do
+        is_expected.to eq 0x00
+      end
+    end
+  end
+
   describe '#wrap_u16' do
     # 引数を 16bit にマスクして wrap させる(下位 16bit のみ残す)。
     # PC の +1 オーバーフロー(0xFFFF→0x0000)、JR の負オフセット、

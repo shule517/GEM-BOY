@@ -84,7 +84,23 @@ class CPU
     byte
   end
 
-  # 16bit(0xFFFF)を超えたら0に戻る
+  # 16bit 値から上位 8bit を取り出す。
+  # 例: high_byte(0x1234) #=> 0x12
+  # レジスタペア setter(BC=, DE=, HL=)で上位バイトを上位レジスタへ振り分けるときに使う。
+  def high_byte(value)
+    (value & 0xFF00) >> 8
+  end
+
+  # 16bit 値から下位 8bit を取り出す。
+  # 例: low_byte(0x1234) #=> 0x34
+  # レジスタペア setter(BC=, DE=, HL=)で下位バイトを下位レジスタへ振り分けるときに使う。
+  def low_byte(value)
+    value & 0x00FF
+  end
+
+  # 16bit にマスクして wrap させる(下位 16bit のみ残す)。
+  # PC の +1 オーバーフロー(0xFFFF→0x0000)、JR の負オフセット、
+  # ADD HL,BC のキャリーアウトなど、16bit 演算結果を正規化するときに使う。
   def wrap_u16(n)
     n & 0xFFFF
   end
@@ -135,6 +151,16 @@ class CPU
 
   def carry=(value)
     self.f = (f & 0b11101111) | (value ? 1 << 4 : 0) # bit4 Carry
+  end
+
+  def bc=(value)
+    self.b = (value & 0b1111111100000000) >> 8
+    self.c = value & 0b0000000011111111
+  end
+
+  def de=(value)
+    self.d = (value & 0b1111111100000000) >> 8
+    self.e = value & 0b0000000011111111
   end
 
   def hl=(value)
