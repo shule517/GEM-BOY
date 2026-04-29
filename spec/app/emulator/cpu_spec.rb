@@ -447,6 +447,187 @@ RSpec.describe CPU do
     end
   end
 
+  describe '#bc' do
+    # B + C を 16bit に合成して返す getter。B が上位、C が下位。
+    # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
+    subject { cpu.bc }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context 'B=0x12, C=0x34 のとき' do
+      before do
+        cpu.b = 0x12
+        cpu.c = 0x34
+      end
+
+      it '0x1234 を返す' do
+        is_expected.to eq 0x1234
+      end
+    end
+
+    context 'B=0x00, C=0x00 のとき' do
+      it '0x0000 を返す' do
+        is_expected.to eq 0x0000
+      end
+    end
+
+    context 'B=0xFF, C=0xFF のとき' do
+      before do
+        cpu.b = 0xFF
+        cpu.c = 0xFF
+      end
+
+      it '0xFFFF を返す' do
+        is_expected.to eq 0xFFFF
+      end
+    end
+
+    context 'B=0x00, C=0xFF のとき' do
+      before do
+        cpu.b = 0x00
+        cpu.c = 0xFF
+      end
+
+      it '0x00FF を返す' do
+        is_expected.to eq 0x00FF
+      end
+    end
+
+    context 'B=0xFF, C=0x00 のとき' do
+      before do
+        cpu.b = 0xFF
+        cpu.c = 0x00
+      end
+
+      it '0xFF00 を返す' do
+        is_expected.to eq 0xFF00
+      end
+    end
+  end
+
+  describe '#de' do
+    # D + E を 16bit に合成して返す getter。D が上位、E が下位。
+    subject { cpu.de }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context 'D=0x12, E=0x34 のとき' do
+      before do
+        cpu.d = 0x12
+        cpu.e = 0x34
+      end
+
+      it '0x1234 を返す' do
+        is_expected.to eq 0x1234
+      end
+    end
+
+    context 'D=0x00, E=0x00 のとき' do
+      it '0x0000 を返す' do
+        is_expected.to eq 0x0000
+      end
+    end
+
+    context 'D=0xFF, E=0xFF のとき' do
+      before do
+        cpu.d = 0xFF
+        cpu.e = 0xFF
+      end
+
+      it '0xFFFF を返す' do
+        is_expected.to eq 0xFFFF
+      end
+    end
+
+    context 'D=0x00, E=0xFF のとき' do
+      before do
+        cpu.d = 0x00
+        cpu.e = 0xFF
+      end
+
+      it '0x00FF を返す' do
+        is_expected.to eq 0x00FF
+      end
+    end
+
+    context 'D=0xFF, E=0x00 のとき' do
+      before do
+        cpu.d = 0xFF
+        cpu.e = 0x00
+      end
+
+      it '0xFF00 を返す' do
+        is_expected.to eq 0xFF00
+      end
+    end
+  end
+
+  describe '#hl' do
+    # H + L を 16bit に合成して返す getter。H が上位、L が下位。
+    subject { cpu.hl }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context 'H=0x12, L=0x34 のとき' do
+      before do
+        cpu.h = 0x12
+        cpu.l = 0x34
+      end
+
+      it '0x1234 を返す' do
+        is_expected.to eq 0x1234
+      end
+    end
+
+    context 'H=0x00, L=0x00 のとき' do
+      it '0x0000 を返す' do
+        is_expected.to eq 0x0000
+      end
+    end
+
+    context 'H=0xFF, L=0xFF のとき' do
+      before do
+        cpu.h = 0xFF
+        cpu.l = 0xFF
+      end
+
+      it '0xFFFF を返す' do
+        is_expected.to eq 0xFFFF
+      end
+    end
+
+    context 'H=0x00, L=0xFF のとき' do
+      before do
+        cpu.h = 0x00
+        cpu.l = 0xFF
+      end
+
+      it '0x00FF を返す' do
+        is_expected.to eq 0x00FF
+      end
+    end
+
+    context 'H=0xFF, L=0x00 のとき' do
+      before do
+        cpu.h = 0xFF
+        cpu.l = 0x00
+      end
+
+      it '0xFF00 を返す' do
+        is_expected.to eq 0xFF00
+      end
+    end
+
+    context 'setter で代入した直後に getter で読み戻したとき' do
+      # bc=, de=, hl= で書いた値と bc, de, hl で読んだ値が一致すること(往復確認)
+      before { cpu.hl = 0xABCD }
+
+      it '元の値 (0xABCD) が返る' do
+        is_expected.to eq 0xABCD
+      end
+    end
+  end
+
   describe '#bc=' do
     # 16bit 値を BC ペアに振り分ける setter。B が上位、C が下位。
     # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html

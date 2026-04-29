@@ -161,6 +161,10 @@ class CPU
     self.f = (f & 0b11101111) | (value ? 1 << 4 : 0) # bit4 Carry
   end
 
+  def bc = make_u16(high: b, low: c)
+  def de = make_u16(high: d, low: e)
+  def hl = make_u16(high: h, low: l)
+
   def bc=(value)
     self.b = high_byte(value)
     self.c = low_byte(value)
