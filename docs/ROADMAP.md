@@ -22,22 +22,22 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 |---|---|---|---|---|
 | A. 土台 | Cartridge + MMU 骨組み + シリアル出力 | 3〜4h | ROM が読める、シリアル出力動く | 3/3 [完了] |
 | B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 2/2(B-2 ほぼ完了: ~102 オペコード実装、ブート ROM が CB-prefix まで到達)|
-| C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 0/2(HELLO WORLD 完走には **C-1 着手が必須**)|
+| C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 1/2(**C-1 完了**: LY ティック動作、HELLO WORLD は VBlank ループを抜けて CALL で停止)|
 | D. HELLO WORLD 表示 | skip_boot 起動 + 画面確認 | 1h | **画面に "Hello World!" 表示** ★第一 | 0/2 |
 | E. Nintendo ロゴ表示 | ブート ROM 用追加命令 + CB-prefix + ブート ROM mapping + スクロール + チャイム | 3〜7h | **正しい Nintendo ロゴ + ブートチャイム** ★第二 | 0/8(E-1 ぶんは B-2 で前倒し済み、**E-2 CB-prefix が次の壁**)|
 | F. tobu.gb タイトル | MBC1 + スプライト + 入力 + タイマー | 6.5〜10h | **tobu.gb タイトル表示** ★第三 | 0/5 |
 
-合計 22 ステップ、想定 17.5〜27h。**現在 5 ステップ完了(フェーズ A 完走 + B-1, B-2 ほぼ完了)**。
+合計 22 ステップ、想定 17.5〜27h。**現在 6 ステップ完了(フェーズ A 完走 + B-1, B-2 ほぼ完了 + C-1 完了)**。
 
 ### 進行中の発見(2026-04-30 時点)
 
-#### 1. CPU は ~102 オペコード実装、統合テスト 138/140 pass
+#### 1. CPU は ~102 オペコード実装、PPU 骨組み完成、統合テスト 145/147 pass
 
-**論理演算系 / 比較系 / 8bit ロード r,r' / 16bit ロード / I/O ロード / レジスタペア間接 / 一部ジャンプ系**まで完成。残り 2 件のテスト失敗は次の通り。
+**論理演算系 / 比較系 / 8bit ロード r,r' / 16bit ロード / I/O ロード / レジスタペア間接 / 一部ジャンプ系**まで完成。**PPU(C-1)も完了**して LY が時間とともに進むようになり、HELLO WORLD は VBlank 待ちループを抜けられるようになった。残り 2 件のテスト失敗は次の通り。
 
-#### 2. HELLO WORLD: VBlank 待ちループで停止(PPU 未実装)
+#### 2. HELLO WORLD: PC=0x0177 で `0xCD CALL u16` 未実装で停止
 
-`spec` の "HELLO WORLD 完走" は依然として VBlank 待ちで足踏み。`LD A,(0xFF44); CP 0x90; JR NZ,-7` のループは **CPU 的には正しく動いている**(0xFA `LD A,(u16)` の `mmu.read` 抜けバグも解消済み)。あとは PPU が LY を 0→153 で循環させればループを抜けられる。
+PPU 実装で VBlank ループを抜けて初期化処理に入った。VRAM 書き込み(0xEA を多用)のあと **CALL 命令で停止中**。**スタック系命令(PUSH / POP / CALL / RET)** の実装が次の壁。
 
 #### 3. ブート ROM: PC=0x0008 で `0xCB`(CB-prefix)未実装で停止
 
@@ -49,17 +49,18 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 - `MMU#write_u16` / `MMU#read_u16` を追加 — `LD (u16),SP`(0x08)で使用、リトルエンディアン書き込みをカプセル化
 - `MMU#read` / `MMU#write` を **キーワード引数化**(`address:` / `value:`)で誤呼び出しを防止
 - レジスタペア(`bc` / `de` / `hl`)の **getter / setter を Bit モジュール経由**で実装、対称性を確保
+- **PPU クラス**(`app/emulator/ppu.rb`)を新設 — `step(cycles)` で LY を 0→153 まで循環、LCD OFF 中は停止、`render_scanline` のフックは C-2 用に空のまま
 
 ### 次の最短経路
 
 優先順位:
 
-1. **E-2(CB-prefix)を着手** — ブート ROM の **次の 1 命令**で必要、ROADMAP E フェーズの中核
-2. **C-1(PPU LY ティック)** — hello.gb 完走の最後のピース、最小実装で OK
-3. **0xF8 `LD HL,SP+i8` のフラグ計算修正**(現在 H=1, C=1 のハードコード、TODO 残り)
-4. **AND A,r 系**(0xA0〜0xA7, 0xE6)— 論理演算 3 兄弟の最後
-5. **ADD / SUB / ADC / SBC / INC / DEC の 8bit 演算**(`Bit.wrap_u8` + フラグ計算のテンプレが揃ったので量産可能)
-6. **PUSH / POP / CALL / RET / RETI / RST**(スタック系、ブート ROM 後半で必要)
+1. **CALL / RET / PUSH / POP / RETI / RST(スタック系)** — HELLO WORLD の次の壁、ブート ROM 後半でも必要
+2. **E-2(CB-prefix)を着手** — ブート ROM の次の 1 命令で必要、ROADMAP E フェーズの中核
+3. **C-2(BG タイル描画)** — 画面に "Hello World!" を表示するための最後のピース(D-2 と統合可能)
+4. **0xF8 `LD HL,SP+i8` のフラグ計算修正**(現在 H=1, C=1 のハードコード、TODO 残り)
+5. **AND A,r 系**(0xA0〜0xA7, 0xE6)— 論理演算 3 兄弟の最後
+6. **ADD / SUB / ADC / SBC / INC / DEC の 8bit 演算**(`Bit.wrap_u8` + フラグ計算のテンプレが揃ったので量産可能)
 
 ## 進捗チェックリスト
 
@@ -73,7 +74,7 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 - [x] B-2: hello.gb が使う命令一式(~102 オペコード、HELLO WORLD は VBlank 待ちループまで到達。あとは PPU の LY 更新で完走)
 
 ### フェーズ C: PPU 最小実装
-- [ ] C-1: PPU 骨組み(LCDC, LY, モード) ← **HELLO WORLD 完走に必須**
+- [x] C-1: PPU 骨組み(LCDC, LY, モード) — LY ティック動作、HELLO WORLD は VBlank ループを抜けて CALL で停止
 - [ ] C-2: BG タイル描画(SCY=0 固定)
 
 ### フェーズ D: HELLO WORLD 表示
@@ -131,7 +132,7 @@ GEM-BOY/
 │   │   ├── cartridge.rb     # カートリッジ
 │   │   ├── mmu.rb           # メモリ管理 + シリアル出力 + read_u16/write_u16(E-4 でブート ROM mapping 追加)
 │   │   ├── cpu.rb           # CPU(B-1, B-2 完了。E-1 の大半を前倒しで実装済み。E-2 で CB-prefix 追加)
-│   │   ├── ppu.rb           # 描画(C で骨組み + BG タイル、E-3 で SCY スクロール対応)
+│   │   ├── ppu.rb           # 描画(C-1 完了: LY ティック。C-2 で BG タイル、E-3 で SCY スクロール対応)
 │   │   ├── boot_rom.rb      # ブート ROM ローダ(E-4 で作成、任意で別ファイル化)
 │   │   ├── mbc1.rb          # MBC1 バンク切り替え(F-1 で作成)
 │   │   └── emulator.rb      # 統合
@@ -274,11 +275,23 @@ PPU リファレンス:
 - Pan Docs Tile Data: https://gbdev.io/pandocs/Tile_Data.html
 - Pan Docs LCDC: https://gbdev.io/pandocs/LCDC.html
 
-## ステップ C-1: PPU 骨組み(LCDC, LY, モード) (1時間)
+## ステップ C-1: PPU 骨組み(LCDC, LY, モード) (1時間) [完了]
 
 **目標**: PPU が時間経過とともに `LY` をインクリメントし、4 つのモードを遷移するようにする。
 
-> **HELLO WORLD 完走に必須**: B-2 で hello.gb を走らせると `0x0154` の `LD A,(0xFF44); CP 0x90; JR NZ,-7` という VBlank 待ちループで停止する。CPU 側は完全に正しく動作しているので、**残るは LY を更新する PPU だけ**。BG タイル描画(C-2)は後回しで OK — まず LY が 0 → 153 を循環する状態を作れば、CP 0x90 が満たされて hello.gb が次の処理に進める。最小実装(2 日想定の 1 時間)で十分。
+実装内容:
+
+- `app/emulator/ppu.rb` に PPU クラスを新設
+- I/O レジスタ定数(LCDC / STAT / SCY / SCX / LY / LYC / BGP)、画面サイズ定数(SCREEN_WIDTH / SCREEN_HEIGHT)、サイクル定数(CYCLES_PER_SCANLINE=456 / SCANLINES_PER_FRAME=154 / VBLANK_START_LY=144)を定義
+- `step(cycles)` メソッド: CPU の消費サイクルを受け取り、累積が 456 を超えるごとに LY を +1(154 でラップ)、MMU の 0xFF44 に反映
+- `lcd_on?` プライベートメソッド: LCDC bit7 = 0 の間は LY 進行を止める(VRAM クリア中の挙動を再現)
+- `render_scanline` プライベートメソッド: C-2 で実装するためのフック(現在は空)
+- `spec/app/emulator/ppu_spec.rb` で `#initialize` / `#step`(LCD OFF / 1 ライン / VBlank 開始 / 1 フレーム完了 / 小サイクル累積)を 7 ケース検証
+- `spec/app/emulator/cpu_spec.rb` の "HELLO WORLD 完走" 統合テストを更新: PPU を組み込んで LY ティックを CPU の `cpu.run` ループと連動、ブート ROM 終了直後の I/O 初期値(LCDC=0x91, BGP=0xFC)を `mmu.write_io_direct` でセット
+
+結果: **HELLO WORLD は VBlank 待ちループを抜けて初期化処理に進み、PC=0x0177 の `CALL u16`(未実装)で停止**するようになった。CPU と PPU の連動が確認できた。
+
+詳細は `git log` を参照。
 
 ### モード遷移(456 ドット = 1 スキャンライン)
 
