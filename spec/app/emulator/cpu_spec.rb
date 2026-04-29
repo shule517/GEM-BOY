@@ -313,14 +313,69 @@ RSpec.describe CPU do
 
     context 'table[0x21] (LD HL,u16) を呼び出したとき' do
       # lambda は fetch_u8 を 2 回呼ぶ。リトルエンディアンなので
-      # 下位バイト(0x34)が先に L へ、続けて上位バイト(0x12)が H へ入る。
-      let(:bytes) { [0x34, 0x12] }
+      # 下位バイト(L)→ 上位バイト(H)の順に読む。
+      # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html
 
-      it '12 サイクルを返し、L=0x34, H=0x12, PC が 2 進む' do
-        expect(subject[0x21].call).to eq 12
-        expect(cpu.l).to eq 0x34
-        expect(cpu.h).to eq 0x12
-        expect(cpu.pc).to eq 0x0002
+      context 'バイト列が [0x34, 0x12] のとき' do
+        let(:bytes) { [0x34, 0x12] }
+
+        it '12 サイクルを返し、L=0x34, H=0x12, PC が 2 進む' do
+          expect(subject[0x21].call).to eq 12
+          expect(cpu.l).to eq 0x34
+          expect(cpu.h).to eq 0x12
+          expect(cpu.pc).to eq 0x0002
+        end
+      end
+
+      context 'バイト列が [0x00, 0x00] のとき' do
+        # HL=0x0000 の境界値。L/H が両方ゼロにセットされることを確認する。
+        let(:bytes) { [0x00, 0x00] }
+
+        it 'L=0x00, H=0x00, PC が 2 進む' do
+          expect(subject[0x21].call).to eq 12
+          expect(cpu.l).to eq 0x00
+          expect(cpu.h).to eq 0x00
+          expect(cpu.pc).to eq 0x0002
+        end
+      end
+
+      context 'バイト列が [0xFF, 0xFF] のとき' do
+        # HL=0xFFFF の境界値。8bit の最大値が L/H 両方に入る。
+        let(:bytes) { [0xFF, 0xFF] }
+
+        it 'L=0xFF, H=0xFF, PC が 2 進む' do
+          expect(subject[0x21].call).to eq 12
+          expect(cpu.l).to eq 0xFF
+          expect(cpu.h).to eq 0xFF
+          expect(cpu.pc).to eq 0x0002
+        end
+      end
+
+      context 'H/L に既に値が入っているとき' do
+        # LD は宛先を上書きする。事前値が残らないことを確認する。
+        let(:bytes) { [0x34, 0x12] }
+        before do
+          cpu.h = 0xAA
+          cpu.l = 0xBB
+        end
+
+        it 'H/L が新しい値 (H=0x12, L=0x34) で上書きされる' do
+          expect(subject[0x21].call).to eq 12
+          expect(cpu.l).to eq 0x34
+          expect(cpu.h).to eq 0x12
+        end
+      end
+
+      context 'F レジスタに値が入っているとき' do
+        # LD HL,u16 はフラグを一切変更しない命令。
+        # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#ld-r16-n16
+        let(:bytes) { [0x34, 0x12] }
+        before { cpu.f = 0b11110000 } # Z=1, N=1, H=1, C=1
+
+        it 'F レジスタは保持される' do
+          subject[0x21].call
+          expect(cpu.f).to eq 0b11110000
+        end
       end
     end
 

@@ -79,8 +79,8 @@ class CPU
 
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
   def fetch_u8
-    byte = @mmu.read(pc) # PCから1バイト読み込む
-    @pc = wrap_u16(pc + 1) # PCを1つ進める
+    byte = mmu.read(pc) # PCから1バイト読み込む
+    self.pc = wrap_u16(pc + 1) # PCを1つ進める
     byte
   end
 
@@ -116,25 +116,30 @@ class CPU
     self.carry = carry unless carry.nil?                # bit4 Carry
   end
 
-  def zero = @f[7]
-  def negative = @f[6]
-  def half_carry = @f[5]
-  def carry = @f[4]
+  def zero = f[7]
+  def negative = f[6]
+  def half_carry = f[5]
+  def carry = f[4]
 
   def zero=(value)
-    @f = (@f & 0b01111111) | (value ? 1 << 7 : 0) # bit7 Zero
+    self.f = (f & 0b01111111) | (value ? 1 << 7 : 0) # bit7 Zero
   end
 
   def negative=(value)
-    @f = (@f & 0b10111111) | (value ? 1 << 6 : 0) # bit6 Negative (Subtract)
+    self.f = (f & 0b10111111) | (value ? 1 << 6 : 0) # bit6 Negative (Subtract)
   end
 
   def half_carry=(value)
-    @f = (@f & 0b11011111) | (value ? 1 << 5 : 0) # bit5 Half Carry
+    self.f = (f & 0b11011111) | (value ? 1 << 5 : 0) # bit5 Half Carry
   end
 
   def carry=(value)
-    @f = (@f & 0b11101111) | (value ? 1 << 4 : 0) # bit4 Carry
+    self.f = (f & 0b11101111) | (value ? 1 << 4 : 0) # bit4 Carry
+  end
+
+  def hl=(value)
+    self.h = (value & 0b1111111100000000) >> 8
+    self.l = value & 0b0000000011111111
   end
 
   private
@@ -151,7 +156,7 @@ class CPU
     table[0x00] = -> { 4 } # NOP: 何もしない。4サイクル進む。
     # table[0x10] = -> { 4 }  # STOP
     # table[0x76] = -> { 4 }  # HALT
-    table[0xF3] = -> { @ime = false; 4 } # DI: IMEフラグをクリアして割り込みを無効
+    table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグをクリアして割り込みを無効
     # table[0xFB] = -> { 4 }  # EI
     # table[0xCB] = -> { 4 }  # PREFIX CB (CB-prefix命令へ分岐)
 
@@ -249,8 +254,8 @@ class CPU
     # ============================================================
     # 8bit ロード - LD A,(u16) / LD (u16),A (絶対アドレス)
     # ============================================================
-    table[0xEA] = -> { mmu.write(fetch_u16, @a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
-    table[0xFA] = -> { @a = fetch_u16; 16 } # LD A,(u16)
+    table[0xEA] = -> { mmu.write(fetch_u16, a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
+    table[0xFA] = -> { self.a = fetch_u16; 16 } # LD A,(u16)
 
     # ============================================================
     # 8bit ロード - I/O ポート (0xFF00 + offset)
@@ -265,8 +270,9 @@ class CPU
     # ============================================================
     # table[0x01] = -> { 12 } # LD BC,u16
     # table[0x11] = -> { 12 } # LD DE,u16
-    table[0x21] = -> { @l = fetch_u8; @h = fetch_u8; 12 } # LD HL,u16: 8bitをL。8bitをHに設定
-    table[0x31] = -> { @sp = fetch_u16; 12 } # LD SP,u16: 16bitをSPに設定
+    ################# table[0x21] = -> { @l = fetch_u8; @h = fetch_u8; 12 } # LD HL,u16: 8bitをL。8bitをHに設定
+    table[0x21] = -> { self.hl = fetch_u16; 12 } # LD HL,u16: 8bitをL。8bitをHに設定
+    table[0x31] = -> { self.sp = fetch_u16; 12 } # LD SP,u16: 16bitをSPに設定
     # table[0x08] = -> { 20 } # LD (u16),SP
     # table[0xF8] = -> { 12 } # LD HL,SP+i8
     # table[0xF9] = -> { 8 }  # LD SP,HL
@@ -378,7 +384,7 @@ class CPU
     # table[0xAC] = -> { 4 }  # XOR A,H
     # table[0xAD] = -> { 4 }  # XOR A,L
     # table[0xAE] = -> { 8 }  # XOR A,(HL)
-    table[0xAF] = -> { @a = 0; @f = 0b10000000; 4 } # XOR A,A
+    table[0xAF] = -> { self.a = 0; self.f = 0b10000000; 4 } # XOR A,A
     # table[0xEE] = -> { 8 }  # XOR A,u8
 
     # ============================================================
@@ -443,7 +449,7 @@ class CPU
     # ============================================================
     # ジャンプ - JP (絶対ジャンプ)
     # ============================================================
-    table[0xC3] = -> { @pc = fetch_u16; 16 } # JP u16
+    table[0xC3] = -> { self.pc = fetch_u16; 16 } # JP u16
     # table[0xE9] = -> { 4 }  # JP HL
     # table[0xC2] = -> { 16 } # JP NZ,u16 (taken: 16 / not taken: 12)
     # table[0xCA] = -> { 16 } # JP Z,u16  (taken: 16 / not taken: 12)
@@ -459,7 +465,7 @@ class CPU
     table[0x20] = -> do
       offset_i8 = fetch_i8
       if zero == 0
-        @pc = wrap_u16(@pc + offset_i8)
+        self.pc = wrap_u16(pc + offset_i8)
         12 # 分岐成立
       else
         8  # 分岐不成立
