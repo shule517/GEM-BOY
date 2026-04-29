@@ -322,7 +322,7 @@ class CPU
     # ============================================================
     # 8bit 算術 - ADD A
     # ============================================================
-    # table[0x80] = -> { 4 }  # ADD A,B
+    # TODO: 未実装 table[0x80] = -> { self.a = Bit.wrap_u8(a + b); set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # ADD A,B
     # table[0x81] = -> { 4 }  # ADD A,C
     # table[0x82] = -> { 4 }  # ADD A,D
     # table[0x83] = -> { 4 }  # ADD A,E

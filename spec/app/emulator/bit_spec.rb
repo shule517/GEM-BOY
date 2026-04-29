@@ -153,6 +153,65 @@ RSpec.describe Bit do
     end
   end
 
+  describe '.wrap_u8' do
+    # 引数を 8bit にマスクして wrap させる(下位 8bit のみ残す)。
+    # ADD A,B のキャリーアウト、INC r / DEC r のラップなど、
+    # 8bit レジスタの演算結果を正規化するときに使う。
+    subject { Bit.wrap_u8(n) }
+
+    context '0x00 を渡したとき' do
+      let(:n) { 0x00 }
+
+      it '0x00 を返す' do
+        is_expected.to eq 0x00
+      end
+    end
+
+    context '0xFF (8bit の最大値) を渡したとき' do
+      let(:n) { 0xFF }
+
+      it '0xFF をそのまま返す' do
+        is_expected.to eq 0xFF
+      end
+    end
+
+    context '0x100 (8bit を 1 だけ超えた値) を渡したとき' do
+      # A=0xFF + 1 のケース。bit8 を捨てて 0x00 へ wrap する。
+      let(:n) { 0x100 }
+
+      it '0x00 へ wrap する' do
+        is_expected.to eq 0x00
+      end
+    end
+
+    context '0x1FE (上位 bit がはみ出した値) を渡したとき' do
+      # ADD A,r のキャリーアウトを捨てるケース(0xFF + 0xFF)。下位 8bit (0xFE) が残る。
+      let(:n) { 0x1FE }
+
+      it '下位 8bit (0xFE) を返す' do
+        is_expected.to eq 0xFE
+      end
+    end
+
+    context '-1 (負の値) を渡したとき' do
+      # DEC r で 0x00 - 1 のケース。2 の補数で 0xFF として解釈される。
+      let(:n) { -1 }
+
+      it '0xFF へ wrap する' do
+        is_expected.to eq 0xFF
+      end
+    end
+
+    context '-2 (負の値) を渡したとき' do
+      # 0x00 - 2 = -2 → 0xFE。
+      let(:n) { -2 }
+
+      it '0xFE へ wrap する' do
+        is_expected.to eq 0xFE
+      end
+    end
+  end
+
   describe '.wrap_u16' do
     # 引数を 16bit にマスクして wrap させる(下位 16bit のみ残す)。
     # PC の +1 オーバーフロー(0xFFFF→0x0000)、JR の負オフセット、

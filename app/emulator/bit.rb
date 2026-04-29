@@ -33,6 +33,13 @@ module Bit
     (high << 8) | low
   end
 
+  # 8bit にマスクして wrap させる(下位 8bit のみ残す)。
+  # ADD A,B のキャリーアウト、INC r / DEC r のラップなど、
+  # 8bit 演算結果を 8bit レジスタ(A/B/C/D/E/H/L)の範囲に正規化するときに使う。
+  def wrap_u8(n)
+    n & 0xFF
+  end
+
   # 16bit にマスクして wrap させる(下位 16bit のみ残す)。
   # PC の +1 オーバーフロー(0xFFFF→0x0000)、JR の負オフセット、
   # ADD HL,BC のキャリーアウトなど、16bit 演算結果を正規化するときに使う。
