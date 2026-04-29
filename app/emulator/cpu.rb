@@ -121,7 +121,7 @@ class CPU
     table[0xC3] = -> { @pc = fetch_word; 16 } # JP u16
     table[0xF3] = -> { @ime = false; 4 } # DI: IMEフラグをクリアして割り込みを無効
     table[0xFA] = -> { @a = fetch_word; 16 } # LD A,(u16)
-    table[0xFE] = -> { 8 } # CP A,u8 # TODO
+    table[0xFE] = -> { byte = fetch_byte; set_flags(zero: a == byte, negative: true, half_carry: (a & 0x1111) < (byte & 0x1111), carry: a < byte); 8 } # CP A,u8: Compare(比較)
     # table[0xCB] = -> { 4 } # PREFIX CB
     table
   end
