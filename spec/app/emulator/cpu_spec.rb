@@ -86,6 +86,68 @@ RSpec.describe CPU do
     end
   end
 
+  describe '#wrap_u16' do
+    # 引数を 16bit にマスクして wrap させる(下位 16bit のみ残す)。
+    # PC の +1 オーバーフロー(0xFFFF→0x0000)、JR の負オフセット、
+    # ADD HL,BC のキャリーアウトなど、16bit 演算結果を正規化するときに使う。
+    subject { cpu.wrap_u16(n) }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context '0x0000 を渡したとき' do
+      let(:n) { 0x0000 }
+
+      it '0x0000 を返す' do
+        is_expected.to eq 0x0000
+      end
+    end
+
+    context '0xFFFF (16bit の最大値) を渡したとき' do
+      let(:n) { 0xFFFF }
+
+      it '0xFFFF をそのまま返す' do
+        is_expected.to eq 0xFFFF
+      end
+    end
+
+    context '0x10000 (16bit を 1 だけ超えた値) を渡したとき' do
+      # PC=0xFFFF + 1 のケース。bit16 を捨てて 0x0000 へ wrap する。
+      let(:n) { 0x10000 }
+
+      it '0x0000 へ wrap する' do
+        is_expected.to eq 0x0000
+      end
+    end
+
+    context '0x12345 (上位 bit がはみ出した値) を渡したとき' do
+      # ADD HL,BC のキャリーアウトを捨てるケース。下位 16bit (0x2345) が残る。
+      let(:n) { 0x12345 }
+
+      it '下位 16bit (0x2345) を返す' do
+        is_expected.to eq 0x2345
+      end
+    end
+
+    context '-1 (負の値) を渡したとき' do
+      # JR で PC=0x0000 から逆方向にジャンプしたケース。
+      # 2 の補数で 0xFFFF として解釈される。
+      let(:n) { -1 }
+
+      it '0xFFFF へ wrap する' do
+        is_expected.to eq 0xFFFF
+      end
+    end
+
+    context '-2 (負の値) を渡したとき' do
+      # 0x0000 - 2 = -2 → 0xFFFE。
+      let(:n) { -2 }
+
+      it '0xFFFE へ wrap する' do
+        is_expected.to eq 0xFFFE
+      end
+    end
+  end
+
   describe '#fetch_i8' do
     # PC が指す 1 バイトを符号付き(-128〜+127)として読む private ヘルパ。
     # 2 の補数表現: bit7 が 1 の値(0x80〜0xFF)を負数として解釈する。
@@ -313,7 +375,7 @@ RSpec.describe CPU do
       # 上限 1,000,000 T-cycle まで run を繰り返し、HALT 命令で halted=true になるか確認する。
       # HALT(0x76)は 1 バイト命令なので、実行後 PC は次のバイト(0x01B9)を指している。
       elapsed = 0
-      elapsed += cpu.run(1000) until cpu.halted || elapsed >= 1_000_000
+      elapsed += cpu.run(1000) until cpu.halted || elapsed >= 1_000
 
       expect(cpu.halted).to eq true
       expect(cpu.pc).to eq 0x01B9

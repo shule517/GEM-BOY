@@ -80,8 +80,13 @@ class CPU
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
   def fetch_u8
     byte = @mmu.read(pc) # PCから1バイト読み込む
-    @pc = (pc + 1) & 0xFFFF # PCを1つ進める。16bit(0xFFFF)を超えたら0に戻る。
+    @pc = wrap_u16(pc + 1) # PCを1つ進める
     byte
+  end
+
+  # 16bit(0xFFFF)を超えたら0に戻る
+  def wrap_u16(n)
+    n & 0xFFFF
   end
 
   # PC が指す 2バイトをリトルエンディアンで読む(下位バイトが先)。
@@ -105,10 +110,31 @@ class CPU
   # 引数名は gbops 表記に揃えている(`negative` は Pan Docs 正式名では Subtract フラグ)。
   # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#the-flags-register-lower-8-bits-of-af-register
   def set_flags(zero: nil, negative: nil, half_carry: nil, carry: nil)
-    @f = (@f & 0b01111111) | (zero       ? 1 << 7 : 0) unless zero.nil?        # bit7 Zero
-    @f = (@f & 0b10111111) | (negative   ? 1 << 6 : 0) unless negative.nil?    # bit6 Negative (Subtract)
-    @f = (@f & 0b11011111) | (half_carry ? 1 << 5 : 0) unless half_carry.nil?  # bit5 Half Carry
-    @f = (@f & 0b11101111) | (carry      ? 1 << 4 : 0) unless carry.nil?       # bit4 Carry
+    self.zero = zero unless zero.nil?                   # bit7 Zero
+    self.negative = negative unless negative.nil?       # bit6 Negative (Subtract)
+    self.half_carry = half_carry unless half_carry.nil? # bit5 Half Carry
+    self.carry = carry unless carry.nil?                # bit4 Carry
+  end
+
+  def zero = @f[7]
+  def negative = @f[6]
+  def half_carry = @f[5]
+  def carry = @f[4]
+
+  def zero=(value)
+    @f = (@f & 0b01111111) | (value ? 1 << 7 : 0) # bit7 Zero
+  end
+
+  def negative=(value)
+    @f = (@f & 0b10111111) | (value ? 1 << 6 : 0) # bit6 Negative (Subtract)
+  end
+
+  def half_carry=(value)
+    @f = (@f & 0b11011111) | (value ? 1 << 5 : 0) # bit5 Half Carry
+  end
+
+  def carry=(value)
+    @f = (@f & 0b11101111) | (value ? 1 << 4 : 0) # bit4 Carry
   end
 
   private
@@ -431,9 +457,9 @@ class CPU
     # JR NZ,i8: Z フラグが 0 のとき、JR命令直後のアドレスから符号付き8bit分だけPCを動かす
     # fetch_i8 を先に呼ぶことで、PC が「次の命令の先頭」を指した状態でオフセット加算する
     table[0x20] = -> do
-      offset = fetch_i8
-      if (@f & 0b10000000).zero? # Z フラグ(bit7) == 0 ?
-        @pc = (@pc + offset) & 0xFFFF
+      offset_i8 = fetch_i8
+      if zero == 0
+        @pc = wrap_u16(@pc + offset_i8)
         12 # 分岐成立
       else
         8  # 分岐不成立
