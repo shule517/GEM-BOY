@@ -99,10 +99,10 @@ class CPU
   # 引数名は gbops 表記に揃えている(`negative` は Pan Docs 正式名では Subtract フラグ)。
   # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#the-flags-register-lower-8-bits-of-af-register
   def set_flags(zero: nil, negative: nil, half_carry: nil, carry: nil)
-    @f = (@f & 0b01111111) | (zero       ? 0b10000000 : 0) unless zero.nil?        # bit7 Zero
-    @f = (@f & 0b10111111) | (negative   ? 0b01000000 : 0) unless negative.nil?    # bit6 Negative (Subtract)
-    @f = (@f & 0b11011111) | (half_carry ? 0b00100000 : 0) unless half_carry.nil?  # bit5 Half Carry
-    @f = (@f & 0b11101111) | (carry      ? 0b00010000 : 0) unless carry.nil?       # bit4 Carry
+    @f = (@f & 0b01111111) | (zero       ? 1 << 7 : 0) unless zero.nil?        # bit7 Zero
+    @f = (@f & 0b10111111) | (negative   ? 1 << 6 : 0) unless negative.nil?    # bit6 Negative (Subtract)
+    @f = (@f & 0b11011111) | (half_carry ? 1 << 5 : 0) unless half_carry.nil?  # bit5 Half Carry
+    @f = (@f & 0b11101111) | (carry      ? 1 << 4 : 0) unless carry.nil?       # bit4 Carry
   end
 
   # opcodeテーブル
