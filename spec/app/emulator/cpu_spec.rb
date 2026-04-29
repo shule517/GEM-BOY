@@ -182,6 +182,68 @@ RSpec.describe CPU do
     end
   end
 
+  describe '#make_u16' do
+    # 上位 8bit + 下位 8bit を 16bit に合成する。high_byte / low_byte の逆操作。
+    subject { cpu.make_u16(high: high, low: low) }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context '高位バイトに 0x12、低位バイトに 0x34 を渡したとき' do
+      let(:high) { 0x12 }
+      let(:low)  { 0x34 }
+
+      it '0x1234 を返す' do
+        is_expected.to eq 0x1234
+      end
+    end
+
+    context '両方 0x00 を渡したとき' do
+      let(:high) { 0x00 }
+      let(:low)  { 0x00 }
+
+      it '0x0000 を返す' do
+        is_expected.to eq 0x0000
+      end
+    end
+
+    context '両方 0xFF を渡したとき' do
+      let(:high) { 0xFF }
+      let(:low)  { 0xFF }
+
+      it '0xFFFF を返す' do
+        is_expected.to eq 0xFFFF
+      end
+    end
+
+    context '高位バイトが 0x00、低位バイトが 0xFF のとき' do
+      let(:high) { 0x00 }
+      let(:low)  { 0xFF }
+
+      it '0x00FF を返す' do
+        is_expected.to eq 0x00FF
+      end
+    end
+
+    context '高位バイトが 0xFF、低位バイトが 0x00 のとき' do
+      let(:high) { 0xFF }
+      let(:low)  { 0x00 }
+
+      it '0xFF00 を返す' do
+        is_expected.to eq 0xFF00
+      end
+    end
+
+    context 'high_byte / low_byte と組み合わせたとき' do
+      # 16bit 値を一度バラして再合成すると元に戻ること(逆操作の確認)
+      let(:high) { cpu.high_byte(0xABCD) }
+      let(:low)  { cpu.low_byte(0xABCD) }
+
+      it '元の 16bit 値に戻る (0xABCD)' do
+        is_expected.to eq 0xABCD
+      end
+    end
+  end
+
   describe '#wrap_u16' do
     # 引数を 16bit にマスクして wrap させる(下位 16bit のみ残す)。
     # PC の +1 オーバーフロー(0xFFFF→0x0000)、JR の負オフセット、

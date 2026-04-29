@@ -91,6 +91,14 @@ class CPU
     value & 0x00FF
   end
 
+  # 上位 8bit + 下位 8bit を 16bit に合成する。high_byte / low_byte の逆操作。
+  # 例: make_u16(0x12, 0x34) #=> 0x1234
+  # レジスタペア getter(bc, de, hl)や、リトルエンディアンで読んだ 2 バイトを
+  # 16bit に組み立てる場面で使う。
+  def make_u16(high:, low:)
+    (high << 8) | low
+  end
+
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
   def fetch_u8
     byte = mmu.read(pc) # PCから1バイト読み込む
@@ -108,9 +116,9 @@ class CPU
   # PC が指す 2バイトをリトルエンディアンで読む(下位バイトが先)。
   # Game Boy のメモリレイアウトはリトルエンディアン(https://gbdev.io/pandocs/CPU_Instruction_Set.html)
   def fetch_u16
-    lo = fetch_u8
-    hi = fetch_u8
-    (hi << 8) | lo
+    low = fetch_u8
+    high = fetch_u8
+    make_u16(high: high, low: low)
   end
 
   # PC が指す 1バイトを符号付き(-128〜+127)として読む。JR i8 や ADD SP,i8 で使う。
