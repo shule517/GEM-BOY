@@ -8,15 +8,15 @@ DragonRuby Game Toolkit 上で動く Ruby 製 Game Boy (DMG) エミュレータ�
 
 ## 開発戦略
 
-**Nintendo ロゴ表示を中心目標に置き、Blargg は診断ツールとして使う**。CPU 必要命令と PPU 最小実装ができたらブート ROM を仮接続し、画面に何かが出るところまで一気に進める。崩れた表示が出たら Blargg 個別 ROM を症状ごとに走らせて診断する流れ。「Blargg を全 Pass させてから先に進む」旧戦略は採らない(進捗が見えない時間が長すぎるため)。
+**3 段マイルストーンを最短経路で順番に達成する**。HELLO WORLD → Nintendo ロゴ → tobu.gb タイトルの順で並べ、それぞれを最短で動かす。各段階で動作確認済みのコンポーネント(PPU、CPU 命令、MMU など)が増えていくので、後段ほどデバッグ時の切り分けが楽になる。「Blargg を全 Pass させてから先に進む」旧戦略は採らない(進捗が見えない時間が長すぎるため)。Blargg は Nintendo ロゴ挑戦時(E-6)に**症状ごとの診断ツール**として必要分だけ使う。
 
-詳細なステップ分解は `docs/ROADMAP.md` を参照(18ステップ / 17.5〜26.5時間)。
+詳細なステップ分解は `docs/ROADMAP.md` を参照(22 ステップ / 17.5〜27時間)。
 
 ## 三段マイルストーン
 
-1. **崩れた Nintendo ロゴ**(フェーズ D-2 完了): エミュレータが画面に何かを描いた瞬間。CPU と PPU が連動して動いた証拠
-2. **正しい Nintendo ロゴ**(フェーズ D-4 完了): スクロールイン。ブート ROM が完走した証拠(D-5 でブートチャイムも追加)
-3. **tobu.gb タイトル画面**(フェーズ E-5 完了): 実ゲームが起動。MBC1 + スプライト + 入力が揃った証拠
+1. **HELLO WORLD 表示**(フェーズ D-2 完了): 画面に文字が出た瞬間。CPU 基本命令と PPU が連動して動いた証拠。skip_boot で `hello.gb` を起動し、PPU が信頼できる状態になる
+2. **Nintendo ロゴ表示**(フェーズ E-7 完了): スクロールインのロゴ。**ブート ROM 完走** = CPU + MMU + PPU + フラグ計算 + CB-prefix が全部揃った証拠(E-8 でブートチャイム追加)
+3. **tobu.gb タイトル画面**(フェーズ F-5 完了): 実ゲームが起動。MBC1 + スプライト + 入力 + タイマーが揃った証拠
 
 ## ディレクトリ構造(最終形)
 
@@ -26,11 +26,11 @@ GEM-BOY/
 │   ├── main.rb              # DragonRuby tick エントリ / 画面描画 / 入力(args 依存はここだけ)
 │   ├── emulator/            # 純 Ruby のエミュレータコア(args 非依存、MRI Ruby + RSpec でテスト可能)
 │   │   ├── cartridge.rb     # カートリッジ
-│   │   ├── mmu.rb           # メモリ管理 + シリアル出力
-│   │   ├── cpu.rb           # CPU(フェーズBで追加)
-│   │   ├── ppu.rb           # 描画(フェーズCで追加)
-│   │   ├── boot_rom.rb      # ブートROM(フェーズDで追加)
-│   │   ├── mbc1.rb          # MBC1 バンク切り替え(フェーズEで追加)
+│   │   ├── mmu.rb           # メモリ管理 + シリアル出力(E-4 でブートROM mapping 追加)
+│   │   ├── cpu.rb           # CPU(B で hello.gb 用、E-1/E-2 でブートROM 用に拡充)
+│   │   ├── ppu.rb           # 描画(C で骨組み + BG タイル、E-3 で SCY スクロール対応)
+│   │   ├── boot_rom.rb      # ブートROM ローダ(E-4 で作成、任意で別ファイル化)
+│   │   ├── mbc1.rb          # MBC1 バンク切り替え(F-1 で作成)
 │   │   └── emulator.rb      # CPU/MMU/PPU の統合
 │   └── core_ext/            # ビルトインクラスへの拡張(blank?, present?, String#last など)
 │       ├── blank.rb         # Object#blank? / #present?, String#blank? など
@@ -38,14 +38,14 @@ GEM-BOY/
 ├── data/
 │   ├── tobu.gb              # 動作確認用 ROM(フェーズEのタイトル画面で使用)
 │   ├── cpu_instrs/          # Blargg 個別 ROM(オリジナル配布構造のまま)
-│   │   ├── 06-ld r,r.gb     # D-3a で使用
-│   │   ├── 05-op rp.gb      # D-3b
-│   │   ├── 04-op r,imm.gb   # D-3c
-│   │   ├── 11-op a,(hl).gb  # D-3d
+│   │   ├── 06-ld r,r.gb     # E-6a で使用(条件付き)
+│   │   ├── 05-op rp.gb      # E-6b
+│   │   ├── 04-op r,imm.gb   # E-6c
+│   │   ├── 11-op a,(hl).gb  # E-6d
 │   │   └── ... (他 7 個は完走後の追加検証用)
-│   ├── hello.gb             # HelloWorld(付録、ROADMAP本流では未使用)
-│   ├── dmg_boot.bin         # SameBoot等の互換ブートROM(フェーズDで使用)
-│   └── game-boy-startup.wav # ブートチャイム(D-5 で再生)
+│   ├── hello.gb             # HelloWorld(フェーズ D で使用、第一マイルストーン)
+│   ├── dmg_boot.bin         # SameBoot等の互換ブートROM(フェーズ E で使用、第二マイルストーン)
+│   └── game-boy-startup.wav # ブートチャイム(E-8 で再生)
 ├── spec/                    # RSpec(MRI Ruby で実行)
 └── docs/                    # ROADMAP.md, CONVENTIONS.md など
 ```
@@ -60,18 +60,18 @@ GEM-BOY/
 
 ROADMAP 完走に必須のもの:
 
-- **Blargg 個別 ROM**(フェーズ D-3 診断ループ): https://github.com/retrio/gb-test-roms — `cpu_instrs/individual/` をそのまま `data/cpu_instrs/` に置く。`cpu_instrs.gb` 単体は MBC を使うのでまだ動かない。実際に使うのは `06-ld r,r.gb` (D-3a), `05-op rp.gb` (D-3b), `04-op r,imm.gb` (D-3c), `11-op a,(hl).gb` (D-3d) の 4 個
-- **ブートROM**(フェーズ D): SameBoy リリース版に同梱の `dmg_boot.bin`(SameBoot 互換実装)を `data/dmg_boot.bin` に配置。256 バイト。取得手順:
+- **HelloWorld**(フェーズ D, **第一マイルストーン**): https://github.com/gitendo/helloworld の DMG 用 `hello.gb` を `data/hello.gb` に配置。skip_boot で起動して画面に "Hello World!" を出す。CPU 基本命令 + PPU が動いた最初の証拠
+- **ブートROM**(フェーズ E, **第二マイルストーン**): SameBoy リリース版に同梱の `dmg_boot.bin`(SameBoot 互換実装)を `data/dmg_boot.bin` に配置。256 バイト。取得手順:
   ```bash
   curl -L -o /tmp/sameboy.zip https://github.com/LIJI32/SameBoy/releases/download/v1.0.3/sameboy_cocoa_v1.0.3.zip
   unzip -p /tmp/sameboy.zip 'SameBoy.app/Contents/Resources/dmg_boot.bin' > data/dmg_boot.bin
   ```
   検証用 SHA256: `6f64da4cecd7e54e2f928eb3e3ba7810a7a567d0d247cc71737d1771e073a916`(SameBoy v1.0.3 / SameBoot)。バージョンを上げる場合は SHA256 が変わるので留意
-- **ブートチャイム WAV**(フェーズ D-5): `data/game-boy-startup.wav`。APU 本体は実装せず、ブート ROM が NR14(0xFF14)の trigger bit に書き込んだ瞬間にこの WAV を再生して演出代替する
+- **Blargg 個別 ROM**(フェーズ E-6 診断ループ、条件付き): https://github.com/retrio/gb-test-roms — `cpu_instrs/individual/` をそのまま `data/cpu_instrs/` に置く。`cpu_instrs.gb` 単体は MBC を使うのでまだ動かない。実際に使うのは `06-ld r,r.gb` (E-6a), `05-op rp.gb` (E-6b), `04-op r,imm.gb` (E-6c), `11-op a,(hl).gb` (E-6d) の 4 個。ロゴが崩れて出たときだけ使う
+- **ブートチャイム WAV**(フェーズ E-8): `data/game-boy-startup.wav`。APU 本体は実装せず、ブート ROM が NR14(0xFF14)の trigger bit に書き込んだ瞬間にこの WAV を再生して演出代替する
 
 ROADMAP 外の任意の追加検証用(完走後に正確性を上げたいとき):
 
-- **HelloWorld**: https://github.com/gitendo/helloworld の DMG 用 `hello.gb`。旧 ROADMAP では D-3 として必須だったが、Nintendo ロゴ表示が同じ役割を果たすので新方針では付録扱い
 - **dmg-acid2.gb**: https://github.com/mattcurrie/dmg-acid2/releases — PPU の 1px 精度テスト
 - **Mooneye Test Suite**: https://gekkio.fi/files/mooneye-test-suite/ — MBC やタイミングの精密テスト
 - **instr_timing.gb**: 上記 retrio/gb-test-roms 配下 — 命令サイクル数の検証

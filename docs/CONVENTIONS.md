@@ -1,5 +1,25 @@
 # コーディング規約
 
+## 命名
+
+- **変数名は略さない**。`c` / `mmu_` / `tmp` のような短縮形を使わず、対象を素直に表す名前(`cpu` / `mmu` / `byte` など)で書く。読み手が省略の意図を毎回推測する手間を省き、grep もしやすくするため。`let(:cpu)` の中で同名のローカル変数 `cpu` を作って組み立て直すパターンも OK(let が最終戻り値で memoize される)
+  ```ruby
+  # bad
+  let(:cpu) do
+    c = described_class.new(mmu)
+    c.a = 0x01
+    c
+  end
+
+  # good
+  let(:cpu) do
+    cpu = described_class.new(mmu)
+    cpu.a = 0x01
+    cpu
+  end
+  ```
+  ループカウンタの `i` / `j` や、引数として明らかな `e`(rescue の例外)程度の慣用は許容するが、ドメイン上意味のある変数(CPU、MMU、register、address など)は必ずフルネームで書く
+
 ## 言語・コメント
 
 - **コメント・テストの説明文(`it` / `describe` / `context`)は日本語で書く**
