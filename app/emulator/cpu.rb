@@ -61,7 +61,7 @@ class CPU
   def step
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
 
-    opcode = fetch_byte
+    opcode = fetch_u8
     puts "opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} at PC=0x#{((pc - 1) & 0xFFFF).to_s(16).rjust(4, '0').upcase}"
     handler = opcodes[opcode]
     raise "Unimplemented opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} at PC=0x#{((pc - 1) & 0xFFFF).to_s(16).rjust(4, '0').upcase}" if handler.nil?
@@ -80,7 +80,7 @@ class CPU
   private
 
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
-  def fetch_byte
+  def fetch_u8
     byte = @mmu.read(pc) # PCから1バイト読み込む
     @pc = (pc + 1) & 0xFFFF # PCを1つ進める。16bit(0xFFFF)を超えたら0に戻る。
     byte
@@ -88,9 +88,9 @@ class CPU
 
   # PC が指す 2バイトをリトルエンディアンで読む(下位バイトが先)。
   # Game Boy のメモリレイアウトはリトルエンディアン(https://gbdev.io/pandocs/CPU_Instruction_Set.html)
-  def fetch_word
-    lo = fetch_byte
-    hi = fetch_byte
+  def fetch_u16
+    lo = fetch_u8
+    hi = fetch_u8
     (hi << 8) | lo
   end
 
@@ -215,8 +215,8 @@ class CPU
     # ============================================================
     # 8bit ロード - LD A,(u16) / LD (u16),A (絶対アドレス)
     # ============================================================
-    # table[0xEA] = -> { 16 } # LD (u16),A
-    table[0xFA] = -> { @a = fetch_word; 16 } # LD A,(u16)
+    table[0xEA] = -> { mmu.write(fetch_u16, @a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
+    table[0xFA] = -> { @a = fetch_u16; 16 } # LD A,(u16)
 
     # ============================================================
     # 8bit ロード - I/O ポート (0xFF00 + offset)
@@ -231,8 +231,8 @@ class CPU
     # ============================================================
     # table[0x01] = -> { 12 } # LD BC,u16
     # table[0x11] = -> { 12 } # LD DE,u16
-    table[0x21] = -> { @l = fetch_byte; @h = fetch_byte; 12 } # LD HL,u16: 8bitをL。8bitをHに設定
-    table[0x31] = -> { @sp = fetch_word; 12 } # LD SP,u16: 16bitをSPに設定
+    table[0x21] = -> { @l = fetch_u8; @h = fetch_u8; 12 } # LD HL,u16: 8bitをL。8bitをHに設定
+    table[0x31] = -> { @sp = fetch_u16; 12 } # LD SP,u16: 16bitをSPに設定
     # table[0x08] = -> { 20 } # LD (u16),SP
     # table[0xF8] = -> { 12 } # LD HL,SP+i8
     # table[0xF9] = -> { 8 }  # LD SP,HL
@@ -371,7 +371,7 @@ class CPU
     # table[0xBD] = -> { 4 }  # CP A,L
     # table[0xBE] = -> { 8 }  # CP A,(HL)
     # table[0xBF] = -> { 4 }  # CP A,A
-    table[0xFE] = -> { byte = fetch_byte; set_flags(zero: a == byte, negative: true, half_carry: (a & 0x1111) < (byte & 0x1111), carry: a < byte); 8 } # CP A,u8: Compare(比較)
+    table[0xFE] = -> { byte = fetch_u8; set_flags(zero: a == byte, negative: true, half_carry: (a & 0x1111) < (byte & 0x1111), carry: a < byte); 8 } # CP A,u8: Compare(比較)
 
     # ============================================================
     # 16bit 算術 - ADD HL / INC rr / DEC rr / ADD SP,i8
@@ -409,7 +409,7 @@ class CPU
     # ============================================================
     # ジャンプ - JP (絶対ジャンプ)
     # ============================================================
-    table[0xC3] = -> { @pc = fetch_word; 16 } # JP u16
+    table[0xC3] = -> { @pc = fetch_u16; 16 } # JP u16
     # table[0xE9] = -> { 4 }  # JP HL
     # table[0xC2] = -> { 16 } # JP NZ,u16 (taken: 16 / not taken: 12)
     # table[0xCA] = -> { 16 } # JP Z,u16  (taken: 16 / not taken: 12)

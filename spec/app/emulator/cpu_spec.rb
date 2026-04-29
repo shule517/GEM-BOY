@@ -38,7 +38,7 @@ RSpec.describe CPU do
       # NOP (0x00) で dispatch の最小動作だけを検証する。
       let(:bytes) { [0x00] }
 
-      it 'fetch_byte で PC を 1 進めて 4 サイクルを返す' do
+      it 'fetch_u8 で PC を 1 進めて 4 サイクルを返す' do
         is_expected.to eq 4
         expect(cpu.pc).to eq 0x0001
       end
@@ -151,7 +151,7 @@ RSpec.describe CPU do
   describe '#build_opcode_table' do
     # build_opcode_table が返すテーブル(initialize から呼ばれて cpu.opcodes に格納される)を
     # 取り出し、各 opcode の lambda を直接呼んで振る舞いを検証する。
-    # step が消費するオペコード分の fetch_byte は通っていない状態で lambda を呼ぶので、
+    # step が消費するオペコード分の fetch_u8 は通っていない状態で lambda を呼ぶので、
     # 即値オペランドは PC=0x0000 から読まれる点に注意。
     subject { cpu.opcodes }
     let(:cpu) { described_class.new(mmu) }
@@ -171,7 +171,7 @@ RSpec.describe CPU do
     end
 
     context 'table[0x21] (LD HL,u16) を呼び出したとき' do
-      # lambda は fetch_byte を 2 回呼ぶ。リトルエンディアンなので
+      # lambda は fetch_u8 を 2 回呼ぶ。リトルエンディアンなので
       # 下位バイト(0x34)が先に L へ、続けて上位バイト(0x12)が H へ入る。
       let(:bytes) { [0x34, 0x12] }
 
@@ -184,7 +184,7 @@ RSpec.describe CPU do
     end
 
     context 'table[0x31] (LD SP,u16) を呼び出したとき' do
-      # fetch_word はリトルエンディアン(下位バイト → 上位バイトの順に読む)で 16bit を組み立てる。
+      # fetch_u16 はリトルエンディアン(下位バイト → 上位バイトの順に読む)で 16bit を組み立てる。
       # bytes = [0x34, 0x12] → SP = 0x1234
       let(:bytes) { [0x34, 0x12] }
 
