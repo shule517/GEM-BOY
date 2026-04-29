@@ -94,6 +94,14 @@ class CPU
     (hi << 8) | lo
   end
 
+  # PC が指す 1バイトを符号付き(-128〜+127)として読む。JR i8 や ADD SP,i8 で使う。
+  # 2の補数表現: bit7 が 1 の値(0x80〜0xFF)を負数として解釈する。
+  def fetch_i8
+    byte = fetch_u8
+    byte -= 256 if byte[7] == 1
+    byte
+  end
+
   # F レジスタ(bit7=Z, bit6=N, bit5=H, bit4=C、下位 4bit は常に 0)の各ビットを更新する。
   # true なら 1、false なら 0に変更する。
   # 引数名は gbops 表記に揃えている(`negative` は Pan Docs 正式名では Subtract フラグ)。
@@ -420,7 +428,17 @@ class CPU
     # ジャンプ - JR (相対ジャンプ)
     # ============================================================
     # table[0x18] = -> { 12 } # JR i8
-    # table[0x20] = -> { 12 } # JR NZ,i8 (taken: 12 / not taken: 8)
+    # JR NZ,i8: Z フラグが 0 のとき、JR命令直後のアドレスから符号付き8bit分だけPCを動かす
+    # fetch_i8 を先に呼ぶことで、PC が「次の命令の先頭」を指した状態でオフセット加算する
+    table[0x20] = lambda do
+      offset = fetch_i8
+      if (@f & 0b10000000).zero? # Z フラグ(bit7) == 0 ?
+        @pc = (@pc + offset) & 0xFFFF
+        12 # 分岐成立
+      else
+        8  # 分岐不成立
+      end
+    end
     # table[0x28] = -> { 12 } # JR Z,i8  (taken: 12 / not taken: 8)
     # table[0x30] = -> { 12 } # JR NC,i8 (taken: 12 / not taken: 8)
     # table[0x38] = -> { 12 } # JR C,i8  (taken: 12 / not taken: 8)

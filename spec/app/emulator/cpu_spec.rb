@@ -86,6 +86,85 @@ RSpec.describe CPU do
     end
   end
 
+  describe '#fetch_i8' do
+    # PC が指す 1 バイトを符号付き(-128〜+127)として読む private ヘルパ。
+    # 2 の補数表現: bit7 が 1 の値(0x80〜0xFF)を負数として解釈する。
+    # JR i8 / ADD SP,i8 / LD HL,SP+i8 で使う。
+    subject { cpu.send(:fetch_i8) }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
+    let(:rom_data) do
+      data = Array.new(0x8000, 0)
+      bytes.each_with_index { |b, i| data[i] = b }
+      data
+    end
+
+    context 'PC が指すバイトが 0x00 のとき' do
+      let(:bytes) { [0x00] }
+
+      it '0 を返し PC が 1 進む' do
+        is_expected.to eq 0
+        expect(cpu.pc).to eq 0x0001
+      end
+    end
+
+    context 'PC が指すバイトが 0x7F (正の最大値) のとき' do
+      let(:bytes) { [0x7F] }
+
+      it '+127 を返し PC が 1 進む' do
+        is_expected.to eq 127
+        expect(cpu.pc).to eq 0x0001
+      end
+    end
+
+    context 'PC が指すバイトが 0x80 (負の最小値) のとき' do
+      # bit7 = 1 の境界値。0x80 - 256 = -128。
+      let(:bytes) { [0x80] }
+
+      it '-128 を返し PC が 1 進む' do
+        is_expected.to eq(-128)
+        expect(cpu.pc).to eq 0x0001
+      end
+    end
+
+    context 'PC が指すバイトが 0xFF のとき' do
+      # 0xFF - 256 = -1。JR -1 で 1 バイト戻るパターンの典型値。
+      let(:bytes) { [0xFF] }
+
+      it '-1 を返し PC が 1 進む' do
+        is_expected.to eq(-1)
+        expect(cpu.pc).to eq 0x0001
+      end
+    end
+
+    context 'PC が指すバイトが 0xFE のとき' do
+      # 0xFE - 256 = -2。`JR -2` の無限ループで踏むパターン。
+      let(:bytes) { [0xFE] }
+
+      it '-2 を返し PC が 1 進む' do
+        is_expected.to eq(-2)
+        expect(cpu.pc).to eq 0x0001
+      end
+    end
+
+    context 'PC が 0xFFFF を指していて 0xFF を読むとき' do
+      # PC=0xFFFF で fetch すると、PC が +1 で 0x0000 へラップする。
+      # 値の符号解釈とは独立したラップ挙動を確認する。
+      let(:bytes) { [0x00] }
+      before do
+        cpu.pc = 0xFFFF
+        # 0xFFFF は ROM 範囲外なので MMU.write で直接書ける場所ではない。
+        # ここでは PC ラップだけ確認したいので、MMU が 0xFFFF をどう読むかに依存しない
+        # アサーション (PC が 0x0000 になる) のみ行う。
+      end
+
+      it 'PC は 0x0000 へラップする' do
+        subject
+        expect(cpu.pc).to eq 0x0000
+      end
+    end
+  end
+
   describe '#set_flags' do
     # F レジスタの bit7=Z, bit6=N, bit5=H, bit4=C を引数で更新する private ヘルパ。
     # 引数を渡したビットだけ書き換え、省略したビットは現状を保持する。
