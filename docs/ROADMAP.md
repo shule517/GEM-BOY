@@ -21,19 +21,45 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 | フェーズ | 内容 | 想定時間 | 到達点 | 進捗 |
 |---|---|---|---|---|
 | A. 土台 | Cartridge + MMU 骨組み + シリアル出力 | 3〜4h | ROM が読める、シリアル出力動く | 3/3 [完了] |
-| B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 1/2(B-2 進行中: 10 オペコード実装、hello.gb が VBlank 待ちループまで到達) |
-| C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 0/2(B-2 完走の前提として **C-1 を先行着手**する必要あり) |
+| B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 2/2(B-2 ほぼ完了: ~102 オペコード実装、ブート ROM が CB-prefix まで到達)|
+| C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 0/2(HELLO WORLD 完走には **C-1 着手が必須**)|
 | D. HELLO WORLD 表示 | skip_boot 起動 + 画面確認 | 1h | **画面に "Hello World!" 表示** ★第一 | 0/2 |
-| E. Nintendo ロゴ表示 | ブート ROM 用追加命令 + CB-prefix + ブート ROM mapping + スクロール + チャイム | 3〜7h | **正しい Nintendo ロゴ + ブートチャイム** ★第二 | 0/8 |
+| E. Nintendo ロゴ表示 | ブート ROM 用追加命令 + CB-prefix + ブート ROM mapping + スクロール + チャイム | 3〜7h | **正しい Nintendo ロゴ + ブートチャイム** ★第二 | 0/8(E-1 ぶんは B-2 で前倒し済み、**E-2 CB-prefix が次の壁**)|
 | F. tobu.gb タイトル | MBC1 + スプライト + 入力 + タイマー | 6.5〜10h | **tobu.gb タイトル表示** ★第三 | 0/5 |
 
-合計 22 ステップ、想定 17.5〜27h。**現在 4 ステップ完了(フェーズ A 完走 + B-1 完了)、B-2 進行中**。
+合計 22 ステップ、想定 17.5〜27h。**現在 5 ステップ完了(フェーズ A 完走 + B-1, B-2 ほぼ完了)**。
 
-### 進行中の発見
+### 進行中の発見(2026-04-30 時点)
 
-hello.gb 完走 RSpec を走らせたところ、`0x0100 → 0x0101(JP) → 0x0150(DI) → 0x0151(LD SP) → 0x0154-0x0159` まで進み、**VBlank 待ちループで停止**することが判明。具体的には `LD A,(0xFF44); CP 0x90; JR NZ,-7`(LY が VBlank ライン 144 になるまで待つ典型パターン)。
+#### 1. CPU は ~102 オペコード実装、統合テスト 138/140 pass
 
-つまり **B-2 で命令を増やしただけでは hello.gb は完走しない**。LY (0xFF44) を進める PPU が必要なので、本来 D-2 で必要な C-1 を **B-2 と並行で前倒し**するのが最短経路。
+**論理演算系 / 比較系 / 8bit ロード r,r' / 16bit ロード / I/O ロード / レジスタペア間接 / 一部ジャンプ系**まで完成。残り 2 件のテスト失敗は次の通り。
+
+#### 2. HELLO WORLD: VBlank 待ちループで停止(PPU 未実装)
+
+`spec` の "HELLO WORLD 完走" は依然として VBlank 待ちで足踏み。`LD A,(0xFF44); CP 0x90; JR NZ,-7` のループは **CPU 的には正しく動いている**(0xFA `LD A,(u16)` の `mmu.read` 抜けバグも解消済み)。あとは PPU が LY を 0→153 で循環させればループを抜けられる。
+
+#### 3. ブート ROM: PC=0x0008 で `0xCB`(CB-prefix)未実装で停止
+
+`spec` の "ブート ROM 完走" は VRAM クリア(`LD (HL-),A`)を完走して **`BIT 7,H`**(0xCB 0x7C)で停止中。ブート ROM のロゴ展開部に到達しているので、**E-2 CB-prefix の枠組みが次の最大の壁**。
+
+#### 4. 設計面の改善
+
+- `Bit` モジュール(`app/emulator/bit.rb`)を新設 — `low_byte` / `high_byte` / `make_u16` / `wrap_u8` / `wrap_u16` / `low_4bits` を 1 か所に集約。CPU と MMU の両方から使う
+- `MMU#write_u16` / `MMU#read_u16` を追加 — `LD (u16),SP`(0x08)で使用、リトルエンディアン書き込みをカプセル化
+- `MMU#read` / `MMU#write` を **キーワード引数化**(`address:` / `value:`)で誤呼び出しを防止
+- レジスタペア(`bc` / `de` / `hl`)の **getter / setter を Bit モジュール経由**で実装、対称性を確保
+
+### 次の最短経路
+
+優先順位:
+
+1. **E-2(CB-prefix)を着手** — ブート ROM の **次の 1 命令**で必要、ROADMAP E フェーズの中核
+2. **C-1(PPU LY ティック)** — hello.gb 完走の最後のピース、最小実装で OK
+3. **0xF8 `LD HL,SP+i8` のフラグ計算修正**(現在 H=1, C=1 のハードコード、TODO 残り)
+4. **AND A,r 系**(0xA0〜0xA7, 0xE6)— 論理演算 3 兄弟の最後
+5. **ADD / SUB / ADC / SBC / INC / DEC の 8bit 演算**(`Bit.wrap_u8` + フラグ計算のテンプレが揃ったので量産可能)
+6. **PUSH / POP / CALL / RET / RETI / RST**(スタック系、ブート ROM 後半で必要)
 
 ## 進捗チェックリスト
 
@@ -43,11 +69,11 @@ hello.gb 完走 RSpec を走らせたところ、`0x0100 → 0x0101(JP) → 0x01
 - [x] A-3: MMU 骨組み + シリアル出力
 
 ### フェーズ B: CPU 基本命令(hello.gb 用)
-- [x] B-1: CPU 骨組み(NOP のみ)
-- [~] B-2: hello.gb が使う命令一式(進行中: 10 オペコード実装、VBlank 待ちループまで到達。LY 更新待ち)
+- [x] B-1: CPU 骨組み(NOP + ヘルパ群)
+- [x] B-2: hello.gb が使う命令一式(~102 オペコード、HELLO WORLD は VBlank 待ちループまで到達。あとは PPU の LY 更新で完走)
 
 ### フェーズ C: PPU 最小実装
-- [ ] C-1: PPU 骨組み(LCDC, LY, モード) ← **B-2 完走の前提として先行着手推奨**
+- [ ] C-1: PPU 骨組み(LCDC, LY, モード) ← **HELLO WORLD 完走に必須**
 - [ ] C-2: BG タイル描画(SCY=0 固定)
 
 ### フェーズ D: HELLO WORLD 表示
@@ -55,8 +81,8 @@ hello.gb 完走 RSpec を走らせたところ、`0x0100 → 0x0101(JP) → 0x01
 - [ ] D-2: hello.gb 起動 → "Hello World!" 表示 ★第一マイルストーン
 
 ### フェーズ E: Nintendo ロゴ表示
-- [ ] E-1: ブート ROM 用 CPU 命令追加(B-2 で省いた分)
-- [ ] E-2: CB-prefix `BIT n,r` / `RL r` 実装
+- [~] E-1: ブート ROM 用 CPU 命令追加(B-2 で前倒し: 論理演算 / 比較 / レジスタ間転送など多くを実装済み。**残り: AND 系、ADD/SUB/ADC/SBC、INC/DEC、PUSH/POP/CALL/RET、未実装 JR 系**)
+- [ ] E-2: CB-prefix `BIT n,r` / `RL r` 実装 ← **ブート ROM の次の壁(PC=0x0008 で停止中)**
 - [ ] E-3: PPU SCY スクロール対応
 - [ ] E-4: MMU にブート ROM mapping 追加
 - [ ] E-5: ブート ROM 起動 → 崩れたロゴ観察
@@ -101,9 +127,10 @@ GEM-BOY/
 ├── app/
 │   ├── main.rb              # DragonRuby tick エントリ(args 依存はここだけ)
 │   ├── emulator/            # 純 Ruby のエミュレータコア
+│   │   ├── bit.rb           # 8bit/16bit/4bit 操作の純粋関数ヘルパ(low_byte / high_byte / make_u16 / wrap_u8 / wrap_u16 / low_4bits)
 │   │   ├── cartridge.rb     # カートリッジ
-│   │   ├── mmu.rb           # メモリ管理 + シリアル出力(E-4 でブート ROM mapping 追加)
-│   │   ├── cpu.rb           # CPU(B-1 完了:骨組み + NOP のみ。B-2 で hello.gb 用、E-1/E-2 でブート ROM 用に拡充)
+│   │   ├── mmu.rb           # メモリ管理 + シリアル出力 + read_u16/write_u16(E-4 でブート ROM mapping 追加)
+│   │   ├── cpu.rb           # CPU(B-1, B-2 完了。E-1 の大半を前倒しで実装済み。E-2 で CB-prefix 追加)
 │   │   ├── ppu.rb           # 描画(C で骨組み + BG タイル、E-3 で SCY スクロール対応)
 │   │   ├── boot_rom.rb      # ブート ROM ローダ(E-4 で作成、任意で別ファイル化)
 │   │   ├── mbc1.rb          # MBC1 バンク切り替え(F-1 で作成)
@@ -146,43 +173,47 @@ CPU リファレンス:
 実装内容:
 
 - `app/emulator/cpu.rb` に CPU クラスを追加(レジスタ A/B/C/D/E/H/L/F + SP/PC + IME/halted、すべて初期値 0 / false)
-- `step` / `run(cycles_target)` / `fetch_u8` / `fetch_u16` / `fetch_i8` / `wrap_u16` / `set_flags` を実装。HALT 中は fetch せず 4 サイクルだけ消費する分岐込み
-- 256 要素の `@opcodes` テーブルを用意し、現状は **NOP (0x00) のみ** 実装。それ以外を踏むと `Unimplemented opcode 0xXX at PC=0xYYYY` で例外停止
-- `spec/app/emulator/cpu_spec.rb` で `#initialize` / `#step` / `#run` / `#wrap_u16` / `#fetch_i8` / `#set_flags` / `#build_opcode_table` を検証
+- `step` / `run(cycles_target)` / `fetch_u8` / `fetch_u16` / `fetch_i8` / `set_flags` を実装。HALT 中は fetch せず 4 サイクルだけ消費する分岐込み
+- 256 要素の `@opcodes` テーブルを用意し、未実装オペコードを踏むと `Unimplemented opcode 0xXX at PC=0xYYYY` で例外停止
+- `app/emulator/bit.rb` を新設: `low_byte` / `high_byte` / `make_u16` / `wrap_u8` / `wrap_u16` / `low_4bits` を `Bit` モジュールに集約(CPU と MMU の両方から `Bit.xxx` で呼ぶ)
+- F レジスタの個別 setter / getter (`zero` / `negative` / `half_carry` / `carry`)、レジスタペア (`bc` / `de` / `hl`) の getter / setter を実装
+- `spec/app/emulator/cpu_spec.rb` / `spec/app/emulator/bit_spec.rb` で各メソッド単体テスト
 
 詳細は `git log` を参照。
 
 ---
 
-## ステップ B-2: hello.gb が使う命令一式 (1〜1.5時間) [進行中]
+## ステップ B-2: hello.gb が使う命令一式 (1〜1.5時間) [ほぼ完了]
 
 **目標**: `data/hello.gb` の実行に必要な命令を網羅する。**CB-prefix と一部のブート ROM 専用命令はスキップ**(フェーズ E で追加)。
 
-### 現状(2026-04-29 時点)
+### 現状(2026-04-30 時点)
 
-**実装済みヘルパ:**
-- `fetch_u8` / `fetch_u16` / `fetch_i8`(unsigned/signed の読み分け、リトルエンディアン)
-- `wrap_u16`(16bit ラップアラウンド、PC オーバーフロー / JR 負オフセット / 加算キャリーアウトの正規化)
-- `set_flags(zero:, negative:, half_carry:, carry:)`(F レジスタの bit7-4 を選択的に更新)
+**実装済み命令カテゴリ(計 ~102 オペコード):**
 
-**実装済みオペコード(10 個):**
-
-| オペコード | 命令 | 用途 |
+| カテゴリ | 範囲 | 状態 |
 |---|---|---|
-| 0x00 | NOP | ディスパッチの最小単位 |
-| 0x20 | JR NZ,i8 | 条件分岐(VBlank 待ちループの戻り) |
-| 0x21 | LD HL,u16 | 16bit ロード |
-| 0x31 | LD SP,u16 | スタックポインタ初期化 |
-| 0xAF | XOR A,A | A=0 + Z=1 のクリア |
-| 0xC3 | JP u16 | 絶対ジャンプ |
-| 0xEA | LD (u16),A | アドレスへの書き込み |
-| 0xF3 | DI | 割り込み無効化 |
-| 0xFA | LD A,(u16) | アドレスからの読み込み |
-| 0xFE | CP A,u8 | 即値比較 |
+| **制御** | NOP(0x00), DI(0xF3) | ✓ |
+| **8bit ロード r,r'** | 0x40-0x7F の 49 命令(`LD B,B` などの自己コピー含む。`LD r,(HL)` 系・`LD (HL),r` 系・HALT 0x76 は別途) | ✓ ほぼ全網羅 |
+| **8bit ロード レジスタペア間接** | LD (BC),A(0x02)、LD A,(BC)(0x0A)、LD (DE),A(0x12)、LD A,(DE)(0x1A)、LD (HL+),A(0x22)、LD A,(HL+)(0x2A)、LD (HL-),A(0x32)、LD A,(HL-)(0x3A) | ✓ |
+| **8bit ロード u16 即値** | LD (u16),A(0xEA)、LD A,(u16)(0xFA) | ✓ |
+| **LDH(I/O)** | LDH (u8),A(0xE0)、LDH A,(u8)(0xF0)、LD (C),A(0xE2)、LD A,(C)(0xF2) | ✓ |
+| **16bit ロード** | LD BC,u16(0x01)、LD DE,u16(0x11)、LD HL,u16(0x21)、LD SP,u16(0x31)、LD (u16),SP(0x08) | ✓ |
+| **16bit ロード SP 系** | LD SP,HL(0xF9)、LD HL,SP+i8(0xF8) | ✓(F8 はフラグ計算 TODO 残り) |
+| **論理 XOR** | 0xA8〜0xAF + 0xEE | ✓ 全 9 命令 |
+| **論理 OR** | 0xB0〜0xB7 + 0xF6 | ✓ 全 9 命令 |
+| **論理 AND** | 0xA0〜0xA7 + 0xE6 | ❌ 未実装 |
+| **比較 CP** | 0xB8〜0xBF + 0xFE | ✓ 全 9 命令(`Bit.low_4bits` で半キャリー計算済み) |
+| **算術 ADD/ADC/SUB/SBC** | 0x80-0x9F、0xC6/D6/CE/DE | ❌ 未実装(ADD A,B 0x80 が試作中、フラグ計算 TODO) |
+| **INC/DEC** | 8bit / 16bit 系 | ❌ 未実装 |
+| **ジャンプ** | JP u16(0xC3)、JP HL(0xE9)、JR NZ,i8(0x20) | △ JR の他条件 / 無条件 JR / JP cc は未実装 |
+| **スタック PUSH/POP** | 0xC1/D1/E1/F1, 0xC5/D5/E5/F5 | ❌ 未実装 |
+| **コール/リターン** | CALL / RET / RETI / RST | ❌ 未実装 |
+| **CB-prefix** | 0xCB | ❌ 未実装(E-2 で着手) |
 
 **hello.gb の到達点:**
 
-`spec/app/emulator/cpu_spec.rb` の "HELLO WORLD 完走" シナリオで、PC は以下のように進む:
+`spec/app/emulator/cpu_spec.rb` の "HELLO WORLD 完走" シナリオは依然として VBlank 待ちで足踏み:
 
 ```
 0x0100 NOP    → 0x0101 JP 0x0150 → 0x0150 DI → 0x0151 LD SP,u16
@@ -191,10 +222,15 @@ CPU リファレンス:
   0x0159 JR NZ,-7       ┘
 ```
 
-**詰まり要因**: 0xFF44(LY)を読むが、PPU が未実装なので LY が常に 0 → CP 0x90 が永遠に Z=0 を返す。**ジャンプ処理は正常**。次の手は C-1 着手(LY をスキャンラインで更新する PPU を入れる)。
+**詰まり要因**: 0xFF44(LY)を読むが、PPU が未実装なので LY が常に 0 → CP 0x90 が永遠に Z=0 を返す。**0xFA `LD A,(u16)` の `mmu.read` 抜けバグは解消済み**で、CPU 側は完全に正しく動作している。**残るは PPU の LY 更新だけ**。
 
-**次に必要そうな命令(到達次第追加):**
-LCDC OFF / タイル転送ループで踏む `LDH (n8),A` / `LDH A,(n8)`、`INC HL` / `DEC C`、`LD (HL+),A` / `LD (HL),A`、`LD r,n8` / `LD r,r'`、`HALT`、`OR A` あたり。
+**ブート ROM の到達点:**
+
+VRAM クリアループ(0x32 `LD (HL-),A` を `HL=0x9FFF` から `HL=0x7FFF` まで繰り返し)を完走し、PC=0x0008 の **`BIT 7,H`(0xCB 0x7C)で停止**。CB-prefix の枠組み(E-2)が次の最大の壁。
+
+### B-2 で前倒しした E-1 ぶんの命令
+
+ROADMAP では「E-1 でブート ROM 用 CPU 命令を追加」となっていたが、`Bit` モジュールが整備されてテンプレ展開が楽になったため、**B-2 でほぼ全 LD 系・論理演算・比較系を一気に書いた**。E-1 で残っている主な命令は **算術系 / スタック系 / コール系**。これらはサイクルが大きく(8〜24 サイクル)、ブート ROM のロゴ展開部から本格的に必要になる。
 
 ### 実装する命令カテゴリ(おおよその範囲)
 
@@ -242,7 +278,7 @@ PPU リファレンス:
 
 **目標**: PPU が時間経過とともに `LY` をインクリメントし、4 つのモードを遷移するようにする。
 
-> **先行着手推奨**: B-2 で hello.gb を走らせると `0x0154` の `LD A,(0xFF44); CP 0x90; JR NZ,-7` という VBlank 待ちループで停止する。LY が動かない限り B-2 の検証が止まる**ので、本ステップ(特に LY のインクリメント)を B-2 と並行して進める。BG タイル描画(C-2)は後回しで OK — まず LY だけが 0 → 153 を循環する状態を作れば、CP 0x90 が満たされて hello.gb が次の処理に進める。
+> **HELLO WORLD 完走に必須**: B-2 で hello.gb を走らせると `0x0154` の `LD A,(0xFF44); CP 0x90; JR NZ,-7` という VBlank 待ちループで停止する。CPU 側は完全に正しく動作しているので、**残るは LY を更新する PPU だけ**。BG タイル描画(C-2)は後回しで OK — まず LY が 0 → 153 を循環する状態を作れば、CP 0x90 が満たされて hello.gb が次の処理に進める。最小実装(2 日想定の 1 時間)で十分。
 
 ### モード遷移(456 ドット = 1 スキャンライン)
 
