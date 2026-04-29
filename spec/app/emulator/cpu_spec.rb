@@ -1,6 +1,7 @@
 require 'app/emulator/cartridge'
 require 'app/emulator/mmu'
 require 'app/emulator/cpu'
+require 'app/emulator/ppu'
 
 RSpec.describe CPU do
   describe '#initialize' do
@@ -708,13 +709,16 @@ RSpec.describe CPU do
   end
 
   describe 'HELLO WORLD 完走 (hello.gb が HALT に到達するまで)' do
-    # CPU 単体ではなく CPU + MMU + Cartridge + hello.gb の統合シナリオ。
+    # CPU 単体ではなく CPU + MMU + Cartridge + PPU + hello.gb の統合シナリオ。
     # skip_boot 起動で hello.gb を走らせ、画面に "Hello World!" を描画したあと
     # PC=0x01B8 の HALT(0x76)で停止する。`halted` が true になることが完走の証拠。
     #
     # D-1 で CPU.new(skip_boot: true) が実装されるまでは、ここで初期レジスタを直接セットして
     # ブート ROM 終了直後の実機状態を再現する(B-2 の進捗確認用)。
     # 初期値の根拠 Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
+    #
+    # PPU は C-1 で実装済み。VBlank 待ちループ(LY=144 で抜ける)を成立させるため、
+    # CPU が消費したサイクル数を PPU.step に渡して LY を進める必要がある。
     let(:cpu) do
       cpu = described_class.new(mmu)
       cpu.a = 0x01; cpu.f = 0xB0
@@ -725,7 +729,15 @@ RSpec.describe CPU do
       cpu.pc = 0x0100
       cpu
     end
-    let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
+    let(:mmu) do
+      mmu = MMU.new(Cartridge.new(rom_data))
+      # ブート ROM 終了直後の I/O レジスタ初期値(skip_boot のため自前で設定)
+      # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
+      mmu.write_io_direct(0xFF40, 0x91) # LCDC: LCD ON + BG ON + BG タイル領域 0x8000
+      mmu.write_io_direct(0xFF47, 0xFC) # BGP : 標準パレット
+      mmu
+    end
+    let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../data/hello.gb', __FILE__)).bytes }
 
     it 'PC=0x01B8 の HALT に到達して halted=true になる' do
@@ -733,7 +745,11 @@ RSpec.describe CPU do
       # 上限 1,000,000 T-cycle まで run を繰り返し、HALT 命令で halted=true になるか確認する。
       # HALT(0x76)は 1 バイト命令なので、実行後 PC は次のバイト(0x01B9)を指している。
       elapsed = 0
-      elapsed += cpu.run(1000) until cpu.halted || elapsed >= 1_000
+      until cpu.halted || elapsed >= 1_000_000
+        cycles = cpu.run(1000)
+        ppu.step(cycles)
+        elapsed += cycles
+      end
 
       expect(cpu.halted).to eq true
       expect(cpu.pc).to eq 0x01B9
