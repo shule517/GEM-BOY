@@ -298,10 +298,10 @@ class CPU
     # ============================================================
     # 8bit ロード - I/O ポート (0xFF00 + offset)
     # ============================================================
-    # table[0xE0] = -> { 12 } # LD (FF00+u8),A
-    # table[0xE2] = -> { 8 }  # LD (FF00+C),A
-    # table[0xF0] = -> { 12 } # LD A,(FF00+u8)
-    # table[0xF2] = -> { 8 }  # LD A,(FF00+C)
+    table[0xE0] = -> { mmu.write(address: 0xFF00 + fetch_u8, value: a); 12 } # LD (FF00+u8),A
+    table[0xE2] = -> { mmu.write(address: 0xFF00 + c, value: a); 8 }  # LD (FF00+C),A
+    table[0xF0] = -> { self.a = mmu.read(address: 0xFF00 + fetch_u8); 12 } # LD A,(FF00+u8)
+    table[0xF2] = -> { self.a = mmu.read(address: 0xFF00 + c); 8 }  # LD A,(FF00+C)
 
     # ============================================================
     # 16bit ロード - LD rr,u16
@@ -310,7 +310,7 @@ class CPU
     table[0x11] = -> { self.de = fetch_u16; 12 } # LD DE,u16
     table[0x21] = -> { self.hl = fetch_u16; 12 } # LD HL,u16
     table[0x31] = -> { self.sp = fetch_u16; 12 } # LD SP,u16
-    # table[0x08] = -> { 20 } # LD (u16),SP
+    table[0x08] = -> { mmu.write(address: fetch_u16, value: sp); 20 } # LD (u16),SP
     table[0xF8] = -> { self.hl = wrap_u16(sp + fetch_i8); self.negative = 0; self.negative = 0; self.half_carry = 1; self.carry = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
     table[0xF9] = -> { self.sp = hl; 8 } # LD SP,HL
 
