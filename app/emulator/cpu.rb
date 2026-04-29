@@ -77,13 +77,6 @@ class CPU
     cycles
   end
 
-  # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
-  def fetch_u8
-    byte = mmu.read(pc) # PCから1バイト読み込む
-    self.pc = wrap_u16(pc + 1) # PCを1つ進める
-    byte
-  end
-
   # 16bit 値から上位 8bit を取り出す。
   # 例: high_byte(0x1234) #=> 0x12
   # レジスタペア setter(BC=, DE=, HL=)で上位バイトを上位レジスタへ振り分けるときに使う。
@@ -96,6 +89,13 @@ class CPU
   # レジスタペア setter(BC=, DE=, HL=)で下位バイトを下位レジスタへ振り分けるときに使う。
   def low_byte(value)
     value & 0x00FF
+  end
+
+  # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
+  def fetch_u8
+    byte = mmu.read(pc) # PCから1バイト読み込む
+    self.pc = wrap_u16(pc + 1) # PCを1つ進める
+    byte
   end
 
   # 16bit にマスクして wrap させる(下位 16bit のみ残す)。
@@ -154,18 +154,18 @@ class CPU
   end
 
   def bc=(value)
-    self.b = (value & 0b1111111100000000) >> 8
-    self.c = value & 0b0000000011111111
+    self.b = high_byte(value)
+    self.c = low_byte(value)
   end
 
   def de=(value)
-    self.d = (value & 0b1111111100000000) >> 8
-    self.e = value & 0b0000000011111111
+    self.d = high_byte(value)
+    self.e = low_byte(value)
   end
 
   def hl=(value)
-    self.h = (value & 0b1111111100000000) >> 8
-    self.l = value & 0b0000000011111111
+    self.h = high_byte(value)
+    self.l = low_byte(value)
   end
 
   private

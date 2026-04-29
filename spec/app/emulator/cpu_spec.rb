@@ -385,6 +385,190 @@ RSpec.describe CPU do
     end
   end
 
+  describe '#bc=' do
+    # 16bit 値を BC ペアに振り分ける setter。B が上位、C が下位。
+    # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
+    subject { cpu.bc = value }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context '0x1234 を渡したとき' do
+      let(:value) { 0x1234 }
+
+      it 'B=0x12, C=0x34 になる' do
+        subject
+        expect(cpu.b).to eq 0x12
+        expect(cpu.c).to eq 0x34
+      end
+    end
+
+    context '0x0000 を渡したとき' do
+      let(:value) { 0x0000 }
+      before do
+        cpu.b = 0xAA
+        cpu.c = 0xBB
+      end
+
+      it 'B=0x00, C=0x00 で上書きされる' do
+        subject
+        expect(cpu.b).to eq 0x00
+        expect(cpu.c).to eq 0x00
+      end
+    end
+
+    context '0xFFFF を渡したとき' do
+      let(:value) { 0xFFFF }
+
+      it 'B=0xFF, C=0xFF になる' do
+        subject
+        expect(cpu.b).to eq 0xFF
+        expect(cpu.c).to eq 0xFF
+      end
+    end
+
+    context '0x00FF (上位がゼロ) を渡したとき' do
+      let(:value) { 0x00FF }
+
+      it 'B=0x00, C=0xFF になる' do
+        subject
+        expect(cpu.b).to eq 0x00
+        expect(cpu.c).to eq 0xFF
+      end
+    end
+
+    context '0xFF00 (下位がゼロ) を渡したとき' do
+      let(:value) { 0xFF00 }
+
+      it 'B=0xFF, C=0x00 になる' do
+        subject
+        expect(cpu.b).to eq 0xFF
+        expect(cpu.c).to eq 0x00
+      end
+    end
+  end
+
+  describe '#de=' do
+    # 16bit 値を DE ペアに振り分ける setter。D が上位、E が下位。
+    subject { cpu.de = value }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context '0x1234 を渡したとき' do
+      let(:value) { 0x1234 }
+
+      it 'D=0x12, E=0x34 になる' do
+        subject
+        expect(cpu.d).to eq 0x12
+        expect(cpu.e).to eq 0x34
+      end
+    end
+
+    context '0x0000 を渡したとき' do
+      let(:value) { 0x0000 }
+      before do
+        cpu.d = 0xAA
+        cpu.e = 0xBB
+      end
+
+      it 'D=0x00, E=0x00 で上書きされる' do
+        subject
+        expect(cpu.d).to eq 0x00
+        expect(cpu.e).to eq 0x00
+      end
+    end
+
+    context '0xFFFF を渡したとき' do
+      let(:value) { 0xFFFF }
+
+      it 'D=0xFF, E=0xFF になる' do
+        subject
+        expect(cpu.d).to eq 0xFF
+        expect(cpu.e).to eq 0xFF
+      end
+    end
+
+    context '0x00FF (上位がゼロ) を渡したとき' do
+      let(:value) { 0x00FF }
+
+      it 'D=0x00, E=0xFF になる' do
+        subject
+        expect(cpu.d).to eq 0x00
+        expect(cpu.e).to eq 0xFF
+      end
+    end
+
+    context '0xFF00 (下位がゼロ) を渡したとき' do
+      let(:value) { 0xFF00 }
+
+      it 'D=0xFF, E=0x00 になる' do
+        subject
+        expect(cpu.d).to eq 0xFF
+        expect(cpu.e).to eq 0x00
+      end
+    end
+  end
+
+  describe '#hl=' do
+    # 16bit 値を HL ペアに振り分ける setter。H が上位、L が下位。
+    subject { cpu.hl = value }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context '0x1234 を渡したとき' do
+      let(:value) { 0x1234 }
+
+      it 'H=0x12, L=0x34 になる' do
+        subject
+        expect(cpu.h).to eq 0x12
+        expect(cpu.l).to eq 0x34
+      end
+    end
+
+    context '0x0000 を渡したとき' do
+      let(:value) { 0x0000 }
+      before do
+        cpu.h = 0xAA
+        cpu.l = 0xBB
+      end
+
+      it 'H=0x00, L=0x00 で上書きされる' do
+        subject
+        expect(cpu.h).to eq 0x00
+        expect(cpu.l).to eq 0x00
+      end
+    end
+
+    context '0xFFFF を渡したとき' do
+      let(:value) { 0xFFFF }
+
+      it 'H=0xFF, L=0xFF になる' do
+        subject
+        expect(cpu.h).to eq 0xFF
+        expect(cpu.l).to eq 0xFF
+      end
+    end
+
+    context '0x00FF (上位がゼロ) を渡したとき' do
+      let(:value) { 0x00FF }
+
+      it 'H=0x00, L=0xFF になる' do
+        subject
+        expect(cpu.h).to eq 0x00
+        expect(cpu.l).to eq 0xFF
+      end
+    end
+
+    context '0xFF00 (下位がゼロ) を渡したとき' do
+      let(:value) { 0xFF00 }
+
+      it 'H=0xFF, L=0x00 になる' do
+        subject
+        expect(cpu.h).to eq 0xFF
+        expect(cpu.l).to eq 0x00
+      end
+    end
+  end
+
   describe '#build_opcode_table' do
     # build_opcode_table が返すテーブル(initialize から呼ばれて cpu.opcodes に格納される)を
     # 取り出し、各 opcode の lambda を直接呼んで振る舞いを検証する。
