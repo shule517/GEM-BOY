@@ -281,7 +281,7 @@ class CPU
     # 8bit ロード - LD A,(u16) / LD (u16),A (絶対アドレス)
     # ============================================================
     table[0xEA] = -> { mmu.write(fetch_u16, a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
-    table[0xFA] = -> { self.a = fetch_u16; 16 } # LD A,(u16)
+    table[0xFA] = -> { self.a = fetch_u16; 16 } # LD A,(u16) # TODO: バグってそう
 
     # ============================================================
     # 8bit ロード - I/O ポート (0xFF00 + offset)
@@ -294,11 +294,10 @@ class CPU
     # ============================================================
     # 16bit ロード - LD rr,u16
     # ============================================================
-    # table[0x01] = -> { 12 } # LD BC,u16
-    # table[0x11] = -> { 12 } # LD DE,u16
-    ################# table[0x21] = -> { @l = fetch_u8; @h = fetch_u8; 12 } # LD HL,u16: 8bitをL。8bitをHに設定
-    table[0x21] = -> { self.hl = fetch_u16; 12 } # LD HL,u16: 8bitをL。8bitをHに設定
-    table[0x31] = -> { self.sp = fetch_u16; 12 } # LD SP,u16: 16bitをSPに設定
+    table[0x01] = -> { self.bc = fetch_u16; 12 } # LD BC,u16
+    table[0x11] = -> { self.de = fetch_u16; 12 } # LD DE,u16
+    table[0x21] = -> { self.hl = fetch_u16; 12 } # LD HL,u16
+    table[0x31] = -> { self.sp = fetch_u16; 12 } # LD SP,u16
     # table[0x08] = -> { 20 } # LD (u16),SP
     # table[0xF8] = -> { 12 } # LD HL,SP+i8
     # table[0xF9] = -> { 8 }  # LD SP,HL
