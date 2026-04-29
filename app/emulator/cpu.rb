@@ -1,3 +1,5 @@
+require 'app/emulator/bit'
+
 # CPU (Sharp LR35902)
 #
 # Game Boy (DMG) の CPU。Z80 と Intel 8080 を混ぜたような 8bit プロセッサで、
@@ -77,40 +79,11 @@ class CPU
     cycles
   end
 
-  # 16bit 値から上位 8bit を取り出す。
-  # 例: high_byte(0x1234) #=> 0x12
-  # レジスタペア setter(BC=, DE=, HL=)で上位バイトを上位レジスタへ振り分けるときに使う。
-  def high_byte(value)
-    (value & 0xFF00) >> 8
-  end
-
-  # 16bit 値から下位 8bit を取り出す。
-  # 例: low_byte(0x1234) #=> 0x34
-  # レジスタペア setter(BC=, DE=, HL=)で下位バイトを下位レジスタへ振り分けるときに使う。
-  def low_byte(value)
-    value & 0x00FF
-  end
-
-  # 上位 8bit + 下位 8bit を 16bit に合成する。high_byte / low_byte の逆操作。
-  # 例: make_u16(0x12, 0x34) #=> 0x1234
-  # レジスタペア getter(bc, de, hl)や、リトルエンディアンで読んだ 2 バイトを
-  # 16bit に組み立てる場面で使う。
-  def make_u16(high:, low:)
-    (high << 8) | low
-  end
-
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
   def fetch_u8
     byte = mmu.read(address: pc) # PCから1バイト読み込む
-    self.pc = wrap_u16(pc + 1) # PCを1つ進める
+    self.pc = Bit.wrap_u16(pc + 1) # PCを1つ進める
     byte
-  end
-
-  # 16bit にマスクして wrap させる(下位 16bit のみ残す)。
-  # PC の +1 オーバーフロー(0xFFFF→0x0000)、JR の負オフセット、
-  # ADD HL,BC のキャリーアウトなど、16bit 演算結果を正規化するときに使う。
-  def wrap_u16(n)
-    n & 0xFFFF
   end
 
   # PC が指す 2バイトをリトルエンディアンで読む(下位バイトが先)。
@@ -118,7 +91,7 @@ class CPU
   def fetch_u16
     low = fetch_u8
     high = fetch_u8
-    make_u16(high: high, low: low)
+    Bit.make_u16(high: high, low: low)
   end
 
   # PC が指す 1バイトを符号付き(-128〜+127)として読む。JR i8 や ADD SP,i8 で使う。
@@ -161,23 +134,23 @@ class CPU
     self.f = (f & 0b11101111) | (value ? 1 << 4 : 0) # bit4 Carry
   end
 
-  def bc = make_u16(high: b, low: c)
-  def de = make_u16(high: d, low: e)
-  def hl = make_u16(high: h, low: l)
+  def bc = Bit.make_u16(high: b, low: c)
+  def de = Bit.make_u16(high: d, low: e)
+  def hl = Bit.make_u16(high: h, low: l)
 
   def bc=(value)
-    self.b = high_byte(value)
-    self.c = low_byte(value)
+    self.b = Bit.high_byte(value)
+    self.c = Bit.low_byte(value)
   end
 
   def de=(value)
-    self.d = high_byte(value)
-    self.e = low_byte(value)
+    self.d = Bit.high_byte(value)
+    self.e = Bit.low_byte(value)
   end
 
   def hl=(value)
-    self.h = high_byte(value)
-    self.l = low_byte(value)
+    self.h = Bit.high_byte(value)
+    self.l = Bit.low_byte(value)
   end
 
   private
@@ -310,8 +283,8 @@ class CPU
     table[0x11] = -> { self.de = fetch_u16; 12 } # LD DE,u16
     table[0x21] = -> { self.hl = fetch_u16; 12 } # LD HL,u16
     table[0x31] = -> { self.sp = fetch_u16; 12 } # LD SP,u16
-    table[0x08] = -> { mmu.write(address: fetch_u16, value: sp); 20 } # LD (u16),SP
-    table[0xF8] = -> { self.hl = wrap_u16(sp + fetch_i8); self.negative = 0; self.negative = 0; self.half_carry = 1; self.carry = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
+    table[0x08] = -> { mmu.write_u16(address: fetch_u16, value: sp); 20 } # LD (u16),SP
+    table[0xF8] = -> { self.hl = Bit.wrap_u16(sp + fetch_i8); self.negative = 0; self.negative = 0; self.half_carry = 1; self.carry = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
     table[0xF9] = -> { self.sp = hl; 8 } # LD SP,HL
 
     # ============================================================
@@ -502,7 +475,7 @@ class CPU
     table[0x20] = -> do
       offset_i8 = fetch_i8
       if zero == 0
-        self.pc = wrap_u16(pc + offset_i8)
+        self.pc = Bit.wrap_u16(pc + offset_i8)
         12 # 分岐成立
       else
         8  # 分岐不成立

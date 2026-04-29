@@ -1,0 +1,42 @@
+# 8bit / 16bit 値の相互変換ユーティリティ。
+#
+# Game Boy CPU(Sharp LR35902)は 8bit メモリインターフェースを通して
+# 16bit のレジスタペアやアドレスを扱う。その変換は CPU だけでなく MMU や PPU でも
+# 必要になるため、純粋関数として独立した名前空間にまとめる。
+#
+# 状態を持たないため `module_function` で定義し、`Bit.low_byte(...)` の
+# ようにモジュール関数として呼び出す(Ruby の `Math` / `JSON` と同じ流儀)。
+#
+# Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html
+module Bit
+  module_function
+
+  # 16bit 値から下位 8bit を取り出す。
+  # 例: Bit.low_byte(0x1234) #=> 0x34
+  # レジスタペア setter(BC=, DE=, HL=)で下位バイトを下位レジスタへ振り分けるときに使う。
+  def low_byte(value)
+    value & 0x00FF
+  end
+
+  # 16bit 値から上位 8bit を取り出す。
+  # 例: Bit.high_byte(0x1234) #=> 0x12
+  # レジスタペア setter(BC=, DE=, HL=)で上位バイトを上位レジスタへ振り分けるときに使う。
+  def high_byte(value)
+    (value & 0xFF00) >> 8
+  end
+
+  # 上位 8bit + 下位 8bit を 16bit に合成する。high_byte / low_byte の逆操作。
+  # 例: Bit.make_u16(high: 0x12, low: 0x34) #=> 0x1234
+  # レジスタペア getter(bc, de, hl)や、リトルエンディアンで読んだ 2 バイトを
+  # 16bit に組み立てる場面で使う。
+  def make_u16(high:, low:)
+    (high << 8) | low
+  end
+
+  # 16bit にマスクして wrap させる(下位 16bit のみ残す)。
+  # PC の +1 オーバーフロー(0xFFFF→0x0000)、JR の負オフセット、
+  # ADD HL,BC のキャリーアウトなど、16bit 演算結果を正規化するときに使う。
+  def wrap_u16(n)
+    n & 0xFFFF
+  end
+end
