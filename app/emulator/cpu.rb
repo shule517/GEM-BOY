@@ -393,9 +393,9 @@ class CPU
     table[0xAB] = -> { self.a = a ^ e; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,E
     table[0xAC] = -> { self.a = a ^ h; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,H
     table[0xAD] = -> { self.a = a ^ l; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,L
-    # table[0xAE] = -> { 8 }  # XOR A,(HL)
+    table[0xAE] = -> { byte = mmu.read(address: hl); self.a = a ^ byte; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
     table[0xAF] = -> { self.a = 0; set_flags(zero: true, negative: false, half_carry: false, carry: false); 4 } # XOR A,A
-    # table[0xEE] = -> { 8 }  # XOR A,u8
+    table[0xEE] = -> { byte = fetch_u8; self.a = a ^ byte; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,u8
 
     # ============================================================
     # 8bit 論理 - OR
