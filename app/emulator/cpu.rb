@@ -414,27 +414,27 @@ class CPU
     # ============================================================
     # 8bit 論理 - XOR
     # ============================================================
-    # table[0xA8] = -> { 4 }  # XOR A,B
-    # table[0xA9] = -> { 4 }  # XOR A,C
-    # table[0xAA] = -> { 4 }  # XOR A,D
-    # table[0xAB] = -> { 4 }  # XOR A,E
-    # table[0xAC] = -> { 4 }  # XOR A,H
-    # table[0xAD] = -> { 4 }  # XOR A,L
+    table[0xA8] = -> { self.a = a ^ b; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,B
+    table[0xA9] = -> { self.a = a ^ c; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,C
+    table[0xAA] = -> { self.a = a ^ d; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,D
+    table[0xAB] = -> { self.a = a ^ e; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,E
+    table[0xAC] = -> { self.a = a ^ h; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,H
+    table[0xAD] = -> { self.a = a ^ l; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,L
     # table[0xAE] = -> { 8 }  # XOR A,(HL)
-    table[0xAF] = -> { self.a = 0; self.f = 0b10000000; 4 } # XOR A,A
+    table[0xAF] = -> { self.a = 0; set_flags(zero: true, negative: false, half_carry: false, carry: false); 4 } # XOR A,A
     # table[0xEE] = -> { 8 }  # XOR A,u8
 
     # ============================================================
     # 8bit 論理 - OR
     # ============================================================
-    # table[0xB0] = -> { 4 }  # OR A,B
-    # table[0xB1] = -> { 4 }  # OR A,C
-    # table[0xB2] = -> { 4 }  # OR A,D
-    # table[0xB3] = -> { 4 }  # OR A,E
-    # table[0xB4] = -> { 4 }  # OR A,H
-    # table[0xB5] = -> { 4 }  # OR A,L
+    table[0xB0] = -> { self.a = a | b; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,B
+    table[0xB1] = -> { self.a = a | c; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,C
+    table[0xB2] = -> { self.a = a | d; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,D
+    table[0xB3] = -> { self.a = a | e; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,E
+    table[0xB4] = -> { self.a = a | h; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,H
+    table[0xB5] = -> { self.a = a | l; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,L
     # table[0xB6] = -> { 8 }  # OR A,(HL)
-    # table[0xB7] = -> { 4 }  # OR A,A
+    table[0xB7] = -> { set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,A → a | aしても結果は同じ
     # table[0xF6] = -> { 8 }  # OR A,u8
 
     # ============================================================
@@ -487,7 +487,7 @@ class CPU
     # ジャンプ - JP (絶対ジャンプ)
     # ============================================================
     table[0xC3] = -> { self.pc = fetch_u16; 16 } # JP u16
-    # table[0xE9] = -> { 4 }  # JP HL
+    table[0xE9] = -> { self.pc = hl; 4 } # JP HL
     # table[0xC2] = -> { 16 } # JP NZ,u16 (taken: 16 / not taken: 12)
     # table[0xCA] = -> { 16 } # JP Z,u16  (taken: 16 / not taken: 12)
     # table[0xD2] = -> { 16 } # JP NC,u16 (taken: 16 / not taken: 12)
