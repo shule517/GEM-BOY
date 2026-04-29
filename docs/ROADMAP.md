@@ -21,13 +21,19 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 | フェーズ | 内容 | 想定時間 | 到達点 | 進捗 |
 |---|---|---|---|---|
 | A. 土台 | Cartridge + MMU 骨組み + シリアル出力 | 3〜4h | ROM が読める、シリアル出力動く | 3/3 [完了] |
-| B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 1/2 |
-| C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 0/2 |
+| B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 1/2(B-2 進行中: 10 オペコード実装、hello.gb が VBlank 待ちループまで到達) |
+| C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 0/2(B-2 完走の前提として **C-1 を先行着手**する必要あり) |
 | D. HELLO WORLD 表示 | skip_boot 起動 + 画面確認 | 1h | **画面に "Hello World!" 表示** ★第一 | 0/2 |
 | E. Nintendo ロゴ表示 | ブート ROM 用追加命令 + CB-prefix + ブート ROM mapping + スクロール + チャイム | 3〜7h | **正しい Nintendo ロゴ + ブートチャイム** ★第二 | 0/8 |
 | F. tobu.gb タイトル | MBC1 + スプライト + 入力 + タイマー | 6.5〜10h | **tobu.gb タイトル表示** ★第三 | 0/5 |
 
-合計 22 ステップ、想定 17.5〜27h。**現在 4 ステップ完了(フェーズ A 完走 + B-1 完了)**。
+合計 22 ステップ、想定 17.5〜27h。**現在 4 ステップ完了(フェーズ A 完走 + B-1 完了)、B-2 進行中**。
+
+### 進行中の発見
+
+hello.gb 完走 RSpec を走らせたところ、`0x0100 → 0x0101(JP) → 0x0150(DI) → 0x0151(LD SP) → 0x0154-0x0159` まで進み、**VBlank 待ちループで停止**することが判明。具体的には `LD A,(0xFF44); CP 0x90; JR NZ,-7`(LY が VBlank ライン 144 になるまで待つ典型パターン)。
+
+つまり **B-2 で命令を増やしただけでは hello.gb は完走しない**。LY (0xFF44) を進める PPU が必要なので、本来 D-2 で必要な C-1 を **B-2 と並行で前倒し**するのが最短経路。
 
 ## 進捗チェックリスト
 
@@ -38,10 +44,10 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 ### フェーズ B: CPU 基本命令(hello.gb 用)
 - [x] B-1: CPU 骨組み(NOP のみ)
-- [ ] B-2: hello.gb が使う命令一式
+- [~] B-2: hello.gb が使う命令一式(進行中: 10 オペコード実装、VBlank 待ちループまで到達。LY 更新待ち)
 
 ### フェーズ C: PPU 最小実装
-- [ ] C-1: PPU 骨組み(LCDC, LY, モード)
+- [ ] C-1: PPU 骨組み(LCDC, LY, モード) ← **B-2 完走の前提として先行着手推奨**
 - [ ] C-2: BG タイル描画(SCY=0 固定)
 
 ### フェーズ D: HELLO WORLD 表示
@@ -140,17 +146,55 @@ CPU リファレンス:
 実装内容:
 
 - `app/emulator/cpu.rb` に CPU クラスを追加(レジスタ A/B/C/D/E/H/L/F + SP/PC + IME/halted、すべて初期値 0 / false)
-- `step` / `run(cycles_target)` / `fetch_byte` / `fetch_word` を実装。HALT 中は fetch せず 4 サイクルだけ消費する分岐込み
+- `step` / `run(cycles_target)` / `fetch_u8` / `fetch_u16` / `fetch_i8` / `wrap_u16` / `set_flags` を実装。HALT 中は fetch せず 4 サイクルだけ消費する分岐込み
 - 256 要素の `@opcodes` テーブルを用意し、現状は **NOP (0x00) のみ** 実装。それ以外を踏むと `Unimplemented opcode 0xXX at PC=0xYYYY` で例外停止
-- `spec/app/emulator/cpu_spec.rb` で `#initialize` / `#step` / `#build_opcode_table` / `#run` を検証
+- `spec/app/emulator/cpu_spec.rb` で `#initialize` / `#step` / `#run` / `#wrap_u16` / `#fetch_i8` / `#set_flags` / `#build_opcode_table` を検証
 
 詳細は `git log` を参照。
 
 ---
 
-## ステップ B-2: hello.gb が使う命令一式 (1〜1.5時間)
+## ステップ B-2: hello.gb が使う命令一式 (1〜1.5時間) [進行中]
 
 **目標**: `data/hello.gb` の実行に必要な命令を網羅する。**CB-prefix と一部のブート ROM 専用命令はスキップ**(フェーズ E で追加)。
+
+### 現状(2026-04-29 時点)
+
+**実装済みヘルパ:**
+- `fetch_u8` / `fetch_u16` / `fetch_i8`(unsigned/signed の読み分け、リトルエンディアン)
+- `wrap_u16`(16bit ラップアラウンド、PC オーバーフロー / JR 負オフセット / 加算キャリーアウトの正規化)
+- `set_flags(zero:, negative:, half_carry:, carry:)`(F レジスタの bit7-4 を選択的に更新)
+
+**実装済みオペコード(10 個):**
+
+| オペコード | 命令 | 用途 |
+|---|---|---|
+| 0x00 | NOP | ディスパッチの最小単位 |
+| 0x20 | JR NZ,i8 | 条件分岐(VBlank 待ちループの戻り) |
+| 0x21 | LD HL,u16 | 16bit ロード |
+| 0x31 | LD SP,u16 | スタックポインタ初期化 |
+| 0xAF | XOR A,A | A=0 + Z=1 のクリア |
+| 0xC3 | JP u16 | 絶対ジャンプ |
+| 0xEA | LD (u16),A | アドレスへの書き込み |
+| 0xF3 | DI | 割り込み無効化 |
+| 0xFA | LD A,(u16) | アドレスからの読み込み |
+| 0xFE | CP A,u8 | 即値比較 |
+
+**hello.gb の到達点:**
+
+`spec/app/emulator/cpu_spec.rb` の "HELLO WORLD 完走" シナリオで、PC は以下のように進む:
+
+```
+0x0100 NOP    → 0x0101 JP 0x0150 → 0x0150 DI → 0x0151 LD SP,u16
+→ 0x0154 LD A,(0xFF44)  ┐
+  0x0157 CP 0x90        │ ← VBlank 待ちループで停止
+  0x0159 JR NZ,-7       ┘
+```
+
+**詰まり要因**: 0xFF44(LY)を読むが、PPU が未実装なので LY が常に 0 → CP 0x90 が永遠に Z=0 を返す。**ジャンプ処理は正常**。次の手は C-1 着手(LY をスキャンラインで更新する PPU を入れる)。
+
+**次に必要そうな命令(到達次第追加):**
+LCDC OFF / タイル転送ループで踏む `LDH (n8),A` / `LDH A,(n8)`、`INC HL` / `DEC C`、`LD (HL+),A` / `LD (HL),A`、`LD r,n8` / `LD r,r'`、`HALT`、`OR A` あたり。
 
 ### 実装する命令カテゴリ(おおよその範囲)
 
@@ -197,6 +241,8 @@ PPU リファレンス:
 ## ステップ C-1: PPU 骨組み(LCDC, LY, モード) (1時間)
 
 **目標**: PPU が時間経過とともに `LY` をインクリメントし、4 つのモードを遷移するようにする。
+
+> **先行着手推奨**: B-2 で hello.gb を走らせると `0x0154` の `LD A,(0xFF44); CP 0x90; JR NZ,-7` という VBlank 待ちループで停止する。LY が動かない限り B-2 の検証が止まる**ので、本ステップ(特に LY のインクリメント)を B-2 と並行して進める。BG タイル描画(C-2)は後回しで OK — まず LY だけが 0 → 153 を循環する状態を作れば、CP 0x90 が満たされて hello.gb が次の処理に進める。
 
 ### モード遷移(456 ドット = 1 スキャンライン)
 
