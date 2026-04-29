@@ -89,7 +89,7 @@ class MMU
 
   # アドレスに対応する領域から 1バイト読み込む
   # 未対応・使用禁止領域は 0xFF(実機の挙動)。CPU 側で nil 演算事故を防ぐ意図もある。
-  def read(address)
+  def read(address:)
     case address
     when 0x0000..0x7FFF then @cartridge.read(address)
     when 0x8000..0x9FFF then @vram[address - 0x8000]
@@ -105,7 +105,7 @@ class MMU
   # アドレスに対応する領域へ 1バイト書き込む
   # ROM 領域 (0x0000-0x7FFF) はあえて分岐に入れていない
   # (MBC 対応後はここでバンク切り替えレジスタの判定が入る)
-  def write(address, value)
+  def write(address:, value:)
     value &= 0xFF # 1バイトにする(下位8bitのみ)
 
     case address

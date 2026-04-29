@@ -101,7 +101,7 @@ class CPU
 
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
   def fetch_u8
-    byte = mmu.read(pc) # PCから1バイト読み込む
+    byte = mmu.read(address: pc) # PCから1バイト読み込む
     self.pc = wrap_u16(pc + 1) # PCを1つ進める
     byte
   end
@@ -292,7 +292,7 @@ class CPU
     # ============================================================
     # 8bit ロード - LD A,(u16) / LD (u16),A (絶対アドレス)
     # ============================================================
-    table[0xEA] = -> { mmu.write(fetch_u16, a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
+    table[0xEA] = -> { mmu.write(address: fetch_u16, value: a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
     table[0xFA] = -> { self.a = fetch_u16; 16 } # LD A,(u16) # TODO: バグってそう
 
     # ============================================================
