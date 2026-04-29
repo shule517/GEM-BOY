@@ -280,20 +280,20 @@ class CPU
     # ============================================================
     # 8bit ロード - LD A,(rr) / LD (rr),A (レジスタペア間接)
     # ============================================================
-    # table[0x02] = -> { 8 }  # LD (BC),A
-    # table[0x0A] = -> { 8 }  # LD A,(BC)
-    # table[0x12] = -> { 8 }  # LD (DE),A
-    # table[0x1A] = -> { 8 }  # LD A,(DE)
-    # table[0x22] = -> { 8 }  # LD (HL+),A
-    # table[0x2A] = -> { 8 }  # LD A,(HL+)
-    # table[0x32] = -> { 8 }  # LD (HL-),A
-    # table[0x3A] = -> { 8 }  # LD A,(HL-)
+    table[0x02] = -> { mmu.write(address: bc, value: a); 8 } # LD (BC),A
+    table[0x0A] = -> { self.a = mmu.read(address: bc); 8 } # LD A,(BC)
+    table[0x12] = -> { mmu.write(address: de, value: a); 8 } # LD (DE),A
+    table[0x1A] = -> { self.a = mmu.read(address: de); 8 } # LD A,(DE)
+    table[0x22] = -> { mmu.write(address: hl, value: a); self.hl += 1; 8 } # LD (HL+),A
+    table[0x2A] = -> { self.a = mmu.read(address: hl); self.hl += 1; 8 } # LD A,(HL+)
+    table[0x32] = -> { mmu.write(address: hl, value: a); self.hl -= 1; 8 } # LD (HL-),A
+    table[0x3A] = -> { self.a = mmu.read(address: hl); self.hl -= 1; 8 }  # LD A,(HL-)
 
     # ============================================================
     # 8bit ロード - LD A,(u16) / LD (u16),A (絶対アドレス)
     # ============================================================
     table[0xEA] = -> { mmu.write(address: fetch_u16, value: a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
-    table[0xFA] = -> { self.a = fetch_u16; 16 } # LD A,(u16) # TODO: バグってそう
+    table[0xFA] = -> { self.a = mmu.read(address: fetch_u16); 16 } # LD A,(u16) → ()はそのアドレスの先という意味
 
     # ============================================================
     # 8bit ロード - I/O ポート (0xFF00 + offset)
