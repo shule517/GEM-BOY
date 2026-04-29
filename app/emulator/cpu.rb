@@ -406,22 +406,22 @@ class CPU
     table[0xB3] = -> { self.a = a | e; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,E
     table[0xB4] = -> { self.a = a | h; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,H
     table[0xB5] = -> { self.a = a | l; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,L
-    # table[0xB6] = -> { 8 }  # OR A,(HL)
+    table[0xB6] = -> { self.a = a | mmu.read(address: hl); set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
     table[0xB7] = -> { set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,A → a | aしても結果は同じ
-    # table[0xF6] = -> { 8 }  # OR A,u8
+    table[0xF6] = -> { self.a = a | fetch_u8; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,u8
 
     # ============================================================
     # 8bit 比較 - CP (Compare)
     # ============================================================
-    # table[0xB8] = -> { 4 }  # CP A,B
-    # table[0xB9] = -> { 4 }  # CP A,C
-    # table[0xBA] = -> { 4 }  # CP A,D
-    # table[0xBB] = -> { 4 }  # CP A,E
-    # table[0xBC] = -> { 4 }  # CP A,H
-    # table[0xBD] = -> { 4 }  # CP A,L
-    # table[0xBE] = -> { 8 }  # CP A,(HL)
-    # table[0xBF] = -> { 4 }  # CP A,A
-    table[0xFE] = -> { byte = fetch_u8; set_flags(zero: a == byte, negative: true, half_carry: (a & 0x1111) < (byte & 0x1111), carry: a < byte); 8 } # CP A,u8: Compare(比較)
+    table[0xB8] = -> { set_flags(zero: a == b, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(b), carry: a < b); 4 }  # CP A,B
+    table[0xB9] = -> { set_flags(zero: a == c, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(c), carry: a < c); 4 }  # CP A,C
+    table[0xBA] = -> { set_flags(zero: a == d, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(d), carry: a < d); 4 }  # CP A,D
+    table[0xBB] = -> { set_flags(zero: a == e, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(e), carry: a < e); 4 }  # CP A,E
+    table[0xBC] = -> { set_flags(zero: a == h, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(h), carry: a < h); 4 }  # CP A,H
+    table[0xBD] = -> { set_flags(zero: a == l, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(l), carry: a < l); 4 }  # CP A,L
+    table[0xBE] = -> { byte = mmu.read(address: hl); set_flags(zero: a == byte, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(byte), carry: a < byte); 8 }  # CP A,(HL)
+    table[0xBF] = -> { set_flags(zero: true, negative: true, half_carry: false, carry: false); 4 }  # CP A,A
+    table[0xFE] = -> { byte = fetch_u8; set_flags(zero: a == byte, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(byte), carry: a < byte); 8 } # CP A,u8: Compare(比較)
 
     # ============================================================
     # 16bit 算術 - ADD HL / INC rr / DEC rr / ADD SP,i8

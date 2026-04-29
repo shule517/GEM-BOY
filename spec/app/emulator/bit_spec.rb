@@ -212,4 +212,51 @@ RSpec.describe Bit do
       end
     end
   end
+
+  describe '.low_4bits' do
+    # 8bit 値から下位 4bit を取り出す。半キャリー(H フラグ)計算で使う。
+    subject { Bit.low_4bits(value) }
+
+    context '0x34 を渡したとき' do
+      let(:value) { 0x34 }
+
+      it '下位 4bit (0x4) を返す' do
+        is_expected.to eq 0x4
+      end
+    end
+
+    context '0x00 を渡したとき' do
+      let(:value) { 0x00 }
+
+      it '0x0 を返す' do
+        is_expected.to eq 0x0
+      end
+    end
+
+    context '0xFF を渡したとき' do
+      let(:value) { 0xFF }
+
+      it '0xF を返す' do
+        is_expected.to eq 0xF
+      end
+    end
+
+    context '0x0F (上位 4bit がゼロ) を渡したとき' do
+      # 下位 4bit だけに値があるケース。
+      let(:value) { 0x0F }
+
+      it '0xF を返す' do
+        is_expected.to eq 0xF
+      end
+    end
+
+    context '0xF0 (下位 4bit がゼロ) を渡したとき' do
+      # 上位 4bit だけに値があるケース。下位 4bit は 0。
+      let(:value) { 0xF0 }
+
+      it '0x0 を返す' do
+        is_expected.to eq 0x0
+      end
+    end
+  end
 end

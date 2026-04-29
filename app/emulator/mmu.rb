@@ -1,4 +1,5 @@
 require 'app/core_ext/last'
+require 'app/emulator/bit'
 
 # MMU (Memory Management Unit)
 #
@@ -116,6 +117,21 @@ class MMU
     when 0xFF80..0xFFFE then @hram[address - 0xFF80] = value
     when 0xFFFF then @ie = value
     end
+  end
+
+  # 16bit を 2 バイトに分けてリトルエンディアンで書く(下位 → 上位 の順)。
+  # LD (u16),SP (0x08) などで使う。address+1 は 16bit でラップ(0xFFFF→0x0000)。
+  def write_u16(address:, value:)
+    write(address: address, value: Bit.low_byte(value))
+    write(address: Bit.wrap_u16(address + 1), value: Bit.high_byte(value))
+  end
+
+  # 16bit を 2 バイトに分けてリトルエンディアンで読む(下位 → 上位 の順)。
+  # 16bit ジャンプテーブルや関数ポインタの取得で使う。
+  def read_u16(address:)
+    low  = read(address: address)
+    high = read(address: Bit.wrap_u16(address + 1))
+    Bit.make_u16(high: high, low: low)
   end
 
   # 内部状態として I/O を直接触りたいとき用(タイマー割り込み等で使う)。

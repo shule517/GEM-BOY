@@ -39,4 +39,13 @@ module Bit
   def wrap_u16(n)
     n & 0xFFFF
   end
+
+  # 8bit 値から下位 4bit (lower 4 bits) を取り出す。
+  # 半キャリー(H フラグ)計算で使う。
+  # Pan Docs(https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)では
+  # "lower 4 bits" と表記される範囲。
+  # 例: Bit.low_4bits(0x34) #=> 0x4
+  def low_4bits(value)
+    value & 0x0F
+  end
 end
