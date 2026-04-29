@@ -312,7 +312,7 @@ class CPU
     table[0x31] = -> { self.sp = fetch_u16; 12 } # LD SP,u16
     # table[0x08] = -> { 20 } # LD (u16),SP
     # table[0xF8] = -> { 12 } # LD HL,SP+i8
-    # table[0xF9] = -> { 8 }  # LD SP,HL
+    table[0xF9] = -> { self.sp = hl; 8 } # LD SP,HL
 
     # ============================================================
     # スタック - PUSH / POP
