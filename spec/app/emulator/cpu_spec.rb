@@ -86,6 +86,68 @@ RSpec.describe CPU do
     end
   end
 
+  describe '#set_flags' do
+    # F レジスタの bit7=Z, bit6=N, bit5=H, bit4=C を引数で更新する private ヘルパ。
+    # 引数を渡したビットだけ書き換え、省略したビットは現状を保持する。
+    subject { cpu.send(:set_flags, **args) }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+    let(:args) { {} }
+
+    # F レジスタの bit レイアウト(上位 4bit がフラグ、下位 4bit は常に 0)
+    #   bit7  bit6  bit5  bit4  bit3-0
+    #   Z     N     H     C     (常に 0)
+
+    context '全フラグを true に指定したとき' do
+      let(:args) { { zero: true, negative: true, half_carry: true, carry: true } }
+
+      it 'Z=1, N=1, H=1, C=1 になる' do
+        subject
+        expect(cpu.f).to eq 0b11110000
+      end
+    end
+
+    context '全フラグを false に指定したとき' do
+      let(:args) { { zero: false, negative: false, half_carry: false, carry: false } }
+      before { cpu.f = 0b11110000 }  # 全 1 から始めて 0 になることを確認
+
+      it 'Z=0, N=0, H=0, C=0 になる' do
+        subject
+        expect(cpu.f).to eq 0b00000000
+      end
+    end
+
+    context 'zero だけ true、他は省略したとき' do
+      let(:args) { { zero: true } }
+      before { cpu.f = 0b00000000 }  # Z=0, N=0, H=0, C=0
+
+      it 'Z bit だけ立ち、N/H/C は保持される' do
+        subject
+        expect(cpu.f).to eq 0b10000000  # Z=1, N=0, H=0, C=0
+      end
+    end
+
+    context 'carry だけ false、他は省略したとき' do
+      let(:args) { { carry: false } }
+      before { cpu.f = 0b11110000 }  # Z=1, N=1, H=1, C=1
+
+      it 'C bit だけクリア、Z/N/H は保持される' do
+        subject
+        expect(cpu.f).to eq 0b11100000  # Z=1, N=1, H=1, C=0
+      end
+    end
+
+    context '引数を一切渡さなかったとき' do
+      let(:args) { {} }
+      before { cpu.f = 0b10100000 }  # Z=1, N=0, H=1, C=0
+
+      it 'F は変化しない' do
+        subject
+        expect(cpu.f).to eq 0b10100000
+      end
+    end
+  end
+
   describe '#build_opcode_table' do
     # build_opcode_table が返すテーブル(initialize から呼ばれて cpu.opcodes に格納される)を
     # 取り出し、各 opcode の lambda を直接呼んで振る舞いを検証する。

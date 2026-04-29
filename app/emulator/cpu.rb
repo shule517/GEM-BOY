@@ -20,7 +20,10 @@
 #   bit6  N (Subtract)    直前が減算系なら 1(DAA で参照)
 #   bit5  H (Half-Carry)  下位 4bit からの繰り上がり/下がり
 #   bit4  C (Carry)       上位からの繰り上がり/下がり
-#   bit0-3                常に 0(書いても保持されない)
+#   bit3                  常に0
+#   bit2                  常に0
+#   bit1                  常に0
+#   bit0                  常に0
 #
 # === 命令ディスパッチ ===
 # gbops オペコード表: https://izik1.github.io/gbops/
@@ -91,6 +94,17 @@ class CPU
     (hi << 8) | lo
   end
 
+  # F レジスタ(bit7=Z, bit6=N, bit5=H, bit4=C、下位 4bit は常に 0)の各ビットを更新する。
+  # true なら 1、false なら 0に変更する。
+  # 引数名は gbops 表記に揃えている(`negative` は Pan Docs 正式名では Subtract / N フラグ)。
+  # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#the-flags-register-lower-8-bits-of-af-register
+  def set_flags(zero: nil, negative: nil, half_carry: nil, carry: nil)
+    @f = (@f & 0x7F) | (zero ? 0x80 : 0) unless zero.nil?              # bit7 Zero
+    @f = (@f & 0xBF) | (negative ? 0x40 : 0) unless negative.nil?      # bit6 Negative (Subtract / N)
+    @f = (@f & 0xDF) | (half_carry ? 0x20 : 0) unless half_carry.nil?  # bit5 Half-Carry
+    @f = (@f & 0xEF) | (carry ? 0x10 : 0) unless carry.nil?            # bit4 Carry
+  end
+
   # opcodeテーブル
   # CPUの命令一覧 https://izik1.github.io/gbops/
   # GB CPU 命令リファレンス(RGBDS 公式マニュアル) https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
@@ -105,6 +119,9 @@ class CPU
     # table[0x6C] = -> { 4 } # LD L,H
     table[0xAF] = -> { @a = 0; @f = 0b10000000; 4 } # XOR A,A
     table[0xC3] = -> { @pc = fetch_word; 16 } # JP u16
+    table[0xF3] = -> { @ime = false; 4 } # DI: IMEフラグをクリアして割り込みを無効
+    table[0xFA] = -> { @a = fetch_word; 16 } # LD A,(u16)
+    table[0xFE] = -> { 8 } # CP A,u8 # TODO
     # table[0xCB] = -> { 4 } # PREFIX CB
     table
   end
