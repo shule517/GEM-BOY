@@ -90,7 +90,7 @@ RSpec.describe CPU do
     # PC が指す 1 バイトを符号付き(-128〜+127)として読む private ヘルパ。
     # 2 の補数表現: bit7 が 1 の値(0x80〜0xFF)を負数として解釈する。
     # JR i8 / ADD SP,i8 / LD HL,SP+i8 で使う。
-    subject { cpu.send(:fetch_i8) }
+    subject { cpu.fetch_i8 }
     let(:cpu) { described_class.new(mmu) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
     let(:rom_data) do
@@ -168,7 +168,7 @@ RSpec.describe CPU do
   describe '#set_flags' do
     # F レジスタの bit7=Z, bit6=N, bit5=H, bit4=C を引数で更新する private ヘルパ。
     # 引数を渡したビットだけ書き換え、省略したビットは現状を保持する。
-    subject { cpu.send(:set_flags, **args) }
+    subject { cpu.set_flags(**args) }
     let(:cpu) { described_class.new(mmu) }
     let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
     let(:args) { {} }

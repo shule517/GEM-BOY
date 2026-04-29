@@ -77,8 +77,6 @@ class CPU
     cycles
   end
 
-  private
-
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
   def fetch_u8
     byte = @mmu.read(pc) # PCから1バイト読み込む
@@ -112,6 +110,8 @@ class CPU
     @f = (@f & 0b11011111) | (half_carry ? 1 << 5 : 0) unless half_carry.nil?  # bit5 Half Carry
     @f = (@f & 0b11101111) | (carry      ? 1 << 4 : 0) unless carry.nil?       # bit4 Carry
   end
+
+  private
 
   # opcodeテーブル
   # CPUの命令一覧 https://izik1.github.io/gbops/
@@ -430,7 +430,7 @@ class CPU
     # table[0x18] = -> { 12 } # JR i8
     # JR NZ,i8: Z フラグが 0 のとき、JR命令直後のアドレスから符号付き8bit分だけPCを動かす
     # fetch_i8 を先に呼ぶことで、PC が「次の命令の先頭」を指した状態でオフセット加算する
-    table[0x20] = lambda do
+    table[0x20] = -> do
       offset = fetch_i8
       if (@f & 0b10000000).zero? # Z フラグ(bit7) == 0 ?
         @pc = (@pc + offset) & 0xFFFF
