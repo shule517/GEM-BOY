@@ -36,7 +36,7 @@ class PPU
   end
 
   # 引数のサイクルだけ処理を実行する
-  # 456サイクル経過するごとに1ライン描画 + LYを+1、154でラップ
+  # 1ライン描画分サイクルが溜まったら描画する
   def step(cycles)
     return unless lcd_enabled? # LCDが無効
 
@@ -44,11 +44,13 @@ class PPU
     while @cycles >= CYCLES_PER_SCANLINE
       @cycles -= CYCLES_PER_SCANLINE
 
+      # 1行描画する
       if @ly < VBLANK_START_LY # 描画範囲内
         render_scanline
       end
 
-      @ly = (@ly + 1) % SCANLINES_PER_FRAME # 154で0にラップ(次フレーム)
+      # LYを+1
+      @ly = (@ly + 1) % SCANLINES_PER_FRAME # はみ出たら、次フレームへ
       @mmu.write_io_direct(LY, @ly)         # LYを更新
     end
   end
