@@ -87,7 +87,7 @@ class PPU
     pixel_y = bg_y % 8 # タイル内のY座標(0..7)
 
     tile_map_address = bg_tile_map_address
-    unsigned_addressing = (lcdc & 0x10) != 0 # LCDC bit4: 1=unsigned(0x8000基点), 0=signed(0x9000基点)
+    unsigned_addressing = lcdc[4] != 0 # LCDC bit4: 1=unsigned(0x8000基点), 0=signed(0x9000基点)
 
     SCREEN_WIDTH_PIXEL.times do |x|
       bg_x = Bit.wrap_u8(scx + x) # スクロール込みのBG上のX座標
