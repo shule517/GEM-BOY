@@ -319,10 +319,10 @@ RSpec.describe Bit do
     end
   end
 
-  describe '.to_i8' do
+  describe '.u8_to_i8' do
     # u8 (0..255) を i8 (-128..127) として再解釈する(2 の補数)。
     # JR i8 / ADD SP,i8 の符号付きオフセット、signed タイル番号で使う。
-    subject { Bit.to_i8(value) }
+    subject { Bit.u8_to_i8(value) }
 
     context '0x00 を渡したとき' do
       let(:value) { 0x00 }

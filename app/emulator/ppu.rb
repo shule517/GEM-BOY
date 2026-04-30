@@ -106,9 +106,9 @@ class PPU
   # タイル番号 → タイルデータの先頭アドレス(VRAM内) https://gbdev.io/pandocs/Tile_Data.html
   def tile_data_address(tile_num, unsigned_addressing)
     if unsigned_addressing
-      0x8000 + tile_num * 16                  # tile_num=0..255 → 0x8000..0x8FF0
+      0x8000 + tile_num * 16               # tile_num=0..255 → 0x8000..0x8FF0
     else
-      0x9000 + Bit.to_i8(tile_num) * 16       # tile_num=-128..127 → 0x8800..0x97F0
+      0x9000 + Bit.u8_to_i8(tile_num) * 16 # tile_num=-128..127 → 0x8800..0x97F0
     end
   end
 
