@@ -26,7 +26,7 @@ class PPU
   SCANLINES_PER_FRAME = 154 # 1フレームのスキャンライン数(描画144行 + VBlank10行) https://gbdev.io/pandocs/Rendering.html
   VBLANK_START_LY     = 144 # これ以上のY座標はVBlank(描画スキップ)
 
-  attr_reader :framebuffer, :ly
+  attr_accessor :framebuffer, :ly
 
   def initialize(mmu)
     @mmu = mmu
@@ -50,7 +50,7 @@ class PPU
       end
 
       # LYを+1
-      @ly = (ly + 1) % SCANLINES_PER_FRAME # はみ出たら、次フレームへ
+      self.ly = (ly + 1) % SCANLINES_PER_FRAME # はみ出たら、次フレームへ
       @mmu.write_io_direct(LY, ly)         # LYを更新
     end
   end
