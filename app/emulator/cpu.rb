@@ -97,9 +97,7 @@ class CPU
   # PC が指す 1バイトを符号付き(-128〜+127)として読む。JR i8 や ADD SP,i8 で使う。
   # 2の補数表現: bit7 が 1 の値(0x80〜0xFF)を負数として解釈する。
   def fetch_i8
-    byte = fetch_u8
-    byte -= 256 if byte[7] == 1
-    byte
+    Bit.u8_to_i8(fetch_u8)
   end
 
   # F レジスタ(bit7=Z, bit6=N, bit5=H, bit4=C、下位 4bit は常に 0)の各ビットを更新する。
