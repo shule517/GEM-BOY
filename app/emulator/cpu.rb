@@ -310,14 +310,14 @@ class CPU
     # ============================================================
     # 8bit 算術 - INC / DEC
     # ============================================================
-    # table[0x04] = -> { 4 }  # INC B
-    # table[0x0C] = -> { 4 }  # INC C
-    # table[0x14] = -> { 4 }  # INC D
-    # table[0x1C] = -> { 4 }  # INC E
-    # table[0x24] = -> { 4 }  # INC H
-    # table[0x2C] = -> { 4 }  # INC L
+    table[0x04] = -> { half_carry_result = Bit.low_4bits(b) + 1 > 0x0F; self.b = Bit.wrap_u8(b + 1); set_flags(zero: b == 0, negative: false, half_carry: half_carry_result); 4 } # INC B: B+1。Cフラグは保持(他更新)、Hは下位4bitからの繰り上がり
+    table[0x0C] = -> { half_carry_result = Bit.low_4bits(c) + 1 > 0x0F; self.c = Bit.wrap_u8(c + 1); set_flags(zero: c == 0, negative: false, half_carry: half_carry_result); 4 }  # INC C
+    table[0x14] = -> { half_carry_result = Bit.low_4bits(d) + 1 > 0x0F; self.d = Bit.wrap_u8(d + 1); set_flags(zero: d == 0, negative: false, half_carry: half_carry_result); 4 }  # INC D
+    table[0x1C] = -> { half_carry_result = Bit.low_4bits(e) + 1 > 0x0F; self.e = Bit.wrap_u8(e + 1); set_flags(zero: e == 0, negative: false, half_carry: half_carry_result); 4 }  # INC E
+    table[0x24] = -> { half_carry_result = Bit.low_4bits(h) + 1 > 0x0F; self.h = Bit.wrap_u8(h + 1); set_flags(zero: h == 0, negative: false, half_carry: half_carry_result); 4 }  # INC H
+    table[0x2C] = -> { half_carry_result = Bit.low_4bits(l) + 1 > 0x0F; self.l = Bit.wrap_u8(l + 1); set_flags(zero: l == 0, negative: false, half_carry: half_carry_result); 4 }  # INC L
     # table[0x34] = -> { 12 } # INC (HL)
-    # table[0x3C] = -> { 4 }  # INC A
+    table[0x3C] = -> { half_carry_result = Bit.low_4bits(a) + 1 > 0x0F; self.a = Bit.wrap_u8(a + 1); set_flags(zero: a == 0, negative: false, half_carry: half_carry_result); 4 }  # INC A
     # table[0x05] = -> { 4 }  # DEC B
     # table[0x0D] = -> { 4 }  # DEC C
     # table[0x15] = -> { 4 }  # DEC D
@@ -496,7 +496,7 @@ class CPU
     # ============================================================
     # コール / リターン
     # ============================================================
-    # table[0xCD] = -> { 24 } # CALL u16
+    table[0xCD] = -> { address = fetch_u16; self.sp = Bit.wrap_u16(sp - 2); mmu.write_u16(address: sp, value: pc); self.pc = address; 24 } # CALL u16: 戻りアドレス(=次の命令のPC)をstackに積んでから呼び出し先にjump
     # table[0xC4] = -> { 24 } # CALL NZ,u16 (taken: 24 / not taken: 12)
     # table[0xCC] = -> { 24 } # CALL Z,u16  (taken: 24 / not taken: 12)
     # table[0xD4] = -> { 24 } # CALL NC,u16 (taken: 24 / not taken: 12)
