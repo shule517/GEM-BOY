@@ -72,7 +72,7 @@ class MMU
   SC = 0xFF02  # Serial Control: 転送制御
   SC_TRANSFER_START = 0x81  # SC への書き込みがこの値のとき転送開始 (bit7=1, bit0=1)
 
-  def initialize(cartridge)
+  def initialize(cartridge, skip_boot: false)
     @cartridge = cartridge
 
     # 各領域は「サイズちょうどの 0 埋め配列」として確保する(各要素は 0..0xFF)。
@@ -86,6 +86,8 @@ class MMU
     # シリアル送信履歴。0xFF02 ← 0x81 が発火するたびに 0xFF01 の文字が追記される。
     # Blargg のテスト結果("Passed" / "Failed XX") はこの経路でしか届かない。
     @serial_buffer = ''
+
+    setup_post_boot_io if skip_boot
   end
 
   # アドレスに対応する領域から 1バイト読み込む
@@ -141,6 +143,13 @@ class MMU
   end
 
   private
+
+  # ブートROM 完走後の I/O レジスタ初期値を設定する(skip_boot 起動でブートROM をスキップするため)
+  # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
+  def setup_post_boot_io
+    write_io_direct(0xFF40, 0x91) # LCDC: LCD ON + BG ON + unsigned addressing
+    write_io_direct(0xFF47, 0xFC) # BGP : 標準パレット(色0=白、色1〜3=黒)
+  end
 
   # シリアルポートの送信プロトコル
   # Pan Docs: https://gbdev.io/pandocs/Serial_Data_Transfer_(Link_Cable).html

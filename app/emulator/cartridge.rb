@@ -4,7 +4,7 @@
 # === カートリッジヘッダ (0x0100-0x014F の 80 バイト) ===
 # Pan Docs: https://gbdev.io/pandocs/The_Cartridge_Header.html
 #
-# DMG が起動すると、ブート ROM が 0x0104-0x0133 の Nintendo ロゴをチェックし、
+# DMG が起動すると、ブートROM が 0x0104-0x0133 の Nintendo ロゴをチェックし、
 # 一致すれば 0x0100 へジャンプして実行を開始する。ヘッダはその直後の領域に
 # メタ情報を格納している。
 #

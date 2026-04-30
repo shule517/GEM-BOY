@@ -5,23 +5,56 @@ require 'app/emulator/ppu'
 
 RSpec.describe CPU do
   describe '#initialize' do
-    subject { described_class.new(mmu) }
     let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
 
-    it '全レジスタが 0、IME と halted が false で初期化される' do
-      cpu = subject
-      expect(cpu.a).to eq 0
-      expect(cpu.b).to eq 0
-      expect(cpu.c).to eq 0
-      expect(cpu.d).to eq 0
-      expect(cpu.e).to eq 0
-      expect(cpu.h).to eq 0
-      expect(cpu.l).to eq 0
-      expect(cpu.f).to eq 0
-      expect(cpu.sp).to eq 0
-      expect(cpu.pc).to eq 0
-      expect(cpu.ime).to eq false
-      expect(cpu.halted).to eq false
+    context 'skip_boot を指定しないとき(ブートROM 経由起動)' do
+      subject { described_class.new(mmu) }
+
+      it '全レジスタが 0、IME と halted が false で初期化される' do
+        cpu = subject
+        expect(cpu.a).to eq 0
+        expect(cpu.b).to eq 0
+        expect(cpu.c).to eq 0
+        expect(cpu.d).to eq 0
+        expect(cpu.e).to eq 0
+        expect(cpu.h).to eq 0
+        expect(cpu.l).to eq 0
+        expect(cpu.f).to eq 0
+        expect(cpu.sp).to eq 0
+        expect(cpu.pc).to eq 0
+        expect(cpu.ime).to eq false
+        expect(cpu.halted).to eq false
+      end
+    end
+
+    context 'skip_boot: true を指定したとき(ブートROM をスキップして起動)' do
+      # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
+      # ブートROM 完走後の DMG 実機値を最初からセットして起動する
+      subject { described_class.new(mmu, skip_boot: true) }
+
+      it 'A=0x01, F=0xB0(DMG識別値 + Z=1,N=0,H=1,C=1)' do
+        expect(subject.a).to eq 0x01
+        expect(subject.f).to eq 0xB0
+      end
+
+      it 'BC=0x0013, DE=0x00D8, HL=0x014D' do
+        expect(subject.bc).to eq 0x0013
+        expect(subject.de).to eq 0x00D8
+        expect(subject.hl).to eq 0x014D
+      end
+
+      it 'SP=0xFFFE(HRAM末端)' do
+        expect(subject.sp).to eq 0xFFFE
+      end
+
+      it 'PC=0x0100(カートリッジコード開始位置)' do
+        expect(subject.pc).to eq 0x0100
+      end
+
+      it 'IME=false, halted=false' do
+        expect(subject.ime).to eq false
+        expect(subject.halted).to eq false
+      end
     end
   end
 
@@ -713,30 +746,10 @@ RSpec.describe CPU do
     # skip_boot 起動で hello.gb を走らせ、画面に "Hello World!" を描画したあと
     # PC=0x01B8 の HALT(0x76)で停止する。`halted` が true になることが完走の証拠。
     #
-    # D-1 で CPU.new(skip_boot: true) が実装されるまでは、ここで初期レジスタを直接セットして
-    # ブート ROM 終了直後の実機状態を再現する(B-2 の進捗確認用)。
-    # 初期値の根拠 Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
-    #
     # PPU は C-1 で実装済み。VBlank 待ちループ(LY=144 で抜ける)を成立させるため、
     # CPU が消費したサイクル数を PPU.step に渡して LY を進める必要がある。
-    let(:cpu) do
-      cpu = described_class.new(mmu)
-      cpu.a = 0x01; cpu.f = 0xB0
-      cpu.b = 0x00; cpu.c = 0x13
-      cpu.d = 0x00; cpu.e = 0xD8
-      cpu.h = 0x01; cpu.l = 0x4D
-      cpu.sp = 0xFFFE
-      cpu.pc = 0x0100
-      cpu
-    end
-    let(:mmu) do
-      mmu = MMU.new(Cartridge.new(rom_data))
-      # ブート ROM 終了直後の I/O レジスタ初期値(skip_boot のため自前で設定)
-      # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
-      mmu.write_io_direct(0xFF40, 0x91) # LCDC: LCD ON + BG ON + BG タイル領域 0x8000
-      mmu.write_io_direct(0xFF47, 0xFC) # BGP : 標準パレット
-      mmu
-    end
+    let(:cpu) { described_class.new(mmu, skip_boot: true) }
+    let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../data/hello.gb', __FILE__)).bytes }
 
@@ -756,15 +769,15 @@ RSpec.describe CPU do
     end
   end
 
-  describe 'ブート ROM 完走 (PC が 0x0100 に到達するまで)' do
-    # CPU 単体ではなく CPU + MMU + Cartridge + ブート ROM の統合シナリオ。
-    # 「ブート ROM を実行して PC が 0x0100 に到達する」という振る舞いの検証なので
+  describe 'ブートROM 完走 (PC が 0x0100 に到達するまで)' do
+    # CPU 単体ではなく CPU + MMU + Cartridge + ブートROM の統合シナリオ。
+    # 「ブートROM を実行して PC が 0x0100 に到達する」という振る舞いの検証なので
     # 特定のメソッド describe ではなくシナリオ名で切る。
 
-    # ブート ROM (256 バイト) を ROM 先頭に重ねて、tobu.gb の本体側 (Nintendo ロゴ + ヘッダ含む)
-    # と組み合わせて流す。ブート ROM はカートリッジヘッダのロゴ照合を通らないと 0x0100 へ
+    # ブートROM (256 バイト) を ROM 先頭に重ねて、tobu.gb の本体側 (Nintendo ロゴ + ヘッダ含む)
+    # と組み合わせて流す。ブートROM はカートリッジヘッダのロゴ照合を通らないと 0x0100 へ
     # ジャンプしないため、tobu.gb の正規ロゴを 0x0104-0x0133 に置く必要がある。
-    # E-4 で MMU 側にブート ROM 重畳の正規実装が入るが、B-2/E-1/E-2 の進捗確認用にここでは
+    # E-4 で MMU 側にブートROM 重畳の正規実装が入るが、B-2/E-1/E-2 の進捗確認用にここでは
     # Cartridge 配列の先頭を直接書き換える簡易セットアップを使う。
     let(:cpu) { described_class.new(mmu) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
@@ -773,7 +786,7 @@ RSpec.describe CPU do
     let(:rom_data) { boot_rom + tobu[boot_rom.size..] }
 
     it 'tobu.gb のロゴ照合を通って PC=0x0100 に到達する' do
-      # ブート ROM は実機で約 70,000 T-cycle 程度で完走する。
+      # ブートROM は実機で約 70,000 T-cycle 程度で完走する。
       # 上限 200,000 T-cycle まで run を繰り返し、PC が 0x0100 (カートリッジ先頭) に到達するか確認する。
       elapsed = 0
       elapsed += cpu.run(1000) while cpu.pc < 0x0100 && elapsed < 200_000

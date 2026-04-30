@@ -15,7 +15,7 @@ DragonRuby Game Toolkit 上で動く Ruby 製 Game Boy (DMG) エミュレータ�
 ## 三段マイルストーン
 
 1. **HELLO WORLD 表示**(フェーズ D-2 完了): 画面に文字が出た瞬間。CPU 基本命令と PPU が連動して動いた証拠。skip_boot で `hello.gb` を起動し、PPU が信頼できる状態になる
-2. **Nintendo ロゴ表示**(フェーズ E-7 完了): スクロールインのロゴ。**ブート ROM 完走** = CPU + MMU + PPU + フラグ計算 + CB-prefix が全部揃った証拠(E-8 でブートチャイム追加)
+2. **Nintendo ロゴ表示**(フェーズ E-7 完了): スクロールインのロゴ。**ブートROM 完走** = CPU + MMU + PPU + フラグ計算 + CB-prefix が全部揃った証拠(E-8 でブートチャイム追加)
 3. **tobu.gb タイトル画面**(フェーズ F-5 完了): 実ゲームが起動。MBC1 + スプライト + 入力 + タイマーが揃った証拠
 
 ## ディレクトリ構造(最終形)
@@ -68,7 +68,7 @@ ROADMAP 完走に必須のもの:
   ```
   検証用 SHA256: `6f64da4cecd7e54e2f928eb3e3ba7810a7a567d0d247cc71737d1771e073a916`(SameBoy v1.0.3 / SameBoot)。バージョンを上げる場合は SHA256 が変わるので留意
 - **Blargg 個別 ROM**(フェーズ E-6 診断ループ、条件付き): https://github.com/retrio/gb-test-roms — `cpu_instrs/individual/` をそのまま `data/cpu_instrs/` に置く。`cpu_instrs.gb` 単体は MBC を使うのでまだ動かない。実際に使うのは `06-ld r,r.gb` (E-6a), `05-op rp.gb` (E-6b), `04-op r,imm.gb` (E-6c), `11-op a,(hl).gb` (E-6d) の 4 個。ロゴが崩れて出たときだけ使う
-- **ブートチャイム WAV**(フェーズ E-8): `data/game-boy-startup.wav`。APU 本体は実装せず、ブート ROM が NR14(0xFF14)の trigger bit に書き込んだ瞬間にこの WAV を再生して演出代替する
+- **ブートチャイム WAV**(フェーズ E-8): `data/game-boy-startup.wav`。APU 本体は実装せず、ブートROM が NR14(0xFF14)の trigger bit に書き込んだ瞬間にこの WAV を再生して演出代替する
 
 ROADMAP 外の任意の追加検証用(完走後に正確性を上げたいとき):
 

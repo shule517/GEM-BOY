@@ -7,31 +7,31 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 「Blargg を全 Pass させてから先に進む」旧戦略も「Nintendo ロゴ一発狙い」中継戦略もやめ、**3 つの視覚的マイルストーンを近い順に並べて段階的に達成する**ルートに改める。
 
 1. **HELLO WORLD 表示**(`hello.gb` を skip_boot 起動)★ 第一マイルストーン
-2. **Nintendo ロゴ表示**(ブート ROM 経由 + スクロールイン + チャイム)★ 第二マイルストーン
+2. **Nintendo ロゴ表示**(ブートROM 経由 + スクロールイン + チャイム)★ 第二マイルストーン
 3. **tobu.gb タイトル画面**(MBC1 + スプライト + 入力)★ 第三マイルストーン
 
 利点:
 
 - **「画面に何か出る」最初の瞬間が最も早く来る**(約 5〜6h で HELLO WORLD)。長時間進捗が見えない不安を解消
 - 各マイルストーン到達時に **PPU / CPU / MMU の動作確認済みコンポーネント**が増えていく → 次段階のデバッグ時に「これは動いている」と切り分けがしやすい
-- HELLO WORLD で PPU が動いているとブート ROM 挑戦時に「PPU は OK、犯人は CPU 側」と限定でき、Nintendo ロゴ挑戦時の Blargg 診断(E-6)の時間が短くなる傾向
+- HELLO WORLD で PPU が動いているとブートROM 挑戦時に「PPU は OK、犯人は CPU 側」と限定でき、Nintendo ロゴ挑戦時の Blargg 診断(E-6)の時間が短くなる傾向
 
 ## 全体像
 
 | フェーズ | 内容 | 想定時間 | 到達点 | 進捗 |
 |---|---|---|---|---|
 | A. 土台 | Cartridge + MMU 骨組み + シリアル出力 | 3〜4h | ROM が読める、シリアル出力動く | 3/3 [完了] |
-| B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 2/2(B-2 ほぼ完了: ~102 オペコード実装、ブート ROM が CB-prefix まで到達)|
+| B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 2/2(B-2 ほぼ完了: ~102 オペコード実装、ブートROM が CB-prefix まで到達)|
 | C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 2/2 [完了](C-1: LY ティック / C-2: BG タイル描画。framebuffer に画素が乗るようになった)|
 | D. HELLO WORLD 表示 | skip_boot 起動 + 画面確認 | 1h | **画面に "Hello World!" 表示** ★第一 | 0/2 |
-| E. Nintendo ロゴ表示 | ブート ROM 用追加命令 + CB-prefix + ブート ROM mapping + スクロール + チャイム | 3〜7h | **正しい Nintendo ロゴ + ブートチャイム** ★第二 | 0/8(E-1 ぶんは B-2 で前倒し済み、**E-2 CB-prefix が次の壁**)|
+| E. Nintendo ロゴ表示 | ブートROM 用追加命令 + CB-prefix + ブートROM mapping + スクロール + チャイム | 3〜7h | **正しい Nintendo ロゴ + ブートチャイム** ★第二 | 0/8(E-1 ぶんは B-2 で前倒し済み、**E-2 CB-prefix が次の壁**)|
 | F. tobu.gb タイトル | MBC1 + スプライト + 入力 + タイマー | 6.5〜10h | **tobu.gb タイトル表示** ★第三 | 0/5 |
 
-合計 22 ステップ、想定 17.5〜27h。**現在 7 ステップ完了(フェーズ A 完走 + B-1, B-2 ほぼ完了 + C-1, C-2 完了)**。
+合計 22 ステップ、想定 17.5〜27h。**現在 8 ステップ完了(フェーズ A 完走 + B-1, B-2 ほぼ完了 + C-1, C-2 完了 + D-1 完了)**。
 
 ### 進行中の発見(2026-04-30 時点)
 
-#### 1. CPU は ~102 オペコード実装、PPU(C-1, C-2)完成、統合テスト 157/159 pass
+#### 1. CPU は ~102 オペコード実装、PPU(C-1, C-2)完成、D-1 完了、統合テスト 165/167 pass
 
 **論理演算系 / 比較系 / 8bit ロード r,r' / 16bit ロード / I/O ロード / レジスタペア間接 / 一部ジャンプ系**まで完成。**PPU(C-1, C-2)も完了**して LY が時間とともに進み、`render_scanline` で BG タイルが framebuffer に乗るようになった。HELLO WORLD は VBlank 待ちループを抜けて初期化処理に進んでいる。残り 2 件のテスト失敗は次の通り。
 
@@ -39,9 +39,9 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 PPU 実装で VBlank ループを抜けて初期化処理に入った。VRAM 書き込み(0xEA を多用)のあと **CALL 命令で停止中**。**スタック系命令(PUSH / POP / CALL / RET)** の実装が次の壁。
 
-#### 3. ブート ROM: PC=0x0008 で `0xCB`(CB-prefix)未実装で停止
+#### 3. ブートROM: PC=0x0008 で `0xCB`(CB-prefix)未実装で停止
 
-`spec` の "ブート ROM 完走" は VRAM クリア(`LD (HL-),A`)を完走して **`BIT 7,H`**(0xCB 0x7C)で停止中。ブート ROM のロゴ展開部に到達しているので、**E-2 CB-prefix の枠組みが次の最大の壁**。
+`spec` の "ブートROM 完走" は VRAM クリア(`LD (HL-),A`)を完走して **`BIT 7,H`**(0xCB 0x7C)で停止中。ブートROM のロゴ展開部に到達しているので、**E-2 CB-prefix の枠組みが次の最大の壁**。
 
 #### 4. 設計面の改善
 
@@ -59,9 +59,9 @@ PPU 実装で VBlank ループを抜けて初期化処理に入った。VRAM 書
 
 優先順位:
 
-1. **CALL / RET / PUSH / POP / RETI / RST(スタック系)** — HELLO WORLD の次の壁(PC=0x0177 で停止中)、ブート ROM 後半でも必要
+1. **CALL / RET / PUSH / POP / RETI / RST(スタック系)** — HELLO WORLD の次の壁(PC=0x0177 で停止中)、ブートROM 後半でも必要
 2. **D-1(skip_boot モード)+ D-2(main.rb で framebuffer 表示)** — CALL 系が通れば画面表示で **第一マイルストーン達成**
-3. **E-2(CB-prefix)を着手** — ブート ROM の次の 1 命令で必要、ROADMAP E フェーズの中核
+3. **E-2(CB-prefix)を着手** — ブートROM の次の 1 命令で必要、ROADMAP E フェーズの中核
 4. **0xF8 `LD HL,SP+i8` のフラグ計算修正**(現在 H=1, C=1 のハードコード、TODO 残り)
 5. **AND A,r 系**(0xA0〜0xA7, 0xE6)— 論理演算 3 兄弟の最後
 6. **ADD / SUB / ADC / SBC / INC / DEC の 8bit 演算**(`Bit.wrap_u8` + フラグ計算のテンプレが揃ったので量産可能)
@@ -82,15 +82,15 @@ PPU 実装で VBlank ループを抜けて初期化処理に入った。VRAM 書
 - [x] C-2: BG タイル描画(SCY=0 固定) — render_scanline 実装、2bpp デコード / signed-unsigned 切替 / パレット変換まで対応
 
 ### フェーズ D: HELLO WORLD 表示
-- [ ] D-1: skip_boot モード実装
+- [x] D-1: skip_boot モード実装 — `CPU.new(mmu, skip_boot: true)` / `MMU.new(cartridge, skip_boot: true)` で実機ブート完走後の状態(レジスタ値 + I/O 初期値 LCDC=0x91, BGP=0xFC)を再現、main.rb を `hello.gb` + skip_boot 起動に切り替え
 - [ ] D-2: hello.gb 起動 → "Hello World!" 表示 ★第一マイルストーン
 
 ### フェーズ E: Nintendo ロゴ表示
-- [~] E-1: ブート ROM 用 CPU 命令追加(B-2 で前倒し: 論理演算 / 比較 / レジスタ間転送など多くを実装済み。**残り: AND 系、ADD/SUB/ADC/SBC、INC/DEC、PUSH/POP/CALL/RET、未実装 JR 系**)
-- [ ] E-2: CB-prefix `BIT n,r` / `RL r` 実装 ← **ブート ROM の次の壁(PC=0x0008 で停止中)**
+- [~] E-1: ブートROM 用 CPU 命令追加(B-2 で前倒し: 論理演算 / 比較 / レジスタ間転送など多くを実装済み。**残り: AND 系、ADD/SUB/ADC/SBC、INC/DEC、PUSH/POP/CALL/RET、未実装 JR 系**)
+- [ ] E-2: CB-prefix `BIT n,r` / `RL r` 実装 ← **ブートROM の次の壁(PC=0x0008 で停止中)**
 - [ ] E-3: PPU SCY スクロール対応
-- [ ] E-4: MMU にブート ROM mapping 追加
-- [ ] E-5: ブート ROM 起動 → 崩れたロゴ観察
+- [ ] E-4: MMU にブートROM mapping 追加
+- [ ] E-5: ブートROM 起動 → 崩れたロゴ観察
 - [ ] E-6: Blargg 診断ループ(崩れたとき、症状から推測した順序で)
   - [ ] E-6a: `06-ld r,r.gb` で LD 命令検証
   - [ ] E-6b: `05-op rp.gb` で 16bit / INC・DEC 検証
@@ -109,7 +109,7 @@ PPU 実装で VBlank ループを抜けて初期化処理に入った。VRAM 書
 ## 三段マイルストーン
 
 1. **HELLO WORLD 表示**(D-2 完了時, 約 5〜6h):画面に文字が出た瞬間。CPU 基本命令と PPU が連動して動いた証拠。「自分で書ける範囲のコードが正しく解釈・描画される」最小ループの完成
-2. **Nintendo ロゴ表示**(E-7 完了時, 約 8〜13h):スクロールインのロゴ。**ブート ROM 完走** = CPU + MMU + PPU + フラグ計算 + CB-prefix が全部揃った証拠。E-8 でブートチャイム
+2. **Nintendo ロゴ表示**(E-7 完了時, 約 8〜13h):スクロールインのロゴ。**ブートROM 完走** = CPU + MMU + PPU + フラグ計算 + CB-prefix が全部揃った証拠。E-8 でブートチャイム
 3. **tobu.gb タイトル**(F-5 完了時, 約 14.5〜23h):実ゲームが起動。MBC1 + スプライト + 入力 + タイマー が揃った証拠
 
 ## 前提
@@ -134,10 +134,10 @@ GEM-BOY/
 │   ├── emulator/            # 純 Ruby のエミュレータコア
 │   │   ├── bit.rb           # 8bit/16bit/4bit 操作の純粋関数ヘルパ(low_byte / high_byte / make_u16 / wrap_u8 / wrap_u16 / low_4bits)
 │   │   ├── cartridge.rb     # カートリッジ
-│   │   ├── mmu.rb           # メモリ管理 + シリアル出力 + read_u16/write_u16(E-4 でブート ROM mapping 追加)
+│   │   ├── mmu.rb           # メモリ管理 + シリアル出力 + read_u16/write_u16(E-4 でブートROM mapping 追加)
 │   │   ├── cpu.rb           # CPU(B-1, B-2 完了。E-1 の大半を前倒しで実装済み。E-2 で CB-prefix 追加)
 │   │   ├── ppu.rb           # 描画(C-1, C-2 完了: LY ティック + BG タイル描画。E-3 で SCY スクロール対応)
-│   │   ├── boot_rom.rb      # ブート ROM ローダ(E-4 で作成、任意で別ファイル化)
+│   │   ├── boot_rom.rb      # ブートROM ローダ(E-4 で作成、任意で別ファイル化)
 │   │   ├── mbc1.rb          # MBC1 バンク切り替え(F-1 で作成)
 │   │   └── emulator.rb      # 統合
 │   └── core_ext/            # ビルトインクラス拡張(blank? など)
@@ -164,7 +164,7 @@ GEM-BOY/
 
 # フェーズ B: CPU 基本命令(hello.gb 用)
 
-`hello.gb` の実行に必要な Sharp LR35902(Game Boy CPU)命令を実装する。**ブート ROM が使う命令の一部のみ**で済む(CB-prefix は不要、`PUSH/POP/CALL/RET` も hello.gb 次第で省略可能)。残りの命令はフェーズ E で追加する。
+`hello.gb` の実行に必要な Sharp LR35902(Game Boy CPU)命令を実装する。**ブートROM が使う命令の一部のみ**で済む(CB-prefix は不要、`PUSH/POP/CALL/RET` も hello.gb 次第で省略可能)。残りの命令はフェーズ E で追加する。
 
 CPU リファレンス:
 - Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html
@@ -190,7 +190,7 @@ CPU リファレンス:
 
 ## ステップ B-2: hello.gb が使う命令一式 (1〜1.5時間) [ほぼ完了]
 
-**目標**: `data/hello.gb` の実行に必要な命令を網羅する。**CB-prefix と一部のブート ROM 専用命令はスキップ**(フェーズ E で追加)。
+**目標**: `data/hello.gb` の実行に必要な命令を網羅する。**CB-prefix と一部のブートROM 専用命令はスキップ**(フェーズ E で追加)。
 
 ### 現状(2026-04-30 時点)
 
@@ -229,13 +229,13 @@ CPU リファレンス:
 
 **詰まり要因**: 0xFF44(LY)を読むが、PPU が未実装なので LY が常に 0 → CP 0x90 が永遠に Z=0 を返す。**0xFA `LD A,(u16)` の `mmu.read` 抜けバグは解消済み**で、CPU 側は完全に正しく動作している。**残るは PPU の LY 更新だけ**。
 
-**ブート ROM の到達点:**
+**ブートROM の到達点:**
 
 VRAM クリアループ(0x32 `LD (HL-),A` を `HL=0x9FFF` から `HL=0x7FFF` まで繰り返し)を完走し、PC=0x0008 の **`BIT 7,H`(0xCB 0x7C)で停止**。CB-prefix の枠組み(E-2)が次の最大の壁。
 
 ### B-2 で前倒しした E-1 ぶんの命令
 
-ROADMAP では「E-1 でブート ROM 用 CPU 命令を追加」となっていたが、`Bit` モジュールが整備されてテンプレ展開が楽になったため、**B-2 でほぼ全 LD 系・論理演算・比較系を一気に書いた**。E-1 で残っている主な命令は **算術系 / スタック系 / コール系**。これらはサイクルが大きく(8〜24 サイクル)、ブート ROM のロゴ展開部から本格的に必要になる。
+ROADMAP では「E-1 でブートROM 用 CPU 命令を追加」となっていたが、`Bit` モジュールが整備されてテンプレ展開が楽になったため、**B-2 でほぼ全 LD 系・論理演算・比較系を一気に書いた**。E-1 で残っている主な命令は **算術系 / スタック系 / コール系**。これらはサイクルが大きく(8〜24 サイクル)、ブートROM のロゴ展開部から本格的に必要になる。
 
 ### 実装する命令カテゴリ(おおよその範囲)
 
@@ -272,7 +272,7 @@ ROADMAP では「E-1 でブート ROM 用 CPU 命令を追加」となってい�
 
 # フェーズ C: PPU 最小実装
 
-`hello.gb` および ブート ROM が画面に表示するのは **BG タイルのみ**(スプライトもウィンドウも使わない)。最小限の PPU で済む。**SCY スクロール対応はフェーズ E**(Nintendo ロゴで必須)に回す。
+`hello.gb` および ブートROM が画面に表示するのは **BG タイルのみ**(スプライトもウィンドウも使わない)。最小限の PPU で済む。**SCY スクロール対応はフェーズ E**(Nintendo ロゴで必須)に回す。
 
 PPU リファレンス:
 - Pan Docs Rendering: https://gbdev.io/pandocs/Rendering.html
@@ -291,7 +291,7 @@ PPU リファレンス:
 - `lcd_on?` プライベートメソッド: LCDC bit7 = 0 の間は LY 進行を止める(VRAM クリア中の挙動を再現)
 - `render_scanline` プライベートメソッド: C-2 で実装するためのフック(現在は空)
 - `spec/app/emulator/ppu_spec.rb` で `#initialize` / `#step`(LCD OFF / 1 ライン / VBlank 開始 / 1 フレーム完了 / 小サイクル累積)を 7 ケース検証
-- `spec/app/emulator/cpu_spec.rb` の "HELLO WORLD 完走" 統合テストを更新: PPU を組み込んで LY ティックを CPU の `cpu.run` ループと連動、ブート ROM 終了直後の I/O 初期値(LCDC=0x91, BGP=0xFC)を `mmu.write_io_direct` でセット
+- `spec/app/emulator/cpu_spec.rb` の "HELLO WORLD 完走" 統合テストを更新: PPU を組み込んで LY ティックを CPU の `cpu.run` ループと連動、ブートROM 終了直後の I/O 初期値(LCDC=0x91, BGP=0xFC)を `mmu.write_io_direct` でセット
 
 結果: **HELLO WORLD は VBlank 待ちループを抜けて初期化処理に進み、PC=0x0177 の `CALL u16`(未実装)で停止**するようになった。CPU と PPU の連動が確認できた。
 
@@ -403,7 +403,7 @@ skip_boot 起動で `hello.gb` を直接実行し、画面に "Hello World!" を
 
 ## ステップ D-1: skip_boot モード実装 (30分)
 
-**目標**: ブート ROM を使わず、直接 `PC=0x0100` から起動できるようにする。ブート ROM 終了直後の実機状態をハードコードで再現する。
+**目標**: ブートROM を使わず、直接 `PC=0x0100` から起動できるようにする。ブートROM 終了直後の実機状態をハードコードで再現する。
 
 ### CPU 初期値の差し替え
 
@@ -413,7 +413,7 @@ class CPU
   def initialize(mmu, skip_boot: false)
     @mmu = mmu
     if skip_boot
-      # ブート ROM 終了直後の実機値(DMG)
+      # ブートROM 終了直後の実機値(DMG)
       # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
       @a = 0x01; @f = 0xB0
       @b = 0x00; @c = 0x13
@@ -434,7 +434,7 @@ end
 
 ### MMU 側の I/O レジスタ初期値
 
-ブート ROM が設定する I/O レジスタ(LCDC = 0x91、BGP = 0xFC など)も、skip_boot モードでは MMU 初期化時に同じ値を入れておく必要がある。Pan Docs の Power-Up Sequence の一覧を参照。
+ブートROM が設定する I/O レジスタ(LCDC = 0x91、BGP = 0xFC など)も、skip_boot モードでは MMU 初期化時に同じ値を入れておく必要がある。Pan Docs の Power-Up Sequence の一覧を参照。
 
 ### main.rb 統合
 
@@ -471,21 +471,21 @@ end
 | 文字色が反転している | BGP パレット未対応 | BGP レジスタ(0xFF47)の参照を追加 |
 | **"Hello World!" が出る** | **成功** | ★ 第一マイルストーン達成 |
 
-ここで「画面に文字が出る」だけでも **第一マイルストーン達成**。これで PPU の正しさが裏取りできるので、フェーズ E のブート ROM 挑戦に進んだとき「PPU は OK、犯人は CPU 側」と切り分け可能になる。
+ここで「画面に文字が出る」だけでも **第一マイルストーン達成**。これで PPU の正しさが裏取りできるので、フェーズ E のブートROM 挑戦に進んだとき「PPU は OK、犯人は CPU 側」と切り分け可能になる。
 
 ---
 
 # フェーズ E: Nintendo ロゴ表示 ★第二マイルストーン
 
-ブート ROM 全体を完走させ、**スクロールインする Nintendo ロゴ**を表示する。HELLO WORLD で動作確認済みの PPU と CPU 命令一式を土台にして、不足分(CB-prefix・ブート ROM 専用命令・スクロール・ブート ROM mapping)を追加していく。
+ブートROM 全体を完走させ、**スクロールインする Nintendo ロゴ**を表示する。HELLO WORLD で動作確認済みの PPU と CPU 命令一式を土台にして、不足分(CB-prefix・ブートROM 専用命令・スクロール・ブートROM mapping)を追加していく。
 
-## ステップ E-1: ブート ROM 用 CPU 命令追加 (30分〜1時間)
+## ステップ E-1: ブートROM 用 CPU 命令追加 (30分〜1時間)
 
-**目標**: ブート ROM が使うが hello.gb では使わなかった命令を追加する。
+**目標**: ブートROM が使うが hello.gb では使わなかった命令を追加する。
 
 ### 想定される追加命令
 
-`hello.gb` で省いた命令のうち、ブート ROM が使うもの:
+`hello.gb` で省いた命令のうち、ブートROM が使うもの:
 
 | カテゴリ | 命令 |
 |---|---|
@@ -505,7 +505,7 @@ B-2 と同じ「動かしながら必要分だけ追加」の流れで進める�
 
 ## ステップ E-2: CB-prefix `BIT n,r` / `RL r` 実装 (1時間)
 
-**目標**: 0xCB に続く 8bit でオペコードを解釈する CB 系命令を実装。ブート ROM のロゴ展開で使われる。
+**目標**: 0xCB に続く 8bit でオペコードを解釈する CB 系命令を実装。ブートROM のロゴ展開で使われる。
 
 CB-prefix 命令は全 256 種類だが、ロゴ展開で使うのは:
 - **`BIT n,r`** (0x40-0x7F): 1 ビット検査(Z = !bit_n(r), N=0, H=1)
@@ -539,7 +539,7 @@ end
 
 ## ステップ E-3: PPU SCY スクロール対応 (30分)
 
-**目標**: ブート ROM のロゴスクロールイン演出のため、PPU の BG 描画に `SCY` を反映する。
+**目標**: ブートROM のロゴスクロールイン演出のため、PPU の BG 描画に `SCY` を反映する。
 
 C-2 で `SCY=0` 固定にしていた箇所を、`bg_y = (LY + SCY) & 0xFF` に変更するだけ。`SCX` も同様に対応しておくと将来の拡張で楽。
 
@@ -549,16 +549,16 @@ VRAM に固定タイルを書き、`SCY` を 1 ずつ増やして `render_scanli
 
 ---
 
-## ステップ E-4: MMU にブート ROM mapping 追加 (30分)
+## ステップ E-4: MMU にブートROM mapping 追加 (30分)
 
-**目標**: MMU を改造し、ブート ROM 期間中は `0x0000-0x00FF` をブート ROM (`data/dmg_boot.bin`) にマップする。
+**目標**: MMU を改造し、ブートROM 期間中は `0x0000-0x00FF` をブートROM (`data/dmg_boot.bin`) にマップする。
 
 ### MMU 改造
 
 ```ruby
 # app/emulator/mmu.rb
 class MMU
-  BOOT_ROM_OFF = 0xFF50  # 0x01 を書き込むとブート ROM 切断
+  BOOT_ROM_OFF = 0xFF50  # 0x01 を書き込むとブートROM 切断
 
   def initialize(cartridge, boot_rom: nil)
     @cartridge = cartridge
@@ -586,7 +586,7 @@ end
 
 ```ruby
 # app/main.rb
-ROM_PATH = 'data/tobu.gb'  # ブート ROM を抜けた直後の遷移先(ロゴ表示には何でも良い)
+ROM_PATH = 'data/tobu.gb'  # ブートROM を抜けた直後の遷移先(ロゴ表示には何でも良い)
 SKIP_BOOT = false
 
 def setup(args)
@@ -604,9 +604,9 @@ end
 
 ---
 
-## ステップ E-5: ブート ROM 起動 → 崩れたロゴ観察 (30分)
+## ステップ E-5: ブートROM 起動 → 崩れたロゴ観察 (30分)
 
-**目標**: ブート ROM が動き始める瞬間を確認する。何が崩れているかを目視する。
+**目標**: ブートROM が動き始める瞬間を確認する。何が崩れているかを目視する。
 
 ### 観察チェックリスト
 
@@ -664,7 +664,7 @@ ROM_PATH = 'data/cpu_instrs/06-ld r,r.gb'   # 切り替えてテスト
 
 ## ステップ E-7: 修正済み Nintendo ロゴ表示 (30分) ★第二マイルストーン
 
-**目標**: E-6 で Blargg を Pass させた CPU で再びブート ROM を起動。
+**目標**: E-6 で Blargg を Pass させた CPU で再びブートROM を起動。
 
 ```ruby
 # app/main.rb
@@ -672,7 +672,7 @@ ROM_PATH = 'data/tobu.gb'
 SKIP_BOOT = false
 ```
 
-ブート ROM が完走すると:
+ブートROM が完走すると:
 
 1. グレー → 黒の画面遷移
 2. **Nintendo ロゴが画面中央に上から下へスクロールイン**
@@ -686,7 +686,7 @@ SKIP_BOOT = false
 
 ## ステップ E-8: ブートチャイム再生(NR14 trigger フック) (30分)
 
-**目標**: ブート ROM が APU の Channel 1 を trigger した瞬間を MMU で検知し、`data/game-boy-startup.wav` を再生する。APU 本体は実装せず、**WAV 再生で代替**するライト実装。
+**目標**: ブートROM が APU の Channel 1 を trigger した瞬間を MMU で検知し、`data/game-boy-startup.wav` を再生する。APU 本体は実装せず、**WAV 再生で代替**するライト実装。
 
 ### MMU にチャイムフック追加
 
@@ -727,11 +727,11 @@ end
 
 ### 一発フラグの理由
 
-ブート ROM は **チャイムを 2 回 trigger する**(低音 → 待ちループ → 高音)。今回の WAV は既に「ポイーン」2 音入りの録音なので、**毎回鳴らすと 4 音重なって崩れる**。`@chime_triggered` で初回だけ拾い、以降は無視する。
+ブートROM は **チャイムを 2 回 trigger する**(低音 → 待ちループ → 高音)。今回の WAV は既に「ポイーン」2 音入りの録音なので、**毎回鳴らすと 4 音重なって崩れる**。`@chime_triggered` で初回だけ拾い、以降は無視する。
 
 ### 受け入れ条件
 
-- ブート ROM が完走する瞬間に「ポイーン」が 1 回だけ鳴る
+- ブートROM が完走する瞬間に「ポイーン」が 1 回だけ鳴る
 - ロゴのスクロールインと音のタイミングが大きくズレない(数フレームの遅延は許容)
 - 2 回目の起動でも正常に鳴る(`@chime_triggered` が setup でリセットされること)
 
@@ -743,7 +743,7 @@ end
 
 # フェーズ F: tobu.gb タイトル画面 ★第三マイルストーン
 
-ブート ROM が完走した後、tobu.gb の **タイトル画面**が表示されるところまで実装する。
+ブートROM が完走した後、tobu.gb の **タイトル画面**が表示されるところまで実装する。
 
 ## ステップ F-1: MBC1 実装 (2〜3時間)
 
@@ -767,7 +767,7 @@ ROM Bank 0 (`0x0000-0x3FFF`) は固定、Bank 1..NN (`0x4000-0x7FFF`) が切り�
 
 ### 動作確認
 
-`tobu.gb` をロードして起動。ブート ROM 完走後、`PC` がカートリッジの命令を実行し続けることを確認(クラッシュしなければ OK の段階)。
+`tobu.gb` をロードして起動。ブートROM 完走後、`PC` がカートリッジの命令を実行し続けることを確認(クラッシュしなければ OK の段階)。
 
 ---
 
@@ -872,7 +872,7 @@ TIMA オーバーフローで `IF` (0xFF0F) の bit2 を立てる。
 - RGBDS gbz80(7) 命令リファレンス: https://rgbds.gbdev.io/docs/gbz80.7
 - emudev.de: https://emudev.de/gameboy-emulator/testing-our-cpu/
 - gameboy-doctor(CPU トレース比較): https://github.com/robert/gameboy-doctor
-- ブート ROM 逆アセンブリ: https://github.com/ISSOtm/gb-bootroms
+- ブートROM 逆アセンブリ: https://github.com/ISSOtm/gb-bootroms
 - Blargg gb-test-roms: https://github.com/retrio/gb-test-roms
 - SameBoy(参照実装): https://github.com/LIJI32/SameBoy
 - gitendo HelloWorld: https://github.com/gitendo/helloworld

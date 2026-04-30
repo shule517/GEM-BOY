@@ -210,4 +210,31 @@ RSpec.describe MMU do
       end
     end
   end
+
+  describe '#initialize' do
+    let(:cartridge) { Cartridge.new(Array.new(0x8000, 0)) }
+
+    context 'skip_boot を指定しないとき(ブートROM 経由起動)' do
+      subject { described_class.new(cartridge) }
+
+      it 'I/O レジスタは 0 で初期化される(LCDC=0, BGP=0)' do
+        expect(subject.read_u8(address: 0xFF40)).to eq 0
+        expect(subject.read_u8(address: 0xFF47)).to eq 0
+      end
+    end
+
+    context 'skip_boot: true を指定したとき(ブートROM をスキップして起動)' do
+      # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
+      # ブートROM 完走後の I/O レジスタ初期値を最初からセットして起動する
+      subject { described_class.new(cartridge, skip_boot: true) }
+
+      it 'LCDC=0x91(LCD ON + BG ON + unsigned addressing)' do
+        expect(subject.read_u8(address: 0xFF40)).to eq 0x91
+      end
+
+      it 'BGP=0xFC(標準パレット)' do
+        expect(subject.read_u8(address: 0xFF47)).to eq 0xFC
+      end
+    end
+  end
 end

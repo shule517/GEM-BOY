@@ -3,8 +3,10 @@ require 'app/core_ext/last.rb'
 require 'app/emulator/cartridge.rb'
 require 'app/emulator/mmu.rb'
 require 'app/emulator/cpu.rb'
+require 'app/emulator/ppu.rb'
 
-ROM_PATH = 'data/tobu.gb'
+ROM_PATH = 'data/hello.gb'
+SKIP_BOOT = true # ブートROM をスキップして直接 PC=0x0100 から起動(D-1)
 
 def tick(args)
   setup(args) if args.state.tick_count == 0
@@ -21,7 +23,9 @@ end
 
 def setup(args)
   args.state.cartridge = Cartridge.new(args.gtk.read_file(ROM_PATH).bytes)
-  args.state.mmu = MMU.new(args.state.cartridge)
+  args.state.mmu = MMU.new(args.state.cartridge, skip_boot: SKIP_BOOT)
+  args.state.cpu = CPU.new(args.state.mmu, skip_boot: SKIP_BOOT)
+  args.state.ppu = PPU.new(args.state.mmu)
 end
 
 def render_header(args)

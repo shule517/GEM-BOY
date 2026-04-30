@@ -7,7 +7,7 @@ require 'app/emulator/bit'
 #
 # ここでは「命令を載せる枠組み」だけを用意する。具体的なオペコードはステップ B-2 以降で
 # `@opcodes` テーブルへ追加していく方針。未実装のオペコードを踏むと例外で停止するため、
-# ブート ROM が実際に必要とする命令だけが自然に浮かび上がる(ROADMAP.md / B-1 参照)。
+# ブートROM が実際に必要とする命令だけが自然に浮かび上がる(ROADMAP.md / B-1 参照)。
 #
 # === レジスタ ===
 # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
@@ -45,14 +45,24 @@ class CPU
                 :opcodes, # CPUの命令一覧 https://izik1.github.io/gbops/
                 :mmu
 
-  def initialize(mmu)
+  def initialize(mmu, skip_boot: false)
     @mmu = mmu
 
-    # ブート ROM 経由で起動するので全レジスタ 0 から始める。
-    # (skip_boot 起動なら A=0x01, F=0xB0, PC=0x0100, SP=0xFFFE 等)
-    @a = @b = @c = @d = @e = @h = @l = @f = 0
-    @sp = 0 # スタックポインタ
-    @pc = 0 # プログラムカウンタ
+    if skip_boot
+      # ブートROM 完走後の DMG 実機値(skip_boot 起動でブートROM をスキップ)
+      # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
+      @a = 0x01; @f = 0xB0 # A: DMG識別値、F: Z=1,N=0,H=1,C=1
+      @b = 0x00; @c = 0x13
+      @d = 0x00; @e = 0xD8
+      @h = 0x01; @l = 0x4D # HL: カートリッジヘッダのチェックサム関連
+      @sp = 0xFFFE         # HRAM末端
+      @pc = 0x0100         # カートリッジコードの開始位置
+    else
+      # ブートROM 経由で起動するので全レジスタ 0 から始める
+      @a = @b = @c = @d = @e = @h = @l = @f = 0
+      @sp = 0 # スタックポインタ
+      @pc = 0 # プログラムカウンタ
+    end
     @ime = false  # 割り込み許可フラグ(Interrupt Master Enable)
     @halted = false # CPUの一時停止中フラグ
 
