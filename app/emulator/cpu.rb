@@ -174,7 +174,7 @@ class CPU
     # ============================================================
     table[0x00] = -> { 4 } # NOP: 何もしない。4サイクル進む。
     # table[0x10] = -> { 4 }  # STOP
-    # table[0x76] = -> { 4 }  # HALT
+    table[0x76] = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
     table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグをクリアして割り込みを無効
     # table[0xFB] = -> { 4 }  # EI
     # table[0xCB] = -> { 4 }  # PREFIX CB (CB-prefix命令へ分岐)
