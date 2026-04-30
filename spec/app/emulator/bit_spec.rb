@@ -367,4 +367,60 @@ RSpec.describe Bit do
       end
     end
   end
+
+  describe '.bit_at' do
+    # 値の n 番目のビット(0 or 1)を取り出す。
+    # MRI Ruby では `value[n]` で同じことができるが、DragonRuby (mruby) は未対応。
+    subject { Bit.bit_at(value, n) }
+
+    context '0x80 の bit7 を取り出すとき' do
+      let(:value) { 0x80 }
+      let(:n) { 7 }
+
+      it '1 を返す' do
+        is_expected.to eq 1
+      end
+    end
+
+    context '0x80 の bit0 を取り出すとき' do
+      let(:value) { 0x80 }
+      let(:n) { 0 }
+
+      it '0 を返す' do
+        is_expected.to eq 0
+      end
+    end
+
+    context '0x91 の bit0 を取り出すとき(LCDC のBG有効ビット)' do
+      let(:value) { 0x91 }
+      let(:n) { 0 }
+
+      it '1 を返す' do
+        is_expected.to eq 1
+      end
+    end
+
+    context '0x91 の bit3 を取り出すとき' do
+      let(:value) { 0x91 }
+      let(:n) { 3 }
+
+      it '0 を返す' do
+        is_expected.to eq 0
+      end
+    end
+
+    context '0xFF のすべてのビットを取り出すとき' do
+      let(:value) { 0xFF }
+
+      (0..7).each do |bit|
+        context "bit#{bit}" do
+          let(:n) { bit }
+
+          it '1 を返す' do
+            is_expected.to eq 1
+          end
+        end
+      end
+    end
+  end
 end

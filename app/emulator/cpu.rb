@@ -121,10 +121,10 @@ class CPU
     self.carry = carry unless carry.nil?                # bit4 Carry
   end
 
-  def zero = f[7]
-  def negative = f[6]
-  def half_carry = f[5]
-  def carry = f[4]
+  def zero = Bit.bit_at(f, 7)
+  def negative = Bit.bit_at(f, 6)
+  def half_carry = Bit.bit_at(f, 5)
+  def carry = Bit.bit_at(f, 4)
 
   def zero=(value)
     self.f = (f & 0b01111111) | (value ? 1 << 7 : 0) # bit7 Zero

@@ -59,22 +59,22 @@ class PPU
 
   # LCDが有効か https://gbdev.io/pandocs/LCDC.html#lcdc7--lcd-enable
   def lcd_enabled?
-    @mmu.read_u8(address: LCDC)[7] == 1 # LCDC bit7 = LCD Enable
+    Bit.bit_at(@mmu.read_u8(address: LCDC), 7) == 1 # LCDC bit7 = LCD Enable
   end
 
   # BGが有効か https://gbdev.io/pandocs/LCDC.html#lcdc0--bg-and-window-enablepriority
   def bg_enabled?
-    @mmu.read_u8(address: LCDC)[0] == 1 # LCDC bit0 = BG/Window Enable
+    Bit.bit_at(@mmu.read_u8(address: LCDC), 0) == 1 # LCDC bit0 = BG/Window Enable
   end
 
   # BGタイルマップの先頭アドレス https://gbdev.io/pandocs/LCDC.html#lcdc3--bg-tile-map-area
   def bg_tile_map_address
-    @mmu.read_u8(address: LCDC)[3] == 1 ? 0x9C00 : 0x9800 # LCDC bit3
+    Bit.bit_at(@mmu.read_u8(address: LCDC), 3) == 1 ? 0x9C00 : 0x9800 # LCDC bit3
   end
 
   # BGタイルデータがunsignedアドレッシングか https://gbdev.io/pandocs/LCDC.html#lcdc4--bg-and-window-tile-data-area
   def bg_tile_data_unsigned?
-    @mmu.read_u8(address: LCDC)[4] == 1 # LCDC bit4=1 で unsigned(0x8000基点)、0 で signed(0x9000基点)
+    Bit.bit_at(@mmu.read_u8(address: LCDC), 4) == 1 # LCDC bit4=1 で unsigned(0x8000基点)、0 で signed(0x9000基点)
   end
 
   # 1スキャンライン分(160ピクセル)をframebufferに書き込む(C-2: BGタイル描画)
@@ -124,6 +124,6 @@ class PPU
     byte_lo = @mmu.read_u8(address: tile_address + pixel_y * 2)     # 8ピクセル分の色番号bit0(LSB)を並べたバイト
     byte_hi = @mmu.read_u8(address: tile_address + pixel_y * 2 + 1) # 8ピクセル分の色番号bit1(MSB)を並べたバイト
     bit = 7 - pixel_x                                               # 左端ピクセル(x=0)がbit7、右端(x=7)がbit0
-    (byte_hi[bit] << 1) | byte_lo[bit]                              # MSBとLSBを組み合わせて0..3の色番号
+    (Bit.bit_at(byte_hi, bit) << 1) | Bit.bit_at(byte_lo, bit)      # MSBとLSBを組み合わせて0..3の色番号
   end
 end
