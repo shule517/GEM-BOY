@@ -22,18 +22,18 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 |---|---|---|---|---|
 | A. 土台 | Cartridge + MMU 骨組み + シリアル出力 | 3〜4h | ROM が読める、シリアル出力動く | 3/3 [完了] |
 | B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 2/2(B-2 ほぼ完了: ~102 オペコード実装、ブート ROM が CB-prefix まで到達)|
-| C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 1/2(**C-1 完了**: LY ティック動作、HELLO WORLD は VBlank ループを抜けて CALL で停止)|
+| C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 2/2 [完了](C-1: LY ティック / C-2: BG タイル描画。framebuffer に画素が乗るようになった)|
 | D. HELLO WORLD 表示 | skip_boot 起動 + 画面確認 | 1h | **画面に "Hello World!" 表示** ★第一 | 0/2 |
 | E. Nintendo ロゴ表示 | ブート ROM 用追加命令 + CB-prefix + ブート ROM mapping + スクロール + チャイム | 3〜7h | **正しい Nintendo ロゴ + ブートチャイム** ★第二 | 0/8(E-1 ぶんは B-2 で前倒し済み、**E-2 CB-prefix が次の壁**)|
 | F. tobu.gb タイトル | MBC1 + スプライト + 入力 + タイマー | 6.5〜10h | **tobu.gb タイトル表示** ★第三 | 0/5 |
 
-合計 22 ステップ、想定 17.5〜27h。**現在 6 ステップ完了(フェーズ A 完走 + B-1, B-2 ほぼ完了 + C-1 完了)**。
+合計 22 ステップ、想定 17.5〜27h。**現在 7 ステップ完了(フェーズ A 完走 + B-1, B-2 ほぼ完了 + C-1, C-2 完了)**。
 
 ### 進行中の発見(2026-04-30 時点)
 
-#### 1. CPU は ~102 オペコード実装、PPU 骨組み完成、統合テスト 145/147 pass
+#### 1. CPU は ~102 オペコード実装、PPU(C-1, C-2)完成、統合テスト 152/154 pass
 
-**論理演算系 / 比較系 / 8bit ロード r,r' / 16bit ロード / I/O ロード / レジスタペア間接 / 一部ジャンプ系**まで完成。**PPU(C-1)も完了**して LY が時間とともに進むようになり、HELLO WORLD は VBlank 待ちループを抜けられるようになった。残り 2 件のテスト失敗は次の通り。
+**論理演算系 / 比較系 / 8bit ロード r,r' / 16bit ロード / I/O ロード / レジスタペア間接 / 一部ジャンプ系**まで完成。**PPU(C-1, C-2)も完了**して LY が時間とともに進み、`render_scanline` で BG タイルが framebuffer に乗るようになった。HELLO WORLD は VBlank 待ちループを抜けて初期化処理に進んでいる。残り 2 件のテスト失敗は次の通り。
 
 #### 2. HELLO WORLD: PC=0x0177 で `0xCD CALL u16` 未実装で停止
 
@@ -49,15 +49,16 @@ PPU 実装で VBlank ループを抜けて初期化処理に入った。VRAM 書
 - `MMU#write_u16` / `MMU#read_u16` を追加 — `LD (u16),SP`(0x08)で使用、リトルエンディアン書き込みをカプセル化
 - `MMU#read` / `MMU#write` を **キーワード引数化**(`address:` / `value:`)で誤呼び出しを防止
 - レジスタペア(`bc` / `de` / `hl`)の **getter / setter を Bit モジュール経由**で実装、対称性を確保
-- **PPU クラス**(`app/emulator/ppu.rb`)を新設 — `step(cycles)` で LY を 0→153 まで循環、LCD OFF 中は停止、`render_scanline` のフックは C-2 用に空のまま
+- **PPU クラス**(`app/emulator/ppu.rb`)を新設 — `step(cycles)` で LY を 0→153 まで循環、LCD OFF 中は停止
+- **PPU の `render_scanline`(C-2)実装** — 2bpp デコード / LCDC bit3 のタイルマップ切替 / LCDC bit4 の signed/unsigned アドレッシング / BGP パレット変換まで対応。framebuffer に画素番号(0〜3)が書かれる
 
 ### 次の最短経路
 
 優先順位:
 
-1. **CALL / RET / PUSH / POP / RETI / RST(スタック系)** — HELLO WORLD の次の壁、ブート ROM 後半でも必要
-2. **E-2(CB-prefix)を着手** — ブート ROM の次の 1 命令で必要、ROADMAP E フェーズの中核
-3. **C-2(BG タイル描画)** — 画面に "Hello World!" を表示するための最後のピース(D-2 と統合可能)
+1. **CALL / RET / PUSH / POP / RETI / RST(スタック系)** — HELLO WORLD の次の壁(PC=0x0177 で停止中)、ブート ROM 後半でも必要
+2. **D-1(skip_boot モード)+ D-2(main.rb で framebuffer 表示)** — CALL 系が通れば画面表示で **第一マイルストーン達成**
+3. **E-2(CB-prefix)を着手** — ブート ROM の次の 1 命令で必要、ROADMAP E フェーズの中核
 4. **0xF8 `LD HL,SP+i8` のフラグ計算修正**(現在 H=1, C=1 のハードコード、TODO 残り)
 5. **AND A,r 系**(0xA0〜0xA7, 0xE6)— 論理演算 3 兄弟の最後
 6. **ADD / SUB / ADC / SBC / INC / DEC の 8bit 演算**(`Bit.wrap_u8` + フラグ計算のテンプレが揃ったので量産可能)
@@ -75,7 +76,7 @@ PPU 実装で VBlank ループを抜けて初期化処理に入った。VRAM 書
 
 ### フェーズ C: PPU 最小実装
 - [x] C-1: PPU 骨組み(LCDC, LY, モード) — LY ティック動作、HELLO WORLD は VBlank ループを抜けて CALL で停止
-- [ ] C-2: BG タイル描画(SCY=0 固定)
+- [x] C-2: BG タイル描画(SCY=0 固定) — render_scanline 実装、2bpp デコード / signed-unsigned 切替 / パレット変換まで対応
 
 ### フェーズ D: HELLO WORLD 表示
 - [ ] D-1: skip_boot モード実装
@@ -132,7 +133,7 @@ GEM-BOY/
 │   │   ├── cartridge.rb     # カートリッジ
 │   │   ├── mmu.rb           # メモリ管理 + シリアル出力 + read_u16/write_u16(E-4 でブート ROM mapping 追加)
 │   │   ├── cpu.rb           # CPU(B-1, B-2 完了。E-1 の大半を前倒しで実装済み。E-2 で CB-prefix 追加)
-│   │   ├── ppu.rb           # 描画(C-1 完了: LY ティック。C-2 で BG タイル、E-3 で SCY スクロール対応)
+│   │   ├── ppu.rb           # 描画(C-1, C-2 完了: LY ティック + BG タイル描画。E-3 で SCY スクロール対応)
 │   │   ├── boot_rom.rb      # ブート ROM ローダ(E-4 で作成、任意で別ファイル化)
 │   │   ├── mbc1.rb          # MBC1 バンク切り替え(F-1 で作成)
 │   │   └── emulator.rb      # 統合
@@ -362,43 +363,34 @@ end
 
 ---
 
-## ステップ C-2: BG タイル描画(SCY=0 固定) (1〜1.5時間)
+## ステップ C-2: BG タイル描画(SCY=0 固定) (1〜1.5時間) [完了]
 
-**目標**: VRAM の Tile Data + Tile Map から 1 スキャンライン分のピクセルを生成する。**SCY/SCX は読み込むけど 0 固定前提でコードは書く**(`hello.gb` はスクロールしない)。
+**目標**: VRAM の Tile Data + Tile Map から 1 スキャンライン分のピクセルを生成する。**SCY/SCX は読み込むけど 0 固定前提**(`hello.gb` はスクロールしない)。
 
-### 描画ロジック
+実装内容:
 
-各スキャンライン (`LY`) について:
+- `app/emulator/ppu.rb` の `render_scanline` を実装(C-1 で残していた空フックを埋めた)
+- **BG 有効判定**(LCDC bit0)で無効時はスキップ、`bg_enabled?` プライベートメソッドで判定
+- **タイルマップ切替**(LCDC bit3 で 0x9800 / 0x9C00)
+- **アドレッシング切替**(LCDC bit4): unsigned(0x8000 + tile_num × 16)/ signed(0x9000 + (signed)tile_num × 16)
+  - signed の場合は tile_num=0x80..0xFF を -128..-1 として解釈
+  - `tile_data_address(tile_num, unsigned_addressing)` プライベートメソッドに切り出し
+- **2bpp デコード**を `pixel_color(tile_addr, pixel_x, pixel_y)` プライベートメソッドに集約
+  - 1 タイル = 16 バイト、1 行 = 2 バイト(下位ビット並び + 上位ビット並び)
+  - 左端ピクセル = bit7、右端 = bit0(逆順)
+- **BGP パレット変換**: 色番号(0..3)を `(BGP >> (color_id * 2)) & 0b11` で明度(0..3)に変換
+- SCY / SCX 加算と 8bit ラップを適用(hello.gb は 0 固定だが将来の E-3 SCY スクロール対応の下準備)
+- `spec/app/emulator/ppu_spec.rb` で 7 ケース検証:
+  - BG 無効で framebuffer 不変
+  - 全色 0 / 全色 3 のタイル
+  - パレット反転(色 3 → 明度 0)
+  - **bit 順序**(左端 = bit7、右端 = bit0)を明示的に確認
+  - LCDC bit3=1 でタイルマップ 0x9C00 が参照されること
+  - LCDC bit4=0(signed)で tile_num=0xFF が 0x8FF0 を指すこと
 
-1. BG マップ上の Y 座標: `bg_y = LY`(SCY=0 前提なので加算不要、ただし SCY を読む箇所は明示しておく)
-2. Tile Map のどの行か: `tile_row = bg_y / 8`、その中の何ラインか: `pixel_y = bg_y % 8`
-3. Tile Map のアドレス(LCDC bit3 で 0x9800 か 0x9C00): `map_base + tile_row * 32`
-4. 各ピクセル X (0..159):
-   - `bg_x = X`
-   - `tile_col = bg_x / 8`、`pixel_x = bg_x % 8`
-   - Tile Map から **タイル番号**を取得
-   - LCDC bit4 で Tile Data の解釈方式を選ぶ(0x8000 unsigned / 0x8800 signed)
-   - **Tile Data から 16 バイト = 1 タイル分**を取得し、(pixel_x, pixel_y) のドットを取り出す
-   - BGP パレットで色を変換 → framebuffer に書き込み
+結果: PPU が画素を framebuffer に書き込めるようになった。**HELLO WORLD の詰まり位置は変わらず PC=0x0177 の `CALL u16`**(C-2 の影響範囲外)。CPU 側のスタック系を実装すれば D-1 / D-2 で画面表示まで進める。
 
-### 1 タイルの 2bpp デコード
-
-1 タイル = 16 バイト。各行(2 バイト)= 8 ピクセル。
-- バイト 1 = ピクセルの bit0 を並べたもの
-- バイト 2 = ピクセルの bit1 を並べたもの
-
-```ruby
-def pixel_color(tile_data_addr, pixel_x, pixel_y)
-  byte1 = @mmu.read(tile_data_addr + pixel_y * 2)
-  byte2 = @mmu.read(tile_data_addr + pixel_y * 2 + 1)
-  bit = 7 - pixel_x
-  ((byte2 >> bit) & 1) << 1 | ((byte1 >> bit) & 1)  # 0..3
-end
-```
-
-### 動作確認
-
-VRAM に手で適当なタイル + マップを書いて、`render_scanline` を 144 回呼んで framebuffer 全体を埋める。`framebuffer.tally` で複数色が出ていれば OK。
+詳細は `git log` を参照。
 
 ---
 
