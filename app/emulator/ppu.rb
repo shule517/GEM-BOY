@@ -91,25 +91,25 @@ class PPU
     pixel_y = bg_y % 8           # タイル内のY座標(0..7)
 
     tile_map_address = bg_tile_map_address
-    unsigned_addressing = bg_tile_data_unsigned?
+    tile_data_unsigned = bg_tile_data_unsigned?
 
     SCREEN_WIDTH.times do |screen_x|
       bg_x = Bit.wrap_u8(scx + screen_x) # スクロール込みのBG上のX座標
       tilemap_col = bg_x / 8             # タイルマップ上の列番号(0..31)
       pixel_x = bg_x % 8                 # タイル内のX座標(0..7)
 
-      tile_number  = @mmu.read_u8(address: tile_map_address + tilemap_row * 32 + tilemap_col) # マップから絵柄番号を取得
-      tile_address = tile_data_address(tile_number, unsigned_addressing)                      # 絵柄データのVRAMアドレス
-      color_id     = pixel_color_id(tile_address, pixel_x, pixel_y)                           # 1ピクセルの色番号(0..3)を2bppデコード
-      shade        = (bgp >> (color_id * 2)) & 0b11                                           # BGPで色番号を画面明度(0..3)に変換
+      tile_number   = @mmu.read_u8(address: tile_map_address + tilemap_row * 32 + tilemap_col) # マップから絵柄番号を取得
+      tile_address  = tile_data_address(tile_number, tile_data_unsigned)                       # 絵柄データのVRAMアドレス
+      color_id      = pixel_color_id(tile_address, pixel_x, pixel_y)                           # 1ピクセルの色番号(0..3)を2bppデコード
+      palette_color = (bgp >> (color_id * 2)) & 0b11                                           # BGPで色番号を画面明度(0..3)に変換
 
-      @framebuffer[ly * SCREEN_WIDTH + screen_x] = shade
+      @framebuffer[ly * SCREEN_WIDTH + screen_x] = palette_color
     end
   end
 
   # タイル番号 → タイルデータの先頭アドレス(VRAM内) https://gbdev.io/pandocs/Tile_Data.html
-  def tile_data_address(tile_number, unsigned_addressing)
-    if unsigned_addressing
+  def tile_data_address(tile_number, tile_data_unsigned)
+    if tile_data_unsigned
       # 0x8000..0x8FF0
       0x8000 + tile_number * 16
     else
