@@ -26,7 +26,7 @@ class PPU
   SCANLINES_PER_FRAME = 154 # 1フレームのスキャンライン数(描画144行 + VBlank10行) https://gbdev.io/pandocs/Rendering.html
   VBLANK_START_LY     = 144 # これ以上のY座標はVBlank(描画スキップ)
 
-  attr_accessor :framebuffer, :ly
+  attr_accessor :cycles, :framebuffer, :ly
 
   def initialize(mmu)
     @mmu = mmu
@@ -40,9 +40,9 @@ class PPU
   def step(cycles)
     return unless lcd_enabled? # LCDが無効
 
-    @cycles += cycles
-    while @cycles >= CYCLES_PER_SCANLINE
-      @cycles -= CYCLES_PER_SCANLINE
+    self.cycles += cycles
+    while self.cycles >= CYCLES_PER_SCANLINE
+      self.cycles -= CYCLES_PER_SCANLINE
 
       # 1行描画する
       if ly < VBLANK_START_LY # 描画範囲内
