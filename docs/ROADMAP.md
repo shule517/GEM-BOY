@@ -31,7 +31,7 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 ### 進行中の発見(2026-04-30 時点)
 
-#### 1. CPU は ~102 オペコード実装、PPU(C-1, C-2)完成、統合テスト 152/154 pass
+#### 1. CPU は ~102 オペコード実装、PPU(C-1, C-2)完成、統合テスト 157/159 pass
 
 **論理演算系 / 比較系 / 8bit ロード r,r' / 16bit ロード / I/O ロード / レジスタペア間接 / 一部ジャンプ系**まで完成。**PPU(C-1, C-2)も完了**して LY が時間とともに進み、`render_scanline` で BG タイルが framebuffer に乗るようになった。HELLO WORLD は VBlank 待ちループを抜けて初期化処理に進んでいる。残り 2 件のテスト失敗は次の通り。
 
@@ -45,12 +45,15 @@ PPU 実装で VBlank ループを抜けて初期化処理に入った。VRAM 書
 
 #### 4. 設計面の改善
 
-- `Bit` モジュール(`app/emulator/bit.rb`)を新設 — `low_byte` / `high_byte` / `make_u16` / `wrap_u8` / `wrap_u16` / `low_4bits` を 1 か所に集約。CPU と MMU の両方から使う
+- `Bit` モジュール(`app/emulator/bit.rb`)を新設 — `low_byte` / `high_byte` / `make_u16` / `wrap_u8` / `wrap_u16` / `low_4bits` / **`u8_to_i8`** を 1 か所に集約。CPU と MMU と PPU から使う
 - `MMU#write_u16` / `MMU#read_u16` を追加 — `LD (u16),SP`(0x08)で使用、リトルエンディアン書き込みをカプセル化
-- `MMU#read` / `MMU#write` を **キーワード引数化**(`address:` / `value:`)で誤呼び出しを防止
+- **MMU の API を u8/u16 で対称化** — `MMU#read` / `MMU#write` を **`read_u8` / `write_u8` にリネーム**して `read_u16` / `write_u16` と命名整合(`address:` / `value:` キーワード引数で誤呼び出し防止)
 - レジスタペア(`bc` / `de` / `hl`)の **getter / setter を Bit モジュール経由**で実装、対称性を確保
 - **PPU クラス**(`app/emulator/ppu.rb`)を新設 — `step(cycles)` で LY を 0→153 まで循環、LCD OFF 中は停止
 - **PPU の `render_scanline`(C-2)実装** — 2bpp デコード / LCDC bit3 のタイルマップ切替 / LCDC bit4 の signed/unsigned アドレッシング / BGP パレット変換まで対応。framebuffer に画素番号(0〜3)が書かれる
+- **PPU の LCDC ビット解釈をメソッド抽出** — `lcd_enabled?`(bit7) / `bg_enabled?`(bit0) / `bg_tile_map_address`(bit3 → 0x9800/0x9C00) / `bg_tile_data_unsigned?`(bit4)で、LCDC 各ビットの意味を1ヶ所に集約
+- **PPU の命名整理** — `pixel_color` → `pixel_color_id`(戻り値の意味を明示)、`tile_row/col` → `tilemap_row/col`(階層を明示)、`tile_addr/num` → `tile_address/number`(略語展開)、`actual_color` → `palette_color`(BGP変換後と明示)、`SCREEN_WIDTH_PIXEL` → `SCREEN_WIDTH`(冗長サフィックス削除)
+- **CPU `fetch_i8` を `Bit.u8_to_i8` で書き直し** — u8→i8 変換ロジックが Bit モジュール 1 ヶ所に集約され、CPU/PPU で同じ変換を使う
 
 ### 次の最短経路
 
