@@ -45,13 +45,13 @@ class PPU
       @cycles -= CYCLES_PER_SCANLINE
 
       # 1行描画する
-      if @ly < VBLANK_START_LY # 描画範囲内
+      if ly < VBLANK_START_LY # 描画範囲内
         render_scanline
       end
 
       # LYを+1
-      @ly = (@ly + 1) % SCANLINES_PER_FRAME # はみ出たら、次フレームへ
-      @mmu.write_io_direct(LY, @ly)         # LYを更新
+      @ly = (ly + 1) % SCANLINES_PER_FRAME # はみ出たら、次フレームへ
+      @mmu.write_io_direct(LY, ly)         # LYを更新
     end
   end
 
@@ -77,7 +77,7 @@ class PPU
     bgp  = @mmu.read(address: BGP)  # BGパレット(色)
     lcdc = @mmu.read(address: LCDC) # LCD Control
 
-    bg_y = (@ly + scy) & 0xFF # スクロール込みのBG上のY座標(8bitラップ)
+    bg_y = (ly + scy) & 0xFF # スクロール込みのBG上のY座標(8bitラップ)
     tile_row = bg_y / 8       # タイルマップ上の行番号(0..31)
     pixel_y = bg_y % 8        # タイル内のY座標(0..7)
 
@@ -94,7 +94,7 @@ class PPU
       color_id = pixel_color(tile_addr, pixel_x, pixel_y)                  # 1ピクセルの色番号(0..3)を2bppデコード
       actual_color = (bgp >> (color_id * 2)) & 0b11                        # BGPで色番号を画面明度(0..3)に変換
 
-      @framebuffer[@ly * SCREEN_WIDTH_PIXEL + x] = actual_color
+      @framebuffer[ly * SCREEN_WIDTH_PIXEL + x] = actual_color
     end
   end
 
