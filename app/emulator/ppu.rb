@@ -35,10 +35,10 @@ class PPU
     @framebuffer = Array.new(SCREEN_WIDTH_PIXEL * SCREEN_HEIGHT_PIXEL, 0)
   end
 
-  # CPUの消費サイクルを受け取ってPPUの時間を進める
+  # 引数のサイクルだけ処理を実行する
   # 456サイクル経過するごとに1ライン描画 + LYを+1、154でラップ
   def step(cycles)
-    return unless lcd_on? # LCD OFF中(VRAMクリアなど)はLY進行を止める
+    return unless lcd_enabled? # LCDが無効
 
     @cycles += cycles
     while @cycles >= CYCLES_PER_SCANLINE
@@ -55,10 +55,14 @@ class PPU
 
   private
 
-  # LCDがONか
-  # Pan Docs: https://gbdev.io/pandocs/LCDC.html#lcdc7--lcd-enable
-  def lcd_on?
-    (@mmu.read(address: LCDC) & 0x80) != 0  # LCDC bit7 = LCD Enable
+  # LCDが有効か https://gbdev.io/pandocs/LCDC.html#lcdc7--lcd-enable
+  def lcd_enabled?
+    @mmu.read(address: LCDC)[7] == 1 # LCDC bit7 = LCD Enable
+  end
+
+  # BGが有効か https://gbdev.io/pandocs/LCDC.html#lcdc0--bg-and-window-enablepriority
+  def bg_enabled?
+    @mmu.read(address: LCDC)[0] == 1 # LCDC bit0 = BG/Window Enable
   end
 
   # 1スキャンライン分(160ピクセル)をframebufferに書き込む(C-2: BGタイル描画)
@@ -90,11 +94,6 @@ class PPU
 
       @framebuffer[@ly * SCREEN_WIDTH_PIXEL + x] = actual_color
     end
-  end
-
-  # BGが有効か https://gbdev.io/pandocs/LCDC.html#lcdc0--bg-and-window-enable-priority
-  def bg_enabled?
-    @mmu.read(address: LCDC)[0] == 1 # LCDC bit0 = BG/Window Enable
   end
 
   # タイル番号 → タイルデータの先頭アドレス(VRAM内) https://gbdev.io/pandocs/Tile_Data.html
