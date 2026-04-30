@@ -110,19 +110,20 @@ class PPU
   # タイル番号 → タイルデータの先頭アドレス(VRAM内) https://gbdev.io/pandocs/Tile_Data.html
   def tile_data_address(tile_num, unsigned_addressing)
     if unsigned_addressing
-      # tile_num = 0..255 → 0x8000..0x8FF0
+      # 0x8000..0x8FF0
       0x8000 + tile_num * 16
     else
-      # tile_num = -128..127 → 0x8800..0x97F0
+      # 0x8800..0x97F0
       0x9000 + Bit.u8_to_i8(tile_num) * 16
     end
   end
 
-  # タイル内の1ピクセルの色番号(0..3)を2bppデコードで取り出す https://gbdev.io/pandocs/Tile_Data.html
+  # タイル内の1ピクセルの色番号(0..3)を取り出す
+  # Game Boyの2bppは「ビットプレーン分離」:1行8ピクセル分の色番号を2バイトに分けて格納する https://gbdev.io/pandocs/Tile_Data.html
   def pixel_color(tile_addr, pixel_x, pixel_y)
-    byte_lo = @mmu.read_u8(address: tile_addr + pixel_y * 2)     # その行の各ピクセルのbit0(LSB)を並べたバイト
-    byte_hi = @mmu.read_u8(address: tile_addr + pixel_y * 2 + 1) # その行の各ピクセルのbit1(MSB)を並べたバイト
-    bit = 7 - pixel_x                                         # 左端ピクセル(x=0)= bit7、右端(x=7)= bit0
-    ((byte_hi >> bit) & 1) << 1 | ((byte_lo >> bit) & 1)      # MSBとLSBを組み合わせて0..3の色番号
+    byte_lo = @mmu.read_u8(address: tile_addr + pixel_y * 2)     # 8ピクセル分の色番号bit0(LSB)を並べたバイト
+    byte_hi = @mmu.read_u8(address: tile_addr + pixel_y * 2 + 1) # 8ピクセル分の色番号bit1(MSB)を並べたバイト
+    bit = 7 - pixel_x                                            # 左端ピクセル(x=0)がbit7、右端(x=7)がbit0
+    ((byte_hi >> bit) & 1) << 1 | ((byte_lo >> bit) & 1)         # MSBとLSBを組み合わせて0..3の色番号
   end
 end
