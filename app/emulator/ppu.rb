@@ -86,16 +86,16 @@ class PPU
     scx = @mmu.read_u8(address: SCX) # ViewportのX座標
     bgp = @mmu.read_u8(address: BGP) # BGパレット(色)
 
-    bg_y = Bit.wrap_u8(scy + ly)  # スクロール込みのBG上のY座標
-    tilemap_row = (bg_y / 8).to_i # タイルマップ上の行番号(0..31)
-    pixel_y = bg_y % 8            # タイル内のY座標(0..7)
+    bg_y = Bit.wrap_u8(scy + ly) # スクロール込みのBG上のY座標
+    tilemap_row = bg_y / 8       # タイルマップ上の行番号(0..31)
+    pixel_y = bg_y % 8           # タイル内のY座標(0..7)
 
     tile_map_address = bg_tile_map_address
     tile_data_unsigned = bg_tile_data_unsigned?
 
     SCREEN_WIDTH.times do |screen_x|
       bg_x = Bit.wrap_u8(scx + screen_x) # スクロール込みのBG上のX座標
-      tilemap_col = (bg_x / 8).to_i      # タイルマップ上の列番号(0..31)
+      tilemap_col = bg_x / 8             # タイルマップ上の列番号(0..31)
       pixel_x = bg_x % 8                 # タイル内のX座標(0..7)
 
       tile_number   = @mmu.read_u8(address: tile_map_address + tilemap_row * 32 + tilemap_col) # マップから絵柄番号を取得
@@ -104,6 +104,26 @@ class PPU
       palette_color = (bgp >> (color_id * 2)) & 0b11                                           # BGPで色番号を画面明度(0..3)に変換
 
       @framebuffer[ly * SCREEN_WIDTH + screen_x] = palette_color
+
+      # DEBUG: LY=65 で書いた値を直後にverifyする(計算は正しいか? 実際に書けたか?)
+      if @ly == 65 && @debug_verify_count.to_i < 1
+        if screen_x < 30
+          @debug_log_buffer ||= []
+          @debug_log_buffer << "  X=#{format('%3d', screen_x)}: tile_num=0x#{format('%02X', tile_number)}, p_x=#{pixel_x}, p_y=#{pixel_y}, color_id=#{color_id}, palette=#{palette_color}, fb[#{ly * SCREEN_WIDTH + screen_x}]=#{@framebuffer[ly * SCREEN_WIDTH + screen_x]}"
+        end
+        if screen_x == 159
+          @debug_verify_count = 1
+          puts ""
+          puts "=== render_scanline 内部トレース (LY=65 の最初の30ピクセル) ==="
+          @debug_log_buffer.each { |line| puts line }
+          puts ""
+          puts "=== 直後の framebuffer Y=65 全体 ==="
+          fb_row = (0..159).map { |x| @framebuffer[@ly * SCREEN_WIDTH + x] }
+          visual = fb_row.map { |c| c == 0 ? '.' : c == 3 ? '█' : '▓' }.join
+          puts "  Y=65 (直後): #{visual}"
+          puts "==============================================="
+        end
+      end
     end
   end
 
