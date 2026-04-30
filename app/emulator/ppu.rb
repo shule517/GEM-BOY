@@ -72,22 +72,26 @@ class PPU
     @mmu.read(address: LCDC)[3] == 1 ? 0x9C00 : 0x9800 # LCDC bit3
   end
 
+  # BGタイルデータがunsignedアドレッシングか https://gbdev.io/pandocs/LCDC.html#lcdc4--bg-and-window-tile-data-area
+  def bg_tile_data_unsigned?
+    @mmu.read(address: LCDC)[4] == 1 # LCDC bit4=1 で unsigned(0x8000基点)、0 で signed(0x9000基点)
+  end
+
   # 1スキャンライン分(160ピクセル)をframebufferに書き込む(C-2: BGタイル描画)
   # https://gbdev.io/pandocs/Tile_Maps.html / https://gbdev.io/pandocs/Tile_Data.html
   def render_scanline
     return unless bg_enabled? # BGが無効
 
-    scy  = @mmu.read(address: SCY)  # ViewportのY座標
-    scx  = @mmu.read(address: SCX)  # ViewportのX座標
-    bgp  = @mmu.read(address: BGP)  # BGパレット(色)
-    lcdc = @mmu.read(address: LCDC) # LCD Control
+    scy = @mmu.read(address: SCY) # ViewportのY座標
+    scx = @mmu.read(address: SCX) # ViewportのX座標
+    bgp = @mmu.read(address: BGP) # BGパレット(色)
 
     bg_y = Bit.wrap_u8(scy + ly) # スクロール込みのBG上のY座標
     tile_row = bg_y / 8 # タイルマップ上の行番号(0..31)
     pixel_y = bg_y % 8 # タイル内のY座標(0..7)
 
     tile_map_address = bg_tile_map_address
-    unsigned_addressing = lcdc[4] != 0 # LCDC bit4: 1=unsigned(0x8000基点), 0=signed(0x9000基点)
+    unsigned_addressing = bg_tile_data_unsigned?
 
     SCREEN_WIDTH_PIXEL.times do |x|
       bg_x = Bit.wrap_u8(scx + x) # スクロール込みのBG上のX座標
