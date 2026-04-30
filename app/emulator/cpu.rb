@@ -505,7 +505,7 @@ class CPU
     # table[0xCC] = -> { 24 } # CALL Z,u16  (taken: 24 / not taken: 12)
     # table[0xD4] = -> { 24 } # CALL NC,u16 (taken: 24 / not taken: 12)
     # table[0xDC] = -> { 24 } # CALL C,u16  (taken: 24 / not taken: 12)
-    # table[0xC9] = -> { 16 } # RET
+    table[0xC9] = -> { self.pc = mmu.read_u16(address: sp); self.sp = Bit.wrap_u16(sp + 2); 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
     # table[0xD9] = -> { 16 } # RETI
     # table[0xC0] = -> { 20 } # RET NZ (taken: 20 / not taken: 8)
     # table[0xC8] = -> { 20 } # RET Z  (taken: 20 / not taken: 8)
