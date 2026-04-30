@@ -17,8 +17,8 @@ class PPU
   LYC  = 0xFF45 # LYCとLYを比較する(一致するとSTATに反映) https://gbdev.io/pandocs/STAT.html#ff45--lyc-ly-compare
   BGP  = 0xFF47 # BGパレット(色) https://gbdev.io/pandocs/Palettes.html#ff47--bgp-non-cgb-mode-only-bg-palette-data
 
-  SCREEN_WIDTH_PIXEL  = 160 # 画面の横ピクセル数 https://gbdev.io/pandocs/Specifications.html#specifications
-  SCREEN_HEIGHT_PIXEL = 144 # 画面の縦ピクセル数
+  SCREEN_WIDTH  = 160 # 画面の横ピクセル数 https://gbdev.io/pandocs/Specifications.html#specifications
+  SCREEN_HEIGHT = 144 # 画面の縦ピクセル数
 
   # 1スキャンラインに要するT-cycle数(Mode2: 80 + Mode3: 172 + Mode0: 204) https://gbdev.io/pandocs/Rendering.html#ppu-modes
   CYCLES_PER_SCANLINE = 456
@@ -32,7 +32,7 @@ class PPU
     @mmu = mmu
     @cycles = 0
     @ly = 0
-    @framebuffer = Array.new(SCREEN_WIDTH_PIXEL * SCREEN_HEIGHT_PIXEL, 0)
+    @framebuffer = Array.new(SCREEN_WIDTH * SCREEN_HEIGHT, 0)
   end
 
   # 引数のサイクル分 描画する
@@ -87,43 +87,43 @@ class PPU
     bgp = @mmu.read_u8(address: BGP) # BGパレット(色)
 
     bg_y = Bit.wrap_u8(scy + ly) # スクロール込みのBG上のY座標
-    tile_row = bg_y / 8 # タイルマップ上の行番号(0..31)
-    pixel_y = bg_y % 8 # タイル内のY座標(0..7)
+    tilemap_row = bg_y / 8       # タイルマップ上の行番号(0..31)
+    pixel_y = bg_y % 8           # タイル内のY座標(0..7)
 
     tile_map_address = bg_tile_map_address
     unsigned_addressing = bg_tile_data_unsigned?
 
-    SCREEN_WIDTH_PIXEL.times do |x|
-      bg_x = Bit.wrap_u8(scx + x) # スクロール込みのBG上のX座標
-      tile_col = bg_x / 8 # タイルマップ上の列番号(0..31)
-      pixel_x = bg_x % 8 # タイル内のX座標(0..7)
+    SCREEN_WIDTH.times do |screen_x|
+      bg_x = Bit.wrap_u8(scx + screen_x) # スクロール込みのBG上のX座標
+      tilemap_col = bg_x / 8             # タイルマップ上の列番号(0..31)
+      pixel_x = bg_x % 8                 # タイル内のX座標(0..7)
 
-      tile_num = @mmu.read_u8(address: tile_map_address + tile_row * 32 + tile_col) # マップから絵柄番号を取得
-      tile_addr = tile_data_address(tile_num, unsigned_addressing) # 絵柄データのVRAMアドレス
-      color_id = pixel_color(tile_addr, pixel_x, pixel_y) # 1ピクセルの色番号(0..3)を2bppデコード
-      actual_color = (bgp >> (color_id * 2)) & 0b11 # BGPで色番号を画面明度(0..3)に変換
+      tile_number  = @mmu.read_u8(address: tile_map_address + tilemap_row * 32 + tilemap_col) # マップから絵柄番号を取得
+      tile_address = tile_data_address(tile_number, unsigned_addressing)                      # 絵柄データのVRAMアドレス
+      color_id     = pixel_color_id(tile_address, pixel_x, pixel_y)                           # 1ピクセルの色番号(0..3)を2bppデコード
+      shade        = (bgp >> (color_id * 2)) & 0b11                                           # BGPで色番号を画面明度(0..3)に変換
 
-      @framebuffer[ly * SCREEN_WIDTH_PIXEL + x] = actual_color
+      @framebuffer[ly * SCREEN_WIDTH + screen_x] = shade
     end
   end
 
   # タイル番号 → タイルデータの先頭アドレス(VRAM内) https://gbdev.io/pandocs/Tile_Data.html
-  def tile_data_address(tile_num, unsigned_addressing)
+  def tile_data_address(tile_number, unsigned_addressing)
     if unsigned_addressing
       # 0x8000..0x8FF0
-      0x8000 + tile_num * 16
+      0x8000 + tile_number * 16
     else
       # 0x8800..0x97F0
-      0x9000 + Bit.u8_to_i8(tile_num) * 16
+      0x9000 + Bit.u8_to_i8(tile_number) * 16
     end
   end
 
   # タイル内の1ピクセルの色番号(0..3)を取り出す
   # Game Boyの2bppは「ビットプレーン分離」:1行8ピクセル分の色番号を2バイトに分けて格納する https://gbdev.io/pandocs/Tile_Data.html
-  def pixel_color(tile_addr, pixel_x, pixel_y)
-    byte_lo = @mmu.read_u8(address: tile_addr + pixel_y * 2)     # 8ピクセル分の色番号bit0(LSB)を並べたバイト
-    byte_hi = @mmu.read_u8(address: tile_addr + pixel_y * 2 + 1) # 8ピクセル分の色番号bit1(MSB)を並べたバイト
-    bit = 7 - pixel_x                                            # 左端ピクセル(x=0)がbit7、右端(x=7)がbit0
-    (byte_hi[bit] << 1) | byte_lo[bit]                           # MSBとLSBを組み合わせて0..3の色番号
+  def pixel_color_id(tile_address, pixel_x, pixel_y)
+    byte_lo = @mmu.read_u8(address: tile_address + pixel_y * 2)     # 8ピクセル分の色番号bit0(LSB)を並べたバイト
+    byte_hi = @mmu.read_u8(address: tile_address + pixel_y * 2 + 1) # 8ピクセル分の色番号bit1(MSB)を並べたバイト
+    bit = 7 - pixel_x                                               # 左端ピクセル(x=0)がbit7、右端(x=7)がbit0
+    (byte_hi[bit] << 1) | byte_lo[bit]                              # MSBとLSBを組み合わせて0..3の色番号
   end
 end
