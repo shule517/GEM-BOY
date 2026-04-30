@@ -3,7 +3,7 @@ require 'app/emulator/mmu'
 
 RSpec.describe MMU do
   describe '#read' do
-    subject { mmu.read(address: address) }
+    subject { mmu.read_u8(address: address) }
     let(:mmu) { described_class.new(cartridge) }
     let(:cartridge) { Cartridge.new(rom_data) }
     let(:rom_data) do
@@ -91,8 +91,8 @@ RSpec.describe MMU do
 
     context 'VRAM領域に書き込んだとき' do
       subject do
-        mmu.write(address: 0x8000, value: 0x42)
-        mmu.read(address: 0x8000)
+        mmu.write_u8(address: 0x8000, value: 0x42)
+        mmu.read_u8(address: 0x8000)
       end
       it '読み戻すと 0x42 になる' do
         is_expected.to eq 0x42
@@ -101,8 +101,8 @@ RSpec.describe MMU do
 
     context 'WRAM領域に書き込んだとき' do
       subject do
-        mmu.write(address: 0xC000, value: 0x42)
-        mmu.read(address: 0xC000)
+        mmu.write_u8(address: 0xC000, value: 0x42)
+        mmu.read_u8(address: 0xC000)
       end
       it '読み戻すと 0x42 になる' do
         is_expected.to eq 0x42
@@ -111,8 +111,8 @@ RSpec.describe MMU do
 
     context 'HRAM領域に書き込んだとき' do
       subject do
-        mmu.write(address: 0xFF80, value: 0x42)
-        mmu.read(address: 0xFF80)
+        mmu.write_u8(address: 0xFF80, value: 0x42)
+        mmu.read_u8(address: 0xFF80)
       end
       it '読み戻すと 0x42 になる' do
         is_expected.to eq 0x42
@@ -121,8 +121,8 @@ RSpec.describe MMU do
 
     context 'IEレジスタに書き込んだとき' do
       subject do
-        mmu.write(address: 0xFFFF, value: 0x1F)
-        mmu.read(address: 0xFFFF)
+        mmu.write_u8(address: 0xFFFF, value: 0x1F)
+        mmu.read_u8(address: 0xFFFF)
       end
       it '読み戻すと 0x1F になる' do
         is_expected.to eq 0x1F
@@ -131,8 +131,8 @@ RSpec.describe MMU do
 
     context '0xFF を超える値を書き込んだとき' do
       subject do
-        mmu.write(address: 0xC000, value: 0x1FF)
-        mmu.read(address: 0xC000)
+        mmu.write_u8(address: 0xC000, value: 0x1FF)
+        mmu.read_u8(address: 0xC000)
       end
       it '下位 8bit に切り詰められた 0xFF になる' do
         is_expected.to eq 0xFF
@@ -141,8 +141,8 @@ RSpec.describe MMU do
 
     context 'ROM領域に書き込んだとき' do
       subject do
-        mmu.write(address: 0x0100, value: 0x42)
-        mmu.read(address: 0x0100)
+        mmu.write_u8(address: 0x0100, value: 0x42)
+        mmu.read_u8(address: 0x0100)
       end
       it '書き込みは無視され、ROM の値 0xC3 のまま' do
         is_expected.to eq 0xC3
@@ -169,8 +169,8 @@ RSpec.describe MMU do
 
     context 'SB に文字を置いて SC に SC_TRANSFER_START を書いたとき' do
       before do
-        mmu.write(address: MMU::SB, value: 'A'.ord)
-        mmu.write(address: MMU::SC, value: MMU::SC_TRANSFER_START)
+        mmu.write_u8(address: MMU::SB, value: 'A'.ord)
+        mmu.write_u8(address: MMU::SC, value: MMU::SC_TRANSFER_START)
       end
       it '"A" が追記される' do
         is_expected.to eq 'A'
@@ -180,8 +180,8 @@ RSpec.describe MMU do
     context '複数文字を順次送信したとき' do
       before do
         %w(G B).each do |c|
-          mmu.write(address: MMU::SB, value: c.ord)
-          mmu.write(address: MMU::SC, value: MMU::SC_TRANSFER_START)
+          mmu.write_u8(address: MMU::SB, value: c.ord)
+          mmu.write_u8(address: MMU::SC, value: MMU::SC_TRANSFER_START)
         end
       end
       it '"GB" の順で連結される' do
@@ -191,8 +191,8 @@ RSpec.describe MMU do
 
     context 'SC に SC_TRANSFER_START 以外を書いたとき' do
       before do
-        mmu.write(address: MMU::SB, value: 'A'.ord)
-        mmu.write(address: MMU::SC, value: 0x80)
+        mmu.write_u8(address: MMU::SB, value: 'A'.ord)
+        mmu.write_u8(address: MMU::SC, value: 0x80)
       end
       it 'serial_buffer は空のまま' do
         is_expected.to eq ''
@@ -201,9 +201,9 @@ RSpec.describe MMU do
 
     context 'シリアル送信後の SC を読んだとき' do
       subject do
-        mmu.write(address: MMU::SB, value: 'A'.ord)
-        mmu.write(address: MMU::SC, value: MMU::SC_TRANSFER_START)
-        mmu.read(address: MMU::SC)
+        mmu.write_u8(address: MMU::SB, value: 'A'.ord)
+        mmu.write_u8(address: MMU::SC, value: MMU::SC_TRANSFER_START)
+        mmu.read_u8(address: MMU::SC)
       end
       it '転送完了シグナル 0x01 (bit7 が落ちている) になる' do
         is_expected.to eq 0x01

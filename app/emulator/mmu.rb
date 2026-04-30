@@ -90,7 +90,7 @@ class MMU
 
   # アドレスに対応する領域から 1バイト読み込む
   # 未対応・使用禁止領域は 0xFF(実機の挙動)。CPU 側で nil 演算事故を防ぐ意図もある。
-  def read(address:)
+  def read_u8(address:)
     case address
     when 0x0000..0x7FFF then @cartridge.read(address)
     when 0x8000..0x9FFF then @vram[address - 0x8000]
@@ -106,7 +106,7 @@ class MMU
   # アドレスに対応する領域へ 1バイト書き込む
   # ROM 領域 (0x0000-0x7FFF) はあえて分岐に入れていない
   # (MBC 対応後はここでバンク切り替えレジスタの判定が入る)
-  def write(address:, value:)
+  def write_u8(address:, value:)
     value &= 0xFF # 1バイトにする(下位8bitのみ)
 
     case address
@@ -122,20 +122,20 @@ class MMU
   # 16bit を 2 バイトに分けてリトルエンディアンで書く(下位 → 上位 の順)。
   # LD (u16),SP (0x08) などで使う。address+1 は 16bit でラップ(0xFFFF→0x0000)。
   def write_u16(address:, value:)
-    write(address: address, value: Bit.low_byte(value))
-    write(address: Bit.wrap_u16(address + 1), value: Bit.high_byte(value))
+    write_u8(address: address, value: Bit.low_byte(value))
+    write_u8(address: Bit.wrap_u16(address + 1), value: Bit.high_byte(value))
   end
 
   # 16bit を 2 バイトに分けてリトルエンディアンで読む(下位 → 上位 の順)。
   # 16bit ジャンプテーブルや関数ポインタの取得で使う。
   def read_u16(address:)
-    low  = read(address: address)
-    high = read(address: Bit.wrap_u16(address + 1))
+    low  = read_u8(address: address)
+    high = read_u8(address: Bit.wrap_u16(address + 1))
     Bit.make_u16(high: high, low: low)
   end
 
   # 内部状態として I/O を直接触りたいとき用(タイマー割り込み等で使う)。
-  # write() を経由するとシリアル判定が走ってしまうので、その副作用を避ける裏口。
+  # write_u8() を経由するとシリアル判定が走ってしまうので、その副作用を避ける裏口。
   def write_io_direct(address, value)
     @io[address - 0xFF00] = value & 0xFF
   end

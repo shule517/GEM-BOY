@@ -59,22 +59,22 @@ class PPU
 
   # LCDが有効か https://gbdev.io/pandocs/LCDC.html#lcdc7--lcd-enable
   def lcd_enabled?
-    @mmu.read(address: LCDC)[7] == 1 # LCDC bit7 = LCD Enable
+    @mmu.read_u8(address: LCDC)[7] == 1 # LCDC bit7 = LCD Enable
   end
 
   # BGが有効か https://gbdev.io/pandocs/LCDC.html#lcdc0--bg-and-window-enablepriority
   def bg_enabled?
-    @mmu.read(address: LCDC)[0] == 1 # LCDC bit0 = BG/Window Enable
+    @mmu.read_u8(address: LCDC)[0] == 1 # LCDC bit0 = BG/Window Enable
   end
 
   # BGタイルマップの先頭アドレス https://gbdev.io/pandocs/LCDC.html#lcdc3--bg-tile-map-area
   def bg_tile_map_address
-    @mmu.read(address: LCDC)[3] == 1 ? 0x9C00 : 0x9800 # LCDC bit3
+    @mmu.read_u8(address: LCDC)[3] == 1 ? 0x9C00 : 0x9800 # LCDC bit3
   end
 
   # BGタイルデータがunsignedアドレッシングか https://gbdev.io/pandocs/LCDC.html#lcdc4--bg-and-window-tile-data-area
   def bg_tile_data_unsigned?
-    @mmu.read(address: LCDC)[4] == 1 # LCDC bit4=1 で unsigned(0x8000基点)、0 で signed(0x9000基点)
+    @mmu.read_u8(address: LCDC)[4] == 1 # LCDC bit4=1 で unsigned(0x8000基点)、0 で signed(0x9000基点)
   end
 
   # 1スキャンライン分(160ピクセル)をframebufferに書き込む(C-2: BGタイル描画)
@@ -82,9 +82,9 @@ class PPU
   def render_scanline
     return unless bg_enabled? # BGが無効
 
-    scy = @mmu.read(address: SCY) # ViewportのY座標
-    scx = @mmu.read(address: SCX) # ViewportのX座標
-    bgp = @mmu.read(address: BGP) # BGパレット(色)
+    scy = @mmu.read_u8(address: SCY) # ViewportのY座標
+    scx = @mmu.read_u8(address: SCX) # ViewportのX座標
+    bgp = @mmu.read_u8(address: BGP) # BGパレット(色)
 
     bg_y = Bit.wrap_u8(scy + ly) # スクロール込みのBG上のY座標
     tile_row = bg_y / 8 # タイルマップ上の行番号(0..31)
@@ -98,10 +98,10 @@ class PPU
       tile_col = bg_x / 8 # タイルマップ上の列番号(0..31)
       pixel_x = bg_x % 8 # タイル内のX座標(0..7)
 
-      tile_num = @mmu.read(address: tile_map_address + tile_row * 32 + tile_col) # マップから絵柄番号を取得
+      tile_num = @mmu.read_u8(address: tile_map_address + tile_row * 32 + tile_col) # マップから絵柄番号を取得
       tile_addr = tile_data_address(tile_num, unsigned_addressing) # 絵柄データのVRAMアドレス
-      color_id = pixel_color(tile_addr, pixel_x, pixel_y)          # 1ピクセルの色番号(0..3)を2bppデコード
-      actual_color = (bgp >> (color_id * 2)) & 0b11                # BGPで色番号を画面明度(0..3)に変換
+      color_id = pixel_color(tile_addr, pixel_x, pixel_y) # 1ピクセルの色番号(0..3)を2bppデコード
+      actual_color = (bgp >> (color_id * 2)) & 0b11 # BGPで色番号を画面明度(0..3)に変換
 
       @framebuffer[ly * SCREEN_WIDTH_PIXEL + x] = actual_color
     end
@@ -120,8 +120,8 @@ class PPU
 
   # タイル内の1ピクセルの色番号(0..3)を2bppデコードで取り出す https://gbdev.io/pandocs/Tile_Data.html
   def pixel_color(tile_addr, pixel_x, pixel_y)
-    byte_lo = @mmu.read(address: tile_addr + pixel_y * 2)     # その行の各ピクセルのbit0(LSB)を並べたバイト
-    byte_hi = @mmu.read(address: tile_addr + pixel_y * 2 + 1) # その行の各ピクセルのbit1(MSB)を並べたバイト
+    byte_lo = @mmu.read_u8(address: tile_addr + pixel_y * 2)     # その行の各ピクセルのbit0(LSB)を並べたバイト
+    byte_hi = @mmu.read_u8(address: tile_addr + pixel_y * 2 + 1) # その行の各ピクセルのbit1(MSB)を並べたバイト
     bit = 7 - pixel_x                                         # 左端ピクセル(x=0)= bit7、右端(x=7)= bit0
     ((byte_hi >> bit) & 1) << 1 | ((byte_lo >> bit) & 1)      # MSBとLSBを組み合わせて0..3の色番号
   end

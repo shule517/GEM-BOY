@@ -14,8 +14,8 @@ def tick(args)
   render_serial(args)
 
   if args.inputs.keyboard.key_down.space
-    args.state.mmu.write(address: MMU::SB, value: 'A'.ord)
-    args.state.mmu.write(address: MMU::SC, value: MMU::SC_TRANSFER_START)
+    args.state.mmu.write_u8(address: MMU::SB, value: 'A'.ord)
+    args.state.mmu.write_u8(address: MMU::SC, value: MMU::SC_TRANSFER_START)
   end
 end
 

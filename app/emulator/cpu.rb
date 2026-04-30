@@ -81,7 +81,7 @@ class CPU
 
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
   def fetch_u8
-    byte = mmu.read(address: pc) # PCから1バイト読み込む
+    byte = mmu.read_u8(address: pc) # PCから1バイト読み込む
     self.pc = Bit.wrap_u16(pc + 1) # PCを1つ進める
     byte
   end
@@ -251,28 +251,28 @@ class CPU
     # ============================================================
     # 8bit ロード - LD A,(rr) / LD (rr),A (レジスタペア間接)
     # ============================================================
-    table[0x02] = -> { mmu.write(address: bc, value: a); 8 } # LD (BC),A
-    table[0x0A] = -> { self.a = mmu.read(address: bc); 8 } # LD A,(BC)
-    table[0x12] = -> { mmu.write(address: de, value: a); 8 } # LD (DE),A
-    table[0x1A] = -> { self.a = mmu.read(address: de); 8 } # LD A,(DE)
-    table[0x22] = -> { mmu.write(address: hl, value: a); self.hl += 1; 8 } # LD (HL+),A
-    table[0x2A] = -> { self.a = mmu.read(address: hl); self.hl += 1; 8 } # LD A,(HL+)
-    table[0x32] = -> { mmu.write(address: hl, value: a); self.hl -= 1; 8 } # LD (HL-),A
-    table[0x3A] = -> { self.a = mmu.read(address: hl); self.hl -= 1; 8 }  # LD A,(HL-)
+    table[0x02] = -> { mmu.write_u8(address: bc, value: a); 8 } # LD (BC),A
+    table[0x0A] = -> { self.a = mmu.read_u8(address: bc); 8 } # LD A,(BC)
+    table[0x12] = -> { mmu.write_u8(address: de, value: a); 8 } # LD (DE),A
+    table[0x1A] = -> { self.a = mmu.read_u8(address: de); 8 } # LD A,(DE)
+    table[0x22] = -> { mmu.write_u8(address: hl, value: a); self.hl += 1; 8 } # LD (HL+),A
+    table[0x2A] = -> { self.a = mmu.read_u8(address: hl); self.hl += 1; 8 } # LD A,(HL+)
+    table[0x32] = -> { mmu.write_u8(address: hl, value: a); self.hl -= 1; 8 } # LD (HL-),A
+    table[0x3A] = -> { self.a = mmu.read_u8(address: hl); self.hl -= 1; 8 }  # LD A,(HL-)
 
     # ============================================================
     # 8bit ロード - LD A,(u16) / LD (u16),A (絶対アドレス)
     # ============================================================
-    table[0xEA] = -> { mmu.write(address: fetch_u16, value: a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
-    table[0xFA] = -> { self.a = mmu.read(address: fetch_u16); 16 } # LD A,(u16) → ()はそのアドレスの先という意味
+    table[0xEA] = -> { mmu.write_u8(address: fetch_u16, value: a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
+    table[0xFA] = -> { self.a = mmu.read_u8(address: fetch_u16); 16 } # LD A,(u16) → ()はそのアドレスの先という意味
 
     # ============================================================
     # 8bit ロード - I/O ポート (0xFF00 + offset)
     # ============================================================
-    table[0xE0] = -> { mmu.write(address: 0xFF00 + fetch_u8, value: a); 12 } # LD (FF00+u8),A
-    table[0xE2] = -> { mmu.write(address: 0xFF00 + c, value: a); 8 }  # LD (FF00+C),A
-    table[0xF0] = -> { self.a = mmu.read(address: 0xFF00 + fetch_u8); 12 } # LD A,(FF00+u8)
-    table[0xF2] = -> { self.a = mmu.read(address: 0xFF00 + c); 8 }  # LD A,(FF00+C)
+    table[0xE0] = -> { mmu.write_u8(address: 0xFF00 + fetch_u8, value: a); 12 } # LD (FF00+u8),A
+    table[0xE2] = -> { mmu.write_u8(address: 0xFF00 + c, value: a); 8 }  # LD (FF00+C),A
+    table[0xF0] = -> { self.a = mmu.read_u8(address: 0xFF00 + fetch_u8); 12 } # LD A,(FF00+u8)
+    table[0xF2] = -> { self.a = mmu.read_u8(address: 0xFF00 + c); 8 }  # LD A,(FF00+C)
 
     # ============================================================
     # 16bit ロード - LD rr,u16
@@ -391,7 +391,7 @@ class CPU
     table[0xAB] = -> { self.a = a ^ e; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,E
     table[0xAC] = -> { self.a = a ^ h; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,H
     table[0xAD] = -> { self.a = a ^ l; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,L
-    table[0xAE] = -> { byte = mmu.read(address: hl); self.a = a ^ byte; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
+    table[0xAE] = -> { byte = mmu.read_u8(address: hl); self.a = a ^ byte; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
     table[0xAF] = -> { self.a = 0; set_flags(zero: true, negative: false, half_carry: false, carry: false); 4 } # XOR A,A
     table[0xEE] = -> { byte = fetch_u8; self.a = a ^ byte; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,u8
 
@@ -404,7 +404,7 @@ class CPU
     table[0xB3] = -> { self.a = a | e; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,E
     table[0xB4] = -> { self.a = a | h; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,H
     table[0xB5] = -> { self.a = a | l; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,L
-    table[0xB6] = -> { self.a = a | mmu.read(address: hl); set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
+    table[0xB6] = -> { self.a = a | mmu.read_u8(address: hl); set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
     table[0xB7] = -> { set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,A → a | aしても結果は同じ
     table[0xF6] = -> { self.a = a | fetch_u8; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,u8
 
@@ -417,7 +417,7 @@ class CPU
     table[0xBB] = -> { set_flags(zero: a == e, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(e), carry: a < e); 4 }  # CP A,E
     table[0xBC] = -> { set_flags(zero: a == h, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(h), carry: a < h); 4 }  # CP A,H
     table[0xBD] = -> { set_flags(zero: a == l, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(l), carry: a < l); 4 }  # CP A,L
-    table[0xBE] = -> { byte = mmu.read(address: hl); set_flags(zero: a == byte, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(byte), carry: a < byte); 8 }  # CP A,(HL)
+    table[0xBE] = -> { byte = mmu.read_u8(address: hl); set_flags(zero: a == byte, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(byte), carry: a < byte); 8 }  # CP A,(HL)
     table[0xBF] = -> { set_flags(zero: true, negative: true, half_carry: false, carry: false); 4 }  # CP A,A
     table[0xFE] = -> { byte = fetch_u8; set_flags(zero: a == byte, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(byte), carry: a < byte); 8 } # CP A,u8: Compare(比較)
 
