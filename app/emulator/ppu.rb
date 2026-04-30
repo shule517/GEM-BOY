@@ -26,7 +26,7 @@ class PPU
   SCANLINES_PER_FRAME = 154 # 1フレームのスキャンライン数(描画144行 + VBlank10行) https://gbdev.io/pandocs/Rendering.html
   VBLANK_START_LY     = 144 # これ以上のY座標はVBlank(描画スキップ)
 
-  attr_accessor :cycles, :framebuffer, :ly
+  attr_accessor :cycles, :ly, :framebuffer
 
   def initialize(mmu)
     @mmu = mmu
@@ -35,23 +35,23 @@ class PPU
     @framebuffer = Array.new(SCREEN_WIDTH_PIXEL * SCREEN_HEIGHT_PIXEL, 0)
   end
 
-  # 引数のサイクルだけ処理を実行する
-  # 1ライン描画分サイクルが溜まったら描画する
+  # 引数のサイクル分 描画する
   def step(cycles)
     return unless lcd_enabled? # LCDが無効
-
     self.cycles += cycles
+
+    # 1ライン描画分サイクルが溜まったら描画する
     while self.cycles >= CYCLES_PER_SCANLINE
       self.cycles -= CYCLES_PER_SCANLINE
 
-      # 1行描画する
+      # 1ライン描画する
       if ly < VBLANK_START_LY # 描画範囲内
         render_scanline
       end
 
       # LYを+1
       self.ly = (ly + 1) % SCANLINES_PER_FRAME # はみ出たら、次フレームへ
-      @mmu.write_io_direct(LY, ly)         # LYを更新
+      @mmu.write_io_direct(LY, ly)
     end
   end
 
@@ -68,7 +68,7 @@ class PPU
   end
 
   # 1スキャンライン分(160ピクセル)をframebufferに書き込む(C-2: BGタイル描画)
-  # Pan Docs: https://gbdev.io/pandocs/Tile_Maps.html / https://gbdev.io/pandocs/Tile_Data.html
+  # https://gbdev.io/pandocs/Tile_Maps.html / https://gbdev.io/pandocs/Tile_Data.html
   def render_scanline
     return unless bg_enabled? # BGが無効
 
@@ -77,22 +77,22 @@ class PPU
     bgp  = @mmu.read(address: BGP)  # BGパレット(色)
     lcdc = @mmu.read(address: LCDC) # LCD Control
 
-    bg_y = (ly + scy) & 0xFF # スクロール込みのBG上のY座標(8bitラップ)
-    tile_row = bg_y / 8       # タイルマップ上の行番号(0..31)
-    pixel_y = bg_y % 8        # タイル内のY座標(0..7)
+    bg_y = Bit.wrap_u8(scy + ly) # スクロール込みのBG上のY座標
+    tile_row = bg_y / 8 # タイルマップ上の行番号(0..31)
+    pixel_y = bg_y % 8 # タイル内のY座標(0..7)
 
     map_base = (lcdc & 0x08) != 0 ? 0x9C00 : 0x9800 # LCDC bit3でタイルマップを切替
     unsigned_addressing = (lcdc & 0x10) != 0        # LCDC bit4: 1=unsigned(0x8000基点), 0=signed(0x9000基点)
 
     SCREEN_WIDTH_PIXEL.times do |x|
-      bg_x = (scx + x) & 0xFF       # スクロール込みのBG上のX座標(8bitラップ)
-      tile_col = bg_x / 8           # タイルマップ上の列番号(0..31)
-      pixel_x = bg_x % 8            # タイル内のX座標(0..7)
+      bg_x = Bit.wrap_u8(scx + x) # スクロール込みのBG上のX座標
+      tile_col = bg_x / 8 # タイルマップ上の列番号(0..31)
+      pixel_x = bg_x % 8 # タイル内のX座標(0..7)
 
-      tile_num = @mmu.read(address: map_base + tile_row * 32 + tile_col)  # マップから絵柄番号を取得
-      tile_addr = tile_data_address(tile_num, unsigned_addressing)         # 絵柄データのVRAMアドレス
-      color_id = pixel_color(tile_addr, pixel_x, pixel_y)                  # 1ピクセルの色番号(0..3)を2bppデコード
-      actual_color = (bgp >> (color_id * 2)) & 0b11                        # BGPで色番号を画面明度(0..3)に変換
+      tile_num = @mmu.read(address: map_base + tile_row * 32 + tile_col) # マップから絵柄番号を取得
+      tile_addr = tile_data_address(tile_num, unsigned_addressing)       # 絵柄データのVRAMアドレス
+      color_id = pixel_color(tile_addr, pixel_x, pixel_y)                # 1ピクセルの色番号(0..3)を2bppデコード
+      actual_color = (bgp >> (color_id * 2)) & 0b11                      # BGPで色番号を画面明度(0..3)に変換
 
       @framebuffer[ly * SCREEN_WIDTH_PIXEL + x] = actual_color
     end
