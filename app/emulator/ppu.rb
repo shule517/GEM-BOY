@@ -16,6 +16,7 @@ class PPU
   LY   = 0xFF44 # LCDの現在のY座標 https://gbdev.io/pandocs/STAT.html#ff44--ly-lcd-y-coordinate-read-only
   LYC  = 0xFF45 # LYCとLYを比較する(一致するとSTATに反映) https://gbdev.io/pandocs/STAT.html#ff45--lyc-ly-compare
   BGP  = 0xFF47 # BGパレット(色) https://gbdev.io/pandocs/Palettes.html#ff47--bgp-non-cgb-mode-only-bg-palette-data
+  IF_REG = 0xFF0F # 割り込み要求フラグ(bit0=VBlank) https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
 
   SCREEN_WIDTH  = 160 # 画面の横ピクセル数 https://gbdev.io/pandocs/Specifications.html#specifications
   SCREEN_HEIGHT = 144 # 画面の縦ピクセル数
@@ -52,7 +53,17 @@ class PPU
       # LYを+1
       self.ly = (ly + 1) % SCANLINES_PER_FRAME # はみ出たら、次フレームへ
       @mmu.write_io_direct(LY, ly)
+
+      request_vblank_interrupt if ly == VBLANK_START_LY # 144行目に入った瞬間にVBlank要求
     end
+  end
+
+  # VBlank割り込み要求: IF(0xFF0F)のbit0を立てる
+  # ブートROMは IME=0 でもIFをポーリング(BIT 0,(HL))してVBlank待ちに使うので、フラグ設定は必須
+  # Pan Docs: https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
+  def request_vblank_interrupt
+    current = @mmu.read_u8(address: IF_REG)
+    @mmu.write_io_direct(IF_REG, current | 0x01)
   end
 
   private
