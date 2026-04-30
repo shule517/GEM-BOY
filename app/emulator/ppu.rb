@@ -106,18 +106,17 @@ class PPU
   # タイル番号 → タイルデータの先頭アドレス(VRAM内) https://gbdev.io/pandocs/Tile_Data.html
   def tile_data_address(tile_num, unsigned_addressing)
     if unsigned_addressing
-      0x8000 + tile_num * 16                                  # tile_num=0..255 → 0x8000..0x8FF0
+      0x8000 + tile_num * 16                  # tile_num=0..255 → 0x8000..0x8FF0
     else
-      signed = tile_num >= 0x80 ? tile_num - 256 : tile_num   # 0x80..0xFFを-128..-1として再解釈
-      0x9000 + signed * 16                                    # signed=-128..127 → 0x8800..0x97F0
+      0x9000 + Bit.to_i8(tile_num) * 16       # tile_num=-128..127 → 0x8800..0x97F0
     end
   end
 
   # タイル内の1ピクセルの色番号(0..3)を2bppデコードで取り出す https://gbdev.io/pandocs/Tile_Data.html
   def pixel_color(tile_addr, pixel_x, pixel_y)
-    byte_lo = @mmu.read(address: tile_addr + pixel_y * 2)      # その行の各ピクセルのbit0(LSB)を並べたバイト
-    byte_hi = @mmu.read(address: tile_addr + pixel_y * 2 + 1)  # その行の各ピクセルのbit1(MSB)を並べたバイト
-    bit = 7 - pixel_x                                           # 左端ピクセル(x=0)= bit7、右端(x=7)= bit0
-    ((byte_hi >> bit) & 1) << 1 | ((byte_lo >> bit) & 1)        # MSBとLSBを組み合わせて0..3の色番号
+    byte_lo = @mmu.read(address: tile_addr + pixel_y * 2)     # その行の各ピクセルのbit0(LSB)を並べたバイト
+    byte_hi = @mmu.read(address: tile_addr + pixel_y * 2 + 1) # その行の各ピクセルのbit1(MSB)を並べたバイト
+    bit = 7 - pixel_x                                         # 左端ピクセル(x=0)= bit7、右端(x=7)= bit0
+    ((byte_hi >> bit) & 1) << 1 | ((byte_lo >> bit) & 1)      # MSBとLSBを組み合わせて0..3の色番号
   end
 end

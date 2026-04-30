@@ -55,4 +55,11 @@ module Bit
   def low_4bits(value)
     value & 0x0F
   end
+
+  # u8 (0..255) を i8 (-128..127) として再解釈する(2 の補数)。
+  # JR i8 / ADD SP,i8 の符号付きオフセット、signed タイル番号などで使う。
+  # 例: Bit.to_i8(0x7F) #=> 127, Bit.to_i8(0x80) #=> -128, Bit.to_i8(0xFF) #=> -1
+  def to_i8(u8)
+    u8 >= 0x80 ? u8 - 256 : u8
+  end
 end

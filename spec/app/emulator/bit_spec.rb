@@ -318,4 +318,53 @@ RSpec.describe Bit do
       end
     end
   end
+
+  describe '.to_i8' do
+    # u8 (0..255) を i8 (-128..127) として再解釈する(2 の補数)。
+    # JR i8 / ADD SP,i8 の符号付きオフセット、signed タイル番号で使う。
+    subject { Bit.to_i8(value) }
+
+    context '0x00 を渡したとき' do
+      let(:value) { 0x00 }
+
+      it '0 を返す' do
+        is_expected.to eq 0
+      end
+    end
+
+    context '0x7F (i8 の最大値) を渡したとき' do
+      # bit7 が 0 の最大値。正の値としてそのまま扱う。
+      let(:value) { 0x7F }
+
+      it '127 を返す' do
+        is_expected.to eq 127
+      end
+    end
+
+    context '0x80 (bit7 が立った最小値) を渡したとき' do
+      # bit7 が 1 の境界値。i8 の最小値 -128 として解釈される。
+      let(:value) { 0x80 }
+
+      it '-128 を返す' do
+        is_expected.to eq(-128)
+      end
+    end
+
+    context '0xFF (u8 の最大値) を渡したとき' do
+      # 2 の補数で -1。DEC や JR -1 と等価。
+      let(:value) { 0xFF }
+
+      it '-1 を返す' do
+        is_expected.to eq(-1)
+      end
+    end
+
+    context '0x01 を渡したとき' do
+      let(:value) { 0x01 }
+
+      it '1 を返す' do
+        is_expected.to eq 1
+      end
+    end
+  end
 end
