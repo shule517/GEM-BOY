@@ -6,7 +6,8 @@ require 'app/emulator/cpu.rb'
 require 'app/emulator/ppu.rb'
 
 ROM_PATH = 'data/hello.gb'
-SKIP_BOOT = true # ブートROMをスキップして直接 PC=0x0100 から起動(D-1)
+BOOT_ROM_PATH = 'data/dmg_boot.bin' # SameBoot v1.0.3互換の256BブートROM
+SKIP_BOOT = false # ブートROMをスキップして直接 PC=0x0100 から起動(D-1)
 
 # 1フレームのT-cycle数(154スキャンライン × 456 cycle = 70224)
 CYCLES_PER_FRAME = 154 * 456
@@ -47,7 +48,8 @@ end
 
 def setup(args)
   args.state.cartridge = Cartridge.new(args.gtk.read_file(ROM_PATH).bytes)
-  args.state.mmu = MMU.new(args.state.cartridge, skip_boot: SKIP_BOOT)
+  boot_rom = args.gtk.read_file(BOOT_ROM_PATH).bytes # SKIP_BOOT=falseのときMMUが0x0000-0x00FFに重畳する
+  args.state.mmu = MMU.new(args.state.cartridge, skip_boot: SKIP_BOOT, boot_rom: boot_rom)
   args.state.cpu = CPU.new(args.state.mmu, skip_boot: SKIP_BOOT)
   args.state.ppu = PPU.new(args.state.mmu)
   args.state.crashed = false

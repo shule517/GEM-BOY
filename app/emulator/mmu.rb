@@ -72,7 +72,7 @@ class MMU
   SC = 0xFF02  # Serial Control: 転送制御
   SC_TRANSFER_START = 0x81  # SC への書き込みがこの値のとき転送開始 (bit7=1, bit0=1)
 
-  def initialize(cartridge, skip_boot: false)
+  def initialize(cartridge, skip_boot: false, boot_rom: nil)
     @cartridge = cartridge
 
     # 各領域は「サイズちょうどの 0 埋め配列」として確保する(各要素は 0..0xFF)。
@@ -82,6 +82,12 @@ class MMU
     @oam  = Array.new(0xA0,   0)  # [160 B, 0xFE00..0xFE9F] / OAM (Object Attribute Memory): スプライト 40 個分の属性テーブル(1 スプライト 4 バイト × 40 = 160 B)
     @io   = Array.new(0x80,   0)  # [128 B, 0xFF00..0xFF7F] / I/O Registers: ハードウェア制御の窓口。キー入力/タイマー/LCD/シリアル等が各バイトに割り当てられたメモリマップド I/O
     @ie   = 0                     # [  1 B, 0xFFFF        ] / IE (Interrupt Enable): どの割り込み(V-Blank/LCD/Timer/Serial/Joypad)を有効にするかを示すビットフラグ
+
+    # ブートROM(256B)重畳: skip_boot=falseかつboot_romが渡されたとき0x0000-0x00FFをブートROMで覆う
+    # CPUがPC=0x0000から起動して256バイトを実行し、最後に0xFF50へ非ゼロ書き込みすると外れてカートリッジが見える
+    # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#monochrome-models-dmg0-dmg-mgb
+    @boot_rom = boot_rom
+    @boot_rom_enabled = !skip_boot && !boot_rom.nil?
 
     # シリアル送信履歴。0xFF02 ← 0x81 が発火するたびに 0xFF01 の文字が追記される。
     # Blargg のテスト結果("Passed" / "Failed XX") はこの経路でしか届かない。
@@ -93,6 +99,7 @@ class MMU
   # アドレスに対応する領域から 1バイト読み込む
   # 未対応・使用禁止領域は 0xFF(実機の挙動)。CPU 側で nil 演算事故を防ぐ意図もある。
   def read_u8(address:)
+    return @boot_rom[address] if @boot_rom_enabled && address < 0x0100 # ブートROM重畳中は先頭256Bだけ差し替える
     case address
     when 0x0000..0x7FFF then @cartridge.read(address)
     when 0x8000..0x9FFF then @vram[address - 0x8000]
@@ -115,7 +122,7 @@ class MMU
     when 0x8000..0x9FFF then @vram[address - 0x8000] = value
     when 0xC000..0xDFFF then @wram[address - 0xC000] = value
     when 0xFE00..0xFE9F then @oam[address - 0xFE00] = value
-    when 0xFF00..0xFF7F then @io[address - 0xFF00] = value; handle_serial(address, value)
+    when 0xFF00..0xFF7F then @io[address - 0xFF00] = value; handle_serial(address, value); handle_boot_rom_disable(address, value)
     when 0xFF80..0xFFFE then @hram[address - 0xFF80] = value
     when 0xFFFF then @ie = value
     end
@@ -149,6 +156,15 @@ class MMU
   def setup_post_boot_io
     write_io_direct(0xFF40, 0x91) # LCDC: LCD ON + BG ON + unsigned addressing
     write_io_direct(0xFF47, 0xFC) # BGP : 標準パレット(色0=白、色1〜3=黒)
+  end
+
+  # ブートROM無効化レジスタ(0xFF50)への書き込み処理
+  # 非ゼロを書き込まれた瞬間に重畳を解除する(以後0x0000-0x00FFはカートリッジが見える)
+  # 一度解除したら再有効化はできない(実機ハードウェアでも同じ)
+  # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#monochrome-models-dmg0-dmg-mgb
+  def handle_boot_rom_disable(address, value)
+    return if address != 0xFF50 || value == 0
+    @boot_rom_enabled = false
   end
 
   # シリアルポートの送信プロトコル
