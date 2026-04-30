@@ -48,8 +48,8 @@ class PPU
         render_scanline
       end
 
-      @ly = (@ly + 1) % SCANLINES_PER_FRAME    # 154で0にラップ(次フレーム)
-      @mmu.write_io_direct(LY, @ly)            # 0xFF44に新しいLYを反映
+      @ly = (@ly + 1) % SCANLINES_PER_FRAME # 154で0にラップ(次フレーム)
+      @mmu.write_io_direct(LY, @ly)         # LYを更新
     end
   end
 
@@ -68,7 +68,7 @@ class PPU
   # 1スキャンライン分(160ピクセル)をframebufferに書き込む(C-2: BGタイル描画)
   # Pan Docs: https://gbdev.io/pandocs/Tile_Maps.html / https://gbdev.io/pandocs/Tile_Data.html
   def render_scanline
-    return unless bg_enabled? # BG OFFなら描画しない(framebufferは前の値を保持)
+    return unless bg_enabled? # BGが無効
 
     scy  = @mmu.read(address: SCY)  # ViewportのY座標
     scx  = @mmu.read(address: SCX)  # ViewportのX座標
