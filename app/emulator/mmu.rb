@@ -65,12 +65,14 @@ require 'app/emulator/bit'
 #     +2  タイル番号
 #     +3  属性 (パレット / 反転 / 優先度)
 class MMU
-  attr_reader :serial_buffer
+  attr_reader :serial_buffer, :chime_triggered
 
   # I/O レジスタアドレス(Pan Docs の慣用名と同じ)
-  SB = 0xFF01  # Serial Buffer: 送信したい 1 バイト
-  SC = 0xFF02  # Serial Control: 転送制御
+  SB   = 0xFF01  # Serial Buffer: 送信したい 1 バイト
+  SC   = 0xFF02  # Serial Control: 転送制御
+  NR14 = 0xFF14  # Channel 1 Period high & control: bit7 が trigger(再生開始)
   SC_TRANSFER_START = 0x81  # SC への書き込みがこの値のとき転送開始 (bit7=1, bit0=1)
+  NR14_TRIGGER_MASK = 0x80  # NR14 の bit7。書き込み時にここが立つとチャンネル 1 を再トリガー
 
   def initialize(cartridge, skip_boot: false, boot_rom: nil)
     @cartridge = cartridge
@@ -92,6 +94,11 @@ class MMU
     # シリアル送信履歴。0xFF02 ← 0x81 が発火するたびに 0xFF01 の文字が追記される。
     # Blargg のテスト結果("Passed" / "Failed XX") はこの経路でしか届かない。
     @serial_buffer = ''
+
+    # ブートチャイム再生フラグ。NR14(0xFF14)に trigger bit 付きで書き込まれた瞬間に true になる。
+    # APU 本体は実装せず、ブートROM のチャイム発火を検知して WAV 再生で演出代替するための窓口。
+    # 一度立ったら下げない(複数回 trigger されても演出側で 1 度だけ再生する想定)
+    @chime_triggered = false
 
     setup_post_boot_io if skip_boot
   end
@@ -122,7 +129,7 @@ class MMU
     when 0x8000..0x9FFF then @vram[address - 0x8000] = value
     when 0xC000..0xDFFF then @wram[address - 0xC000] = value
     when 0xFE00..0xFE9F then @oam[address - 0xFE00] = value
-    when 0xFF00..0xFF7F then @io[address - 0xFF00] = value; handle_serial(address, value); handle_boot_rom_disable(address, value)
+    when 0xFF00..0xFF7F then @io[address - 0xFF00] = value; handle_serial(address, value); handle_boot_rom_disable(address, value); handle_chime_trigger(address, value)
     when 0xFF80..0xFFFE then @hram[address - 0xFF80] = value
     when 0xFFFF then @ie = value
     end
@@ -165,6 +172,18 @@ class MMU
   def handle_boot_rom_disable(address, value)
     return if address != 0xFF50 || value == 0
     @boot_rom_enabled = false
+  end
+
+  # ブートチャイムの再生トリガー検知
+  # Pan Docs: https://gbdev.io/pandocs/Audio_Registers.html#ff14--nr14-channel-1-period-high--control
+  #
+  # NR14(0xFF14)bit7 = Trigger。1 を書き込むとチャンネル 1 が再トリガーされて発音が始まる。
+  # GEM BOY は APU を実装しないので、この trigger を WAV 再生(ブートチャイム)に代替する。
+  # ブートROM のチャイムは複数回 trigger を発火するが、フラグは true のまま固定し、
+  # 実際の再生回数制御は呼び出し側(main.rb)で行う。
+  def handle_chime_trigger(address, value)
+    return if address != NR14 || (value & NR14_TRIGGER_MASK) == 0
+    @chime_triggered = true
   end
 
   # シリアルポートの送信プロトコル
