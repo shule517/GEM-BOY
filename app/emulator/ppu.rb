@@ -124,6 +124,6 @@ class PPU
     byte_lo = @mmu.read_u8(address: tile_addr + pixel_y * 2)     # 8ピクセル分の色番号bit0(LSB)を並べたバイト
     byte_hi = @mmu.read_u8(address: tile_addr + pixel_y * 2 + 1) # 8ピクセル分の色番号bit1(MSB)を並べたバイト
     bit = 7 - pixel_x                                            # 左端ピクセル(x=0)がbit7、右端(x=7)がbit0
-    ((byte_hi >> bit) & 1) << 1 | ((byte_lo >> bit) & 1)         # MSBとLSBを組み合わせて0..3の色番号
+    (byte_hi[bit] << 1) | byte_lo[bit]                           # MSBとLSBを組み合わせて0..3の色番号
   end
 end
