@@ -182,14 +182,14 @@ class CPU
     # ============================================================
     # 8bit ロード - LD r,u8 (即値ロード)
     # ============================================================
-    # table[0x06] = -> { 8 }  # LD B,u8
-    # table[0x0E] = -> { 8 }  # LD C,u8
-    # table[0x16] = -> { 8 }  # LD D,u8
-    # table[0x1E] = -> { 8 }  # LD E,u8
-    # table[0x26] = -> { 8 }  # LD H,u8
-    # table[0x2E] = -> { 8 }  # LD L,u8
+    table[0x06] = -> { self.b = fetch_u8; 8 } # LD B,u8
+    table[0x0E] = -> { self.c = fetch_u8; 8 } # LD C,u8
+    table[0x16] = -> { self.d = fetch_u8; 8 } # LD D,u8
+    table[0x1E] = -> { self.e = fetch_u8; 8 } # LD E,u8
+    table[0x26] = -> { self.h = fetch_u8; 8 } # LD H,u8
+    table[0x2E] = -> { self.l = fetch_u8; 8 } # LD L,u8
     # table[0x36] = -> { 12 } # LD (HL),u8
-    # table[0x3E] = -> { 8 }  # LD A,u8
+    table[0x3E] = -> { self.a = fetch_u8; 8 } # LD A,u8
 
     # ============================================================
     # 8bit ロード - LD r,r' (レジスタ間転送)
@@ -442,14 +442,14 @@ class CPU
     # table[0x19] = -> { 8 }  # ADD HL,DE
     # table[0x29] = -> { 8 }  # ADD HL,HL
     # table[0x39] = -> { 8 }  # ADD HL,SP
-    # table[0x03] = -> { 8 }  # INC BC
-    # table[0x13] = -> { 8 }  # INC DE
-    # table[0x23] = -> { 8 }  # INC HL
-    # table[0x33] = -> { 8 }  # INC SP
-    # table[0x0B] = -> { 8 }  # DEC BC
-    # table[0x1B] = -> { 8 }  # DEC DE
-    # table[0x2B] = -> { 8 }  # DEC HL
-    # table[0x3B] = -> { 8 }  # DEC SP
+    table[0x03] = -> { self.bc = Bit.wrap_u16(bc + 1); 8 } # INC BC
+    table[0x13] = -> { self.de = Bit.wrap_u16(de + 1); 8 } # INC DE
+    table[0x23] = -> { self.hl = Bit.wrap_u16(hl + 1); 8 } # INC HL
+    table[0x33] = -> { self.sp = Bit.wrap_u16(sp + 1); 8 } # INC SP
+    table[0x0B] = -> { self.bc = Bit.wrap_u16(bc - 1); 8 } # DEC BC
+    table[0x1B] = -> { self.de = Bit.wrap_u16(de - 1); 8 } # DEC DE
+    table[0x2B] = -> { self.hl = Bit.wrap_u16(hl - 1); 8 } # DEC HL
+    table[0x3B] = -> { self.sp = Bit.wrap_u16(sp - 1); 8 } # DEC SP
     # table[0xE8] = -> { 16 } # ADD SP,i8
 
     # ============================================================
