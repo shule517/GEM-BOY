@@ -308,24 +308,28 @@ class CPU
     # table[0xF5] = -> { 16 } # PUSH AF
 
     # ============================================================
-    # 8bit 算術 - INC / DEC
+    # 8bit 算術 - INC
     # ============================================================
     table[0x04] = -> { half_carry_result = Bit.low_4bits(b) + 1 > 0x0F; self.b = Bit.wrap_u8(b + 1); set_flags(zero: b == 0, negative: false, half_carry: half_carry_result); 4 } # INC B: B+1。Cフラグは保持(他更新)、Hは下位4bitからの繰り上がり
-    table[0x0C] = -> { half_carry_result = Bit.low_4bits(c) + 1 > 0x0F; self.c = Bit.wrap_u8(c + 1); set_flags(zero: c == 0, negative: false, half_carry: half_carry_result); 4 }  # INC C
-    table[0x14] = -> { half_carry_result = Bit.low_4bits(d) + 1 > 0x0F; self.d = Bit.wrap_u8(d + 1); set_flags(zero: d == 0, negative: false, half_carry: half_carry_result); 4 }  # INC D
-    table[0x1C] = -> { half_carry_result = Bit.low_4bits(e) + 1 > 0x0F; self.e = Bit.wrap_u8(e + 1); set_flags(zero: e == 0, negative: false, half_carry: half_carry_result); 4 }  # INC E
-    table[0x24] = -> { half_carry_result = Bit.low_4bits(h) + 1 > 0x0F; self.h = Bit.wrap_u8(h + 1); set_flags(zero: h == 0, negative: false, half_carry: half_carry_result); 4 }  # INC H
-    table[0x2C] = -> { half_carry_result = Bit.low_4bits(l) + 1 > 0x0F; self.l = Bit.wrap_u8(l + 1); set_flags(zero: l == 0, negative: false, half_carry: half_carry_result); 4 }  # INC L
+    table[0x0C] = -> { half_carry_result = Bit.low_4bits(c) + 1 > 0x0F; self.c = Bit.wrap_u8(c + 1); set_flags(zero: c == 0, negative: false, half_carry: half_carry_result); 4 } # INC C
+    table[0x14] = -> { half_carry_result = Bit.low_4bits(d) + 1 > 0x0F; self.d = Bit.wrap_u8(d + 1); set_flags(zero: d == 0, negative: false, half_carry: half_carry_result); 4 } # INC D
+    table[0x1C] = -> { half_carry_result = Bit.low_4bits(e) + 1 > 0x0F; self.e = Bit.wrap_u8(e + 1); set_flags(zero: e == 0, negative: false, half_carry: half_carry_result); 4 } # INC E
+    table[0x24] = -> { half_carry_result = Bit.low_4bits(h) + 1 > 0x0F; self.h = Bit.wrap_u8(h + 1); set_flags(zero: h == 0, negative: false, half_carry: half_carry_result); 4 } # INC H
+    table[0x2C] = -> { half_carry_result = Bit.low_4bits(l) + 1 > 0x0F; self.l = Bit.wrap_u8(l + 1); set_flags(zero: l == 0, negative: false, half_carry: half_carry_result); 4 } # INC L
     # table[0x34] = -> { 12 } # INC (HL)
-    table[0x3C] = -> { half_carry_result = Bit.low_4bits(a) + 1 > 0x0F; self.a = Bit.wrap_u8(a + 1); set_flags(zero: a == 0, negative: false, half_carry: half_carry_result); 4 }  # INC A
-    # table[0x05] = -> { 4 }  # DEC B
-    # table[0x0D] = -> { 4 }  # DEC C
-    # table[0x15] = -> { 4 }  # DEC D
-    # table[0x1D] = -> { 4 }  # DEC E
-    # table[0x25] = -> { 4 }  # DEC H
-    # table[0x2D] = -> { 4 }  # DEC L
+    table[0x3C] = -> { half_carry_result = Bit.low_4bits(a) + 1 > 0x0F; self.a = Bit.wrap_u8(a + 1); set_flags(zero: a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
+
+    # ============================================================
+    # 8bit 算術 - DEC
+    # ============================================================
+    table[0x05] = -> { half_carry_result = Bit.low_4bits(b) == 0; self.b = Bit.wrap_u8(b - 1); set_flags(zero: b == 0, negative: true, half_carry: half_carry_result); 4 } # DEC B
+    table[0x0D] = -> { half_carry_result = Bit.low_4bits(c) == 0; self.c = Bit.wrap_u8(c - 1); set_flags(zero: c == 0, negative: true, half_carry: half_carry_result); 4 } # DEC C: C-1。Cフラグは保持(他更新)、Hは下位4bitが0なら借り発生
+    table[0x15] = -> { half_carry_result = Bit.low_4bits(d) == 0; self.d = Bit.wrap_u8(d - 1); set_flags(zero: d == 0, negative: true, half_carry: half_carry_result); 4 } # DEC D
+    table[0x1D] = -> { half_carry_result = Bit.low_4bits(e) == 0; self.e = Bit.wrap_u8(e - 1); set_flags(zero: e == 0, negative: true, half_carry: half_carry_result); 4 } # DEC E
+    table[0x25] = -> { half_carry_result = Bit.low_4bits(h) == 0; self.h = Bit.wrap_u8(h - 1); set_flags(zero: h == 0, negative: true, half_carry: half_carry_result); 4 } # DEC H
+    table[0x2D] = -> { half_carry_result = Bit.low_4bits(l) == 0; self.l = Bit.wrap_u8(l - 1); set_flags(zero: l == 0, negative: true, half_carry: half_carry_result); 4 } # DEC L
     # table[0x35] = -> { 12 } # DEC (HL)
-    # table[0x3D] = -> { 4 }  # DEC A
+    table[0x3D] = -> { half_carry_result = Bit.low_4bits(a) == 0; self.a = Bit.wrap_u8(a - 1); set_flags(zero: a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
 
     # ============================================================
     # 8bit 算術 - ADD A
@@ -477,7 +481,7 @@ class CPU
     # ============================================================
     # ジャンプ - JR (相対ジャンプ)
     # ============================================================
-    # table[0x18] = -> { 12 } # JR i8
+    table[0x18] = -> { offset_i8 = fetch_i8; self.pc = Bit.wrap_u16(pc + offset_i8); 12 } # JR i8: 無条件相対ジャンプ。fetch_i8 後のPC(=次の命令の先頭)を起点にオフセット加算
     # JR NZ,i8: Z フラグが 0 のとき、JR命令直後のアドレスから符号付き8bit分だけPCを動かす
     # fetch_i8 を先に呼ぶことで、PC が「次の命令の先頭」を指した状態でオフセット加算する
     table[0x20] = -> do
