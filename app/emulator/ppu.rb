@@ -67,6 +67,11 @@ class PPU
     @mmu.read(address: LCDC)[0] == 1 # LCDC bit0 = BG/Window Enable
   end
 
+  # BGタイルマップの先頭アドレス https://gbdev.io/pandocs/LCDC.html#lcdc3--bg-tile-map-area
+  def bg_tile_map_address
+    @mmu.read(address: LCDC)[3] == 1 ? 0x9C00 : 0x9800 # LCDC bit3
+  end
+
   # 1スキャンライン分(160ピクセル)をframebufferに書き込む(C-2: BGタイル描画)
   # https://gbdev.io/pandocs/Tile_Maps.html / https://gbdev.io/pandocs/Tile_Data.html
   def render_scanline
@@ -81,18 +86,18 @@ class PPU
     tile_row = bg_y / 8 # タイルマップ上の行番号(0..31)
     pixel_y = bg_y % 8 # タイル内のY座標(0..7)
 
-    map_base = (lcdc & 0x08) != 0 ? 0x9C00 : 0x9800 # LCDC bit3でタイルマップを切替
-    unsigned_addressing = (lcdc & 0x10) != 0        # LCDC bit4: 1=unsigned(0x8000基点), 0=signed(0x9000基点)
+    tile_map_address = bg_tile_map_address
+    unsigned_addressing = (lcdc & 0x10) != 0 # LCDC bit4: 1=unsigned(0x8000基点), 0=signed(0x9000基点)
 
     SCREEN_WIDTH_PIXEL.times do |x|
       bg_x = Bit.wrap_u8(scx + x) # スクロール込みのBG上のX座標
       tile_col = bg_x / 8 # タイルマップ上の列番号(0..31)
       pixel_x = bg_x % 8 # タイル内のX座標(0..7)
 
-      tile_num = @mmu.read(address: map_base + tile_row * 32 + tile_col) # マップから絵柄番号を取得
-      tile_addr = tile_data_address(tile_num, unsigned_addressing)       # 絵柄データのVRAMアドレス
-      color_id = pixel_color(tile_addr, pixel_x, pixel_y)                # 1ピクセルの色番号(0..3)を2bppデコード
-      actual_color = (bgp >> (color_id * 2)) & 0b11                      # BGPで色番号を画面明度(0..3)に変換
+      tile_num = @mmu.read(address: tile_map_address + tile_row * 32 + tile_col) # マップから絵柄番号を取得
+      tile_addr = tile_data_address(tile_num, unsigned_addressing) # 絵柄データのVRAMアドレス
+      color_id = pixel_color(tile_addr, pixel_x, pixel_y)          # 1ピクセルの色番号(0..3)を2bppデコード
+      actual_color = (bgp >> (color_id * 2)) & 0b11                # BGPで色番号を画面明度(0..3)に変換
 
       @framebuffer[ly * SCREEN_WIDTH_PIXEL + x] = actual_color
     end
