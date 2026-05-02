@@ -274,7 +274,7 @@ class CPU
     # table[0xC5] = -> { 16 } # PUSH BC
     # table[0xD5] = -> { 16 } # PUSH DE
     # table[0xE5] = -> { 16 } # PUSH HL
-    # table[0xF5] = -> { 16 } # PUSH AF
+    table[0xF5] = -> { registers.sp = Bit.wrap_u16(registers.sp - 1); mmu.write_u8(address: registers.sp, value: registers.a); registers.sp = Bit.wrap_u16(registers.sp - 1);; mmu.write_u8(address: registers.sp, value: registers.f); 16 } # PUSH AF
 
     # ============================================================
     # 8bit 算術 - INC
