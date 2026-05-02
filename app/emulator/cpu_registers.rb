@@ -57,19 +57,19 @@ class CpuRegisters
   def carry = Bit.bit_at(f, 4)
 
   def zero=(value)
-    self.f = (f & 0b01111111) | (value ? 1 << 7 : 0) # bit7 Zero
+    self.f = Bit.set_bit(f, 7, value) # bit7 Zero
   end
 
   def negative=(value)
-    self.f = (f & 0b10111111) | (value ? 1 << 6 : 0) # bit6 Negative (Subtract)
+    self.f = Bit.set_bit(f, 6, value) # bit6 Negative (Subtract)
   end
 
   def half_carry=(value)
-    self.f = (f & 0b11011111) | (value ? 1 << 5 : 0) # bit5 Half Carry
+    self.f = Bit.set_bit(f, 5, value) # bit5 Half Carry
   end
 
   def carry=(value)
-    self.f = (f & 0b11101111) | (value ? 1 << 4 : 0) # bit4 Carry
+    self.f = Bit.set_bit(f, 4, value) # bit4 Carry
   end
 
   def bc = Bit.make_u16(high: b, low: c)

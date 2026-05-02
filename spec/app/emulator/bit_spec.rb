@@ -423,4 +423,102 @@ RSpec.describe Bit do
       end
     end
   end
+
+  describe '.set_bit' do
+    # 値の n 番目のビットを on/off に設定した結果を返す
+    # F レジスタの Z/N/H/C を個別更新するときに使う
+    subject { Bit.set_bit(value, n, on) }
+
+    context '0x00 の bit7 を on にしたとき' do
+      let(:value) { 0x00 }
+      let(:n) { 7 }
+      let(:on) { true }
+
+      it '0x80 を返す' do
+        is_expected.to eq 0x80
+      end
+    end
+
+    context '0xFF の bit7 を off にしたとき' do
+      let(:value) { 0xFF }
+      let(:n) { 7 }
+      let(:on) { false }
+
+      it '0x7F を返す(他ビットは保持)' do
+        is_expected.to eq 0x7F
+      end
+    end
+
+    context '0xFF の bit0 を off にしたとき' do
+      let(:value) { 0xFF }
+      let(:n) { 0 }
+      let(:on) { false }
+
+      it '0xFE を返す(他ビットは保持)' do
+        is_expected.to eq 0xFE
+      end
+    end
+
+    context '0x00 の bit4 を on にしたとき(Cフラグセット相当)' do
+      let(:value) { 0x00 }
+      let(:n) { 4 }
+      let(:on) { true }
+
+      it '0x10 を返す' do
+        is_expected.to eq 0x10
+      end
+    end
+
+    context '既に on のビットを on にしたとき(冪等)' do
+      let(:value) { 0x80 }
+      let(:n) { 7 }
+      let(:on) { true }
+
+      it '値は変化せず 0x80 のまま' do
+        is_expected.to eq 0x80
+      end
+    end
+
+    context '既に off のビットを off にしたとき(冪等)' do
+      let(:value) { 0x00 }
+      let(:n) { 7 }
+      let(:on) { false }
+
+      it '値は変化せず 0x00 のまま' do
+        is_expected.to eq 0x00
+      end
+    end
+
+    context 'on に true 以外の真値(整数1)を渡したとき' do
+      # F レジスタ setter からは Bit.bit_at の戻り値(0 or 1)が渡されるケースがある
+      let(:value) { 0x00 }
+      let(:n) { 7 }
+      let(:on) { 1 }
+
+      it '真として扱い bit7 を立てて 0x80 を返す' do
+        is_expected.to eq 0x80
+      end
+    end
+
+    context 'on に nil を渡したとき' do
+      let(:value) { 0xFF }
+      let(:n) { 7 }
+      let(:on) { nil }
+
+      it '偽として扱い bit7 をクリアして 0x7F を返す' do
+        is_expected.to eq 0x7F
+      end
+    end
+
+    context '0xF0 (Z=N=H=C=1) の bit5 (H) だけ off にしたとき' do
+      # F レジスタの Half-Carry だけクリア。他フラグ (Z=bit7, N=bit6, C=bit4) は保持
+      let(:value) { 0xF0 }
+      let(:n) { 5 }
+      let(:on) { false }
+
+      it '0xD0 を返す(Z=1, N=1, H=0, C=1)' do
+        is_expected.to eq 0xD0
+      end
+    end
+  end
 end
