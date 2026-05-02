@@ -95,6 +95,8 @@ class CPU
   # (HL) で指す番地から 1 バイト読む。XOR A,(HL) / OR A,(HL) / CP A,(HL) / LD A,(HL+) などで使う
   def read_at_hl = mmu.read_u8(address: registers.hl)
 
+  def read_at_sp = mmu.read_u8(address: registers.sp)
+
   # (HL) で指す番地に 1 バイト書く。LD (HL+),A / LD (HL-),A などで使う
   def write_at_hl(value) = mmu.write_u8(address: registers.hl, value: value)
 
@@ -270,7 +272,7 @@ class CPU
     # table[0xC1] = -> { 12 } # POP BC
     # table[0xD1] = -> { 12 } # POP DE
     # table[0xE1] = -> { 12 } # POP HL
-    # table[0xF1] = -> { 12 } # POP AF
+    table[0xF1] = -> { registers.f = read_at_sp; registers.sp_increment; registers.a = read_at_sp; registers.sp_increment; 12 } # POP AF
     # table[0xC5] = -> { 16 } # PUSH BC
     # table[0xD5] = -> { 16 } # PUSH DE
     # table[0xE5] = -> { 16 } # PUSH HL
