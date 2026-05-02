@@ -263,7 +263,7 @@ class CPU
     table[0x21] = -> { registers.hl = fetch_u16; 12 } # LD HL,u16
     table[0x31] = -> { registers.sp = fetch_u16; 12 } # LD SP,u16
     table[0x08] = -> { mmu.write_u16(address: fetch_u16, value: registers.sp); 20 } # LD (u16),SP
-    table[0xF8] = -> { registers.hl = Bit.wrap_u16(registers.sp + fetch_i8); registers.negative_flag = 0; registers.negative_flag = 0; registers.half_carry_flag = 1; registers.carry_flag = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
+    table[0xF8] = -> { registers.hl = registers.sp + fetch_i8; registers.negative_flag = 0; registers.negative_flag = 0; registers.half_carry_flag = 1; registers.carry_flag = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
     table[0xF9] = -> { registers.sp = registers.hl; 8 } # LD SP,HL
 
     # ============================================================
@@ -281,14 +281,14 @@ class CPU
     # ============================================================
     # 8bit 算術 - INC
     # ============================================================
-    table[0x04] = -> { half_carry_result = Bit.low_4bits(registers.b) + 1 > 0x0F; registers.b = Bit.wrap_u8(registers.b + 1); registers.set_flags(zero: registers.b == 0, negative: false, half_carry: half_carry_result); 4 } # INC B: B+1。Cフラグは保持(他更新)、Hは下位4bitからの繰り上がり
-    table[0x0C] = -> { half_carry_result = Bit.low_4bits(registers.c) + 1 > 0x0F; registers.c = Bit.wrap_u8(registers.c + 1); registers.set_flags(zero: registers.c == 0, negative: false, half_carry: half_carry_result); 4 } # INC C
-    table[0x14] = -> { half_carry_result = Bit.low_4bits(registers.d) + 1 > 0x0F; registers.d = Bit.wrap_u8(registers.d + 1); registers.set_flags(zero: registers.d == 0, negative: false, half_carry: half_carry_result); 4 } # INC D
-    table[0x1C] = -> { half_carry_result = Bit.low_4bits(registers.e) + 1 > 0x0F; registers.e = Bit.wrap_u8(registers.e + 1); registers.set_flags(zero: registers.e == 0, negative: false, half_carry: half_carry_result); 4 } # INC E
-    table[0x24] = -> { half_carry_result = Bit.low_4bits(registers.h) + 1 > 0x0F; registers.h = Bit.wrap_u8(registers.h + 1); registers.set_flags(zero: registers.h == 0, negative: false, half_carry: half_carry_result); 4 } # INC H
-    table[0x2C] = -> { half_carry_result = Bit.low_4bits(registers.l) + 1 > 0x0F; registers.l = Bit.wrap_u8(registers.l + 1); registers.set_flags(zero: registers.l == 0, negative: false, half_carry: half_carry_result); 4 } # INC L
+    table[0x04] = -> { half_carry_result = Bit.low_4bits(registers.b) + 1 > 0x0F; registers.b = registers.b + 1; registers.set_flags(zero: registers.b == 0, negative: false, half_carry: half_carry_result); 4 } # INC B: B+1。Cフラグは保持(他更新)、Hは下位4bitからの繰り上がり
+    table[0x0C] = -> { half_carry_result = Bit.low_4bits(registers.c) + 1 > 0x0F; registers.c = registers.c + 1; registers.set_flags(zero: registers.c == 0, negative: false, half_carry: half_carry_result); 4 } # INC C
+    table[0x14] = -> { half_carry_result = Bit.low_4bits(registers.d) + 1 > 0x0F; registers.d = registers.d + 1; registers.set_flags(zero: registers.d == 0, negative: false, half_carry: half_carry_result); 4 } # INC D
+    table[0x1C] = -> { half_carry_result = Bit.low_4bits(registers.e) + 1 > 0x0F; registers.e = registers.e + 1; registers.set_flags(zero: registers.e == 0, negative: false, half_carry: half_carry_result); 4 } # INC E
+    table[0x24] = -> { half_carry_result = Bit.low_4bits(registers.h) + 1 > 0x0F; registers.h = registers.h + 1; registers.set_flags(zero: registers.h == 0, negative: false, half_carry: half_carry_result); 4 } # INC H
+    table[0x2C] = -> { half_carry_result = Bit.low_4bits(registers.l) + 1 > 0x0F; registers.l = registers.l + 1; registers.set_flags(zero: registers.l == 0, negative: false, half_carry: half_carry_result); 4 } # INC L
     # table[0x34] = -> { 12 } # INC (HL)
-    table[0x3C] = -> { half_carry_result = Bit.low_4bits(registers.a) + 1 > 0x0F; registers.a = Bit.wrap_u8(registers.a + 1); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
+    table[0x3C] = -> { half_carry_result = Bit.low_4bits(registers.a) + 1 > 0x0F; registers.a = registers.a + 1; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
 
     # ============================================================
     # 16bit 算術 - INC rr (フラグ全保持)
@@ -301,14 +301,14 @@ class CPU
     # ============================================================
     # 8bit 算術 - DEC
     # ============================================================
-    table[0x05] = -> { half_carry_result = Bit.low_4bits(registers.b) == 0; registers.b = Bit.wrap_u8(registers.b - 1); registers.set_flags(zero: registers.b == 0, negative: true, half_carry: half_carry_result); 4 } # DEC B
-    table[0x0D] = -> { half_carry_result = Bit.low_4bits(registers.c) == 0; registers.c = Bit.wrap_u8(registers.c - 1); registers.set_flags(zero: registers.c == 0, negative: true, half_carry: half_carry_result); 4 } # DEC C: C-1。Cフラグは保持(他更新)、Hは下位4bitが0なら借り発生
-    table[0x15] = -> { half_carry_result = Bit.low_4bits(registers.d) == 0; registers.d = Bit.wrap_u8(registers.d - 1); registers.set_flags(zero: registers.d == 0, negative: true, half_carry: half_carry_result); 4 } # DEC D
-    table[0x1D] = -> { half_carry_result = Bit.low_4bits(registers.e) == 0; registers.e = Bit.wrap_u8(registers.e - 1); registers.set_flags(zero: registers.e == 0, negative: true, half_carry: half_carry_result); 4 } # DEC E
-    table[0x25] = -> { half_carry_result = Bit.low_4bits(registers.h) == 0; registers.h = Bit.wrap_u8(registers.h - 1); registers.set_flags(zero: registers.h == 0, negative: true, half_carry: half_carry_result); 4 } # DEC H
-    table[0x2D] = -> { half_carry_result = Bit.low_4bits(registers.l) == 0; registers.l = Bit.wrap_u8(registers.l - 1); registers.set_flags(zero: registers.l == 0, negative: true, half_carry: half_carry_result); 4 } # DEC L
+    table[0x05] = -> { half_carry_result = Bit.low_4bits(registers.b) == 0; registers.b = registers.b - 1; registers.set_flags(zero: registers.b == 0, negative: true, half_carry: half_carry_result); 4 } # DEC B
+    table[0x0D] = -> { half_carry_result = Bit.low_4bits(registers.c) == 0; registers.c = registers.c - 1; registers.set_flags(zero: registers.c == 0, negative: true, half_carry: half_carry_result); 4 } # DEC C: C-1。Cフラグは保持(他更新)、Hは下位4bitが0なら借り発生
+    table[0x15] = -> { half_carry_result = Bit.low_4bits(registers.d) == 0; registers.d = registers.d - 1; registers.set_flags(zero: registers.d == 0, negative: true, half_carry: half_carry_result); 4 } # DEC D
+    table[0x1D] = -> { half_carry_result = Bit.low_4bits(registers.e) == 0; registers.e = registers.e - 1; registers.set_flags(zero: registers.e == 0, negative: true, half_carry: half_carry_result); 4 } # DEC E
+    table[0x25] = -> { half_carry_result = Bit.low_4bits(registers.h) == 0; registers.h = registers.h - 1; registers.set_flags(zero: registers.h == 0, negative: true, half_carry: half_carry_result); 4 } # DEC H
+    table[0x2D] = -> { half_carry_result = Bit.low_4bits(registers.l) == 0; registers.l = registers.l - 1; registers.set_flags(zero: registers.l == 0, negative: true, half_carry: half_carry_result); 4 } # DEC L
     # table[0x35] = -> { 12 } # DEC (HL)
-    table[0x3D] = -> { half_carry_result = Bit.low_4bits(registers.a) == 0; registers.a = Bit.wrap_u8(registers.a - 1); registers.set_flags(zero: registers.a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
+    table[0x3D] = -> { half_carry_result = Bit.low_4bits(registers.a) == 0; registers.a = registers.a - 1; registers.set_flags(zero: registers.a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
 
     # ============================================================
     # 16bit 算術 - DEC rr (フラグ全保持)
@@ -464,11 +464,11 @@ class CPU
     # ============================================================
     # ジャンプ - JR (相対ジャンプ)
     # ============================================================
-    table[0x18] = -> { offset_i8 = fetch_i8; registers.pc = Bit.wrap_u16(registers.pc + offset_i8); 12 } # JR i8: 無条件相対ジャンプ。fetch_i8 後のPC(=次の命令の先頭)を起点にオフセット加算
+    table[0x18] = -> { offset_i8 = fetch_i8; registers.pc = registers.pc + offset_i8; 12 } # JR i8: 無条件相対ジャンプ。fetch_i8 後のPC(=次の命令の先頭)を起点にオフセット加算
     table[0x20] = -> do # JR NZ,i8
       offset_i8 = fetch_i8
       if registers.zero_flag == 0 # NZ: Execute if Z is not set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#NZ
-        registers.pc = Bit.wrap_u16(registers.pc + offset_i8)
+        registers.pc = registers.pc + offset_i8
         12
       else
         8
@@ -477,7 +477,7 @@ class CPU
     table[0x28] = -> do # JR Z,i8  (taken: 12 / not taken: 8)
       offset_i8 = fetch_i8
       if registers.zero_flag == 1 # Z: Execute if Z is set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#Z
-        registers.pc = Bit.wrap_u16(registers.pc + offset_i8)
+        registers.pc = registers.pc + offset_i8
         12
       else
         8
@@ -489,12 +489,12 @@ class CPU
     # ============================================================
     # コール / リターン
     # ============================================================
-    table[0xCD] = -> { address = fetch_u16; registers.sp = Bit.wrap_u16(registers.sp - 2); mmu.write_u16(address: registers.sp, value: registers.pc); registers.pc = address; 24 } # CALL u16: 戻りアドレス(=次の命令のPC)をstackに積んでから呼び出し先にjump
+    table[0xCD] = -> { address = fetch_u16; registers.sp = registers.sp - 2; mmu.write_u16(address: registers.sp, value: registers.pc); registers.pc = address; 24 } # CALL u16: 戻りアドレス(=次の命令のPC)をstackに積んでから呼び出し先にjump
     # table[0xC4] = -> { 24 } # CALL NZ,u16 (taken: 24 / not taken: 12)
     # table[0xCC] = -> { 24 } # CALL Z,u16  (taken: 24 / not taken: 12)
     # table[0xD4] = -> { 24 } # CALL NC,u16 (taken: 24 / not taken: 12)
     # table[0xDC] = -> { 24 } # CALL C,u16  (taken: 24 / not taken: 12)
-    table[0xC9] = -> { registers.pc = mmu.read_u16(address: registers.sp); registers.sp = Bit.wrap_u16(registers.sp + 2); 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
+    table[0xC9] = -> { registers.pc = mmu.read_u16(address: registers.sp); registers.sp = registers.sp + 2; 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
     # table[0xD9] = -> { 16 } # RETI
     # table[0xC0] = -> { 20 } # RET NZ (taken: 20 / not taken: 8)
     # table[0xC8] = -> { 20 } # RET Z  (taken: 20 / not taken: 8)
@@ -566,7 +566,7 @@ class CPU
     # CB-prefix - RL r (Carry 経由の左ローテート、Z=結果0、N=H=0)
     # ============================================================
     # cb_table[0x10] = -> { 8 }  # RL B
-    cb_table[0x11] = -> { carry = registers.c[7]; registers.c = Bit.wrap_u8(Bit.set_bit(registers.c << 1, 0, registers.carry_flag)); registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # RL C
+    cb_table[0x11] = -> { carry = registers.c[7]; registers.c = Bit.set_bit(registers.c << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # RL C
     # cb_table[0x12] = -> { 8 }  # RL D
     # cb_table[0x13] = -> { 8 }  # RL E
     # cb_table[0x14] = -> { 8 }  # RL H
@@ -589,14 +589,14 @@ class CPU
     # ============================================================
     # CB-prefix - SLA r (左シフト、bit7→C、bit0=0、Z=結果0、N=H=0)
     # ============================================================
-    cb_table[0x20] = -> { carry = registers.b[7]; registers.b = Bit.wrap_u8(registers.b << 1); registers.set_flags(zero: registers.b == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA B
-    cb_table[0x21] = -> { carry = registers.c[7]; registers.c = Bit.wrap_u8(registers.c << 1); registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA C
-    cb_table[0x22] = -> { carry = registers.d[7]; registers.d = Bit.wrap_u8(registers.d << 1); registers.set_flags(zero: registers.d == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA D
-    cb_table[0x23] = -> { carry = registers.e[7]; registers.e = Bit.wrap_u8(registers.e << 1); registers.set_flags(zero: registers.e == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA E
-    cb_table[0x24] = -> { carry = registers.h[7]; registers.h = Bit.wrap_u8(registers.h << 1); registers.set_flags(zero: registers.h == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA H
-    cb_table[0x25] = -> { carry = registers.l[7]; registers.l = Bit.wrap_u8(registers.l << 1); registers.set_flags(zero: registers.l == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA L
+    cb_table[0x20] = -> { carry = registers.b[7]; registers.b = registers.b << 1; registers.set_flags(zero: registers.b == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA B
+    cb_table[0x21] = -> { carry = registers.c[7]; registers.c = registers.c << 1; registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA C
+    cb_table[0x22] = -> { carry = registers.d[7]; registers.d = registers.d << 1; registers.set_flags(zero: registers.d == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA D
+    cb_table[0x23] = -> { carry = registers.e[7]; registers.e = registers.e << 1; registers.set_flags(zero: registers.e == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA E
+    cb_table[0x24] = -> { carry = registers.h[7]; registers.h = registers.h << 1; registers.set_flags(zero: registers.h == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA H
+    cb_table[0x25] = -> { carry = registers.l[7]; registers.l = registers.l << 1; registers.set_flags(zero: registers.l == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA L
     # cb_table[0x26] = -> { 16 } # SLA (HL)
-    cb_table[0x27] = -> { carry = registers.a[7]; registers.a = Bit.wrap_u8(registers.a << 1); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA A
+    cb_table[0x27] = -> { carry = registers.a[7]; registers.a = registers.a << 1; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA A
 
     # ============================================================
     # CB-prefix - SRA r (算術右シフト、bit0→C、bit7 維持、Z=結果0、N=H=0)

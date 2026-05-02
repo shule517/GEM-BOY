@@ -28,12 +28,29 @@ class CpuRegisters
   FLAG_C_BIT = 4 # Carry
 
   # レジスタ: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#cpu-registers-and-flags
-  attr_accessor :a, :f, # 8bitレジスタ: Accumulator, Flags(High / Low)
-                :b, :c, # 8bitレジスタ(High / Low)
-                :d, :e, # 8bitレジスタ(High / Low)
-                :h, :l, # 8bitレジスタ(High / Low)
-                :sp, # スタックポインタ
-                :pc # プログラムカウンタ 今メモリのどこを読んでいるか
+  # 8bit レジスタの setter は値を u8 (0..255) にラップして保持する。算出結果が +1/-1 で
+  # 256/-1 になっても各 setter 側で吸収するので、INC/DEC などの呼び出し側で毎回
+  # Bit.wrap_u8 を書かなくて済む
+  attr_reader :a, :f, # 8bitレジスタ: Accumulator, Flags(High / Low)
+              :b, :c, # 8bitレジスタ(High / Low)
+              :d, :e, # 8bitレジスタ(High / Low)
+              :h, :l  # 8bitレジスタ(High / Low)
+
+  # SP / PC の setter も値を u16 (0..0xFFFF) にラップして保持する
+  attr_reader :sp, # スタックポインタ
+              :pc # プログラムカウンタ 今メモリのどこを読んでいるか
+
+  def a=(value); @a = Bit.wrap_u8(value); end
+  def f=(value); @f = Bit.wrap_u8(value); end
+  def b=(value); @b = Bit.wrap_u8(value); end
+  def c=(value); @c = Bit.wrap_u8(value); end
+  def d=(value); @d = Bit.wrap_u8(value); end
+  def e=(value); @e = Bit.wrap_u8(value); end
+  def h=(value); @h = Bit.wrap_u8(value); end
+  def l=(value); @l = Bit.wrap_u8(value); end
+
+  def sp=(value); @sp = Bit.wrap_u16(value); end
+  def pc=(value); @pc = Bit.wrap_u16(value); end
 
   def initialize(skip_boot: false)
     if skip_boot
@@ -102,18 +119,18 @@ class CpuRegisters
     self.l = Bit.low_byte(value)
   end
 
-  # 16bit レジスタペアの +1 / -1(u16 ラップ込み)
+  # 16bit レジスタペアの +1 / -1(u16 ラップは setter 側で吸収)
   # INC rr / DEC rr(0x03/0x0B/0x13/0x1B/0x23/0x2B/0x33/0x3B)で使う。フラグは変化しない
   # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#INC_r16
-  def bc_increment = self.bc = Bit.wrap_u16(bc + 1)
-  def de_increment = self.de = Bit.wrap_u16(de + 1)
-  def hl_increment = self.hl = Bit.wrap_u16(hl + 1)
-  def sp_increment = self.sp = Bit.wrap_u16(sp + 1)
-  def pc_increment = self.pc = Bit.wrap_u16(pc + 1)
+  def bc_increment = self.bc = bc + 1
+  def de_increment = self.de = de + 1
+  def hl_increment = self.hl = hl + 1
+  def sp_increment = self.sp = sp + 1
+  def pc_increment = self.pc = pc + 1
 
-  def bc_decrement = self.bc = Bit.wrap_u16(bc - 1)
-  def de_decrement = self.de = Bit.wrap_u16(de - 1)
-  def hl_decrement = self.hl = Bit.wrap_u16(hl - 1)
-  def sp_decrement = self.sp = Bit.wrap_u16(sp - 1)
-  def pc_decrement = self.pc = Bit.wrap_u16(pc - 1)
+  def bc_decrement = self.bc = bc - 1
+  def de_decrement = self.de = de - 1
+  def hl_decrement = self.hl = hl - 1
+  def sp_decrement = self.sp = sp - 1
+  def pc_decrement = self.pc = pc - 1
 end
