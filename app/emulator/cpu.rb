@@ -52,9 +52,9 @@ class CPU
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
 
     opcode = fetch_u8
-    puts "opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} at PC=0x#{Bit.wrap_u16(pc - 1).to_s(16).rjust(4, '0').upcase}"
+    puts "opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(pc - 1).to_s(16).rjust(4, '0').upcase})"
     handler = opcodes[opcode]
-    raise "Unimplemented opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} at PC=0x#{Bit.wrap_u16(pc - 1).to_s(16).rjust(4, '0').upcase}" if handler.nil?
+    raise "未実装の opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(pc - 1).to_s(16).rjust(4, '0').upcase})" if handler.nil?
     handler.call
   end
 

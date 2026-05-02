@@ -77,7 +77,7 @@ RSpec.describe CPU do
       let(:bytes) { [0xD3] }
 
       it 'PC とオペコードを含む例外を投げる' do
-        expect { subject }.to raise_error(/Unimplemented opcode 0xD3 at PC=0x0000/)
+        expect { subject }.to raise_error(/未実装の opcode 0xD3 \(PC=0x0000\)/)
       end
     end
 

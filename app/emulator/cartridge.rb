@@ -26,7 +26,7 @@
 #   0x014E-0x014F  Global Checksum  ROM 全体の単純加算チェックサム(実機は確認しない)
 class Cartridge
   def initialize(data)
-    raise "Empty ROM data" if data.nil? || data.empty?
+    raise "ROM データが空です" if data.nil? || data.empty?
     @data = data
   end
 

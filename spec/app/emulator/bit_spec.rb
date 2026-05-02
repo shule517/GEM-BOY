@@ -518,7 +518,7 @@ RSpec.describe Bit do
       let(:on) { nil }
 
       it 'ArgumentError を投げる' do
-        expect { subject }.to raise_error(ArgumentError, /on must be 0, 1, true, or false/)
+        expect { subject }.to raise_error(ArgumentError, /いずれかを指定してください/)
       end
     end
 
@@ -529,7 +529,7 @@ RSpec.describe Bit do
       let(:on) { 2 }
 
       it 'ArgumentError を投げる' do
-        expect { subject }.to raise_error(ArgumentError, /on must be 0, 1, true, or false/)
+        expect { subject }.to raise_error(ArgumentError, /いずれかを指定してください/)
       end
     end
 
@@ -539,7 +539,7 @@ RSpec.describe Bit do
       let(:on) { -1 }
 
       it 'ArgumentError を投げる' do
-        expect { subject }.to raise_error(ArgumentError, /on must be 0, 1, true, or false/)
+        expect { subject }.to raise_error(ArgumentError, /いずれかを指定してください/)
       end
     end
 

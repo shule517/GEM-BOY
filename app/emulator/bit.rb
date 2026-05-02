@@ -84,7 +84,7 @@ module Bit
     case on
     when 0, false then value & ~(1 << n) # falseの場合
     when 1, true  then value | (1 << n) # trueの場合
-    else raise ArgumentError, "on must be 0, 1, true, or false, got: #{on.inspect}"
+    else raise ArgumentError, "on は 0 / 1 / true / false のいずれかを指定してください (実際: #{on.inspect})"
     end
   end
 end

@@ -23,6 +23,18 @@
 ## 言語・コメント
 
 - **コメント・テストの説明文(`it` / `describe` / `context`)は日本語で書く**
+- **例外メッセージや `puts` などの実行時テキストも日本語で書く**。ログを後から読み返すのは自分やチームメンバなので、コメントと同じ理由で日本語に統一する。対応する spec の `raise_error(/.../)` も同じく日本語パターンで合わせる
+- **Pan Docs で使われている技術名詞や正式名称は無理に日本語化しない**。CPU 命令ニーモニック (`NOP` / `LD A,B` 等)、レジスタ名 (`LCDC` / `SCY` / `BGP` 等)、頻出する技術名詞 (`opcode` / `cartridge` / `tile` / `sprite` 等)、変数名は識別子として扱い、Pan Docs の表記そのまま英語で残す。「オペコード」「カートリッジ」のように katakana 化すると Pan Docs と grep が一致しなくなり、仕様書を辿るとき手間が増えるため
+  ```ruby
+  # bad
+  raise "Empty ROM data" if data.nil? || data.empty?
+  raise "Unimplemented opcode 0x#{opcode}" if handler.nil?
+  raise "未実装オペコード 0x#{opcode}" if handler.nil? # Pan Docs 用語を katakana 化している
+
+  # good
+  raise "ROM データが空です" if data.nil? || data.empty?
+  raise "未実装の opcode 0x#{opcode} (PC=0x#{pc})" if handler.nil?
+  ```
 - **Game Boy の仕様をコメントに書くときは、必ず Pan Docs の該当ページ URL を併記する**。引用元が辿れないと「これが正しいのか実装側のクセなのか」が後で判別できなくなるため。複数の仕様セクションを 1 つのクラスにまとめている場合は、各セクションの直前に対応する URL を置く
   ```ruby
   # === メモリマップ ===
@@ -89,7 +101,7 @@ describe '#initialize' do
   context 'nil を渡したとき' do
     let(:data) { nil }
     it '例外を投げる' do
-      expect { subject }.to raise_error(/Empty ROM/)
+      expect { subject }.to raise_error(/ROM データが空/)
     end
   end
 end
