@@ -22,6 +22,7 @@ class CPU
   attr_accessor :ime, # Interrupt Master Enable(割り込みマスタ有効フラグ) 1の時に処理を割り込む https://gbdev.io/pandocs/Interrupts.html
                 :halted, # CPUの一時停止中フラグ https://gbdev.io/pandocs/halt.html
                 :opcodes, # CPUの命令一覧 https://izik1.github.io/gbops/
+                :cb_opcodes, # CB-prefix 命令一覧 (0xCB の次のバイトでルックアップ) https://gbdev.io/pandocs/CPU_Instruction_Set.html#cb-prefix-instructions
                 :mmu
   attr_reader :registers # 8bit レジスタ (A/F/B/C/D/E/H/L) と SP / PC、フラグ操作
 
@@ -32,6 +33,7 @@ class CPU
     @halted = false # CPUの一時停止中フラグ
 
     @opcodes = build_opcode_table
+    @cb_opcodes = build_cb_opcode_table
   end
 
   # １つ命令を実行する
@@ -119,6 +121,17 @@ class CPU
     )
   end
 
+  # 0xCB の次バイトを CB-prefix table で解釈して実行する
+  # cb_handler は消費サイクル数 (8/12/16) を返すのでそのまま戻り値にする
+  # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#cb-prefix-instructions
+  def dispatch_cb
+    cb_opcode = fetch_u8
+    cb_handler = cb_opcodes[cb_opcode]
+    puts "CB opcode 0x#{cb_opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})"
+    raise "未実装の CB opcode 0x#{cb_opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})" if cb_handler.nil?
+    cb_handler.call
+  end
+
   # opcodeテーブル
   # CPUの命令一覧 https://izik1.github.io/gbops/
   # GB CPU 命令リファレンス(RGBDS 公式マニュアル) https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
@@ -133,7 +146,7 @@ class CPU
     table[0x76] = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
     table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグをクリアして割り込みを無効
     # table[0xFB] = -> { 4 } # EI
-    # table[0xCB] = -> { 4 } # PREFIX CB (CB-prefix命令へ分岐)
+    table[0xCB] = -> { dispatch_cb } # PREFIX CB (次バイトを CB-prefix table で解釈)
 
     # ============================================================
     # 8bit ロード - LD r,u8 (即値ロード)
@@ -508,5 +521,316 @@ class CPU
     # table[0xFD] = nil # UNUSED
 
     table
+  end
+
+  # CB-prefix opcode テーブル (0xCB の次バイトでルックアップ)
+  # サイクル数は 0xCB 自身の 4 を含めた合計値 (register: 8、(HL) 読み書き: 16、BIT (HL): 12)
+  # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#cb-prefix-instructions
+  # RGBDS: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
+  def build_cb_opcode_table
+    cb_table = Array.new(256, nil)
+
+    # ============================================================
+    # CB-prefix - RLC r (左ローテート、bit7→C/bit0、Z=結果0、N=H=0)
+    # ============================================================
+    # cb_table[0x00] = -> { 8 }  # RLC B
+    # cb_table[0x01] = -> { 8 }  # RLC C
+    # cb_table[0x02] = -> { 8 }  # RLC D
+    # cb_table[0x03] = -> { 8 }  # RLC E
+    # cb_table[0x04] = -> { 8 }  # RLC H
+    # cb_table[0x05] = -> { 8 }  # RLC L
+    # cb_table[0x06] = -> { 16 } # RLC (HL)
+    # cb_table[0x07] = -> { 8 }  # RLC A
+
+    # ============================================================
+    # CB-prefix - RRC r (右ローテート、bit0→C/bit7、Z=結果0、N=H=0)
+    # ============================================================
+    # cb_table[0x08] = -> { 8 }  # RRC B
+    # cb_table[0x09] = -> { 8 }  # RRC C
+    # cb_table[0x0A] = -> { 8 }  # RRC D
+    # cb_table[0x0B] = -> { 8 }  # RRC E
+    # cb_table[0x0C] = -> { 8 }  # RRC H
+    # cb_table[0x0D] = -> { 8 }  # RRC L
+    # cb_table[0x0E] = -> { 16 } # RRC (HL)
+    # cb_table[0x0F] = -> { 8 }  # RRC A
+
+    # ============================================================
+    # CB-prefix - RL r (Carry 経由の左ローテート、Z=結果0、N=H=0)
+    # ============================================================
+    # cb_table[0x10] = -> { 8 }  # RL B
+    # cb_table[0x11] = -> { 8 }  # RL C ← ブートROM のロゴ展開で頻発
+    # cb_table[0x12] = -> { 8 }  # RL D
+    # cb_table[0x13] = -> { 8 }  # RL E
+    # cb_table[0x14] = -> { 8 }  # RL H
+    # cb_table[0x15] = -> { 8 }  # RL L
+    # cb_table[0x16] = -> { 16 } # RL (HL)
+    # cb_table[0x17] = -> { 8 }  # RL A
+
+    # ============================================================
+    # CB-prefix - RR r (Carry 経由の右ローテート、Z=結果0、N=H=0)
+    # ============================================================
+    # cb_table[0x18] = -> { 8 }  # RR B
+    # cb_table[0x19] = -> { 8 }  # RR C
+    # cb_table[0x1A] = -> { 8 }  # RR D
+    # cb_table[0x1B] = -> { 8 }  # RR E
+    # cb_table[0x1C] = -> { 8 }  # RR H
+    # cb_table[0x1D] = -> { 8 }  # RR L
+    # cb_table[0x1E] = -> { 16 } # RR (HL)
+    # cb_table[0x1F] = -> { 8 }  # RR A
+
+    # ============================================================
+    # CB-prefix - SLA r (左シフト、bit7→C、bit0=0、Z=結果0、N=H=0)
+    # ============================================================
+    # cb_table[0x20] = -> { 8 }  # SLA B
+    # cb_table[0x21] = -> { 8 }  # SLA C
+    # cb_table[0x22] = -> { 8 }  # SLA D
+    # cb_table[0x23] = -> { 8 }  # SLA E
+    # cb_table[0x24] = -> { 8 }  # SLA H
+    # cb_table[0x25] = -> { 8 }  # SLA L
+    # cb_table[0x26] = -> { 16 } # SLA (HL)
+    # cb_table[0x27] = -> { 8 }  # SLA A
+
+    # ============================================================
+    # CB-prefix - SRA r (算術右シフト、bit0→C、bit7 維持、Z=結果0、N=H=0)
+    # ============================================================
+    # cb_table[0x28] = -> { 8 }  # SRA B
+    # cb_table[0x29] = -> { 8 }  # SRA C
+    # cb_table[0x2A] = -> { 8 }  # SRA D
+    # cb_table[0x2B] = -> { 8 }  # SRA E
+    # cb_table[0x2C] = -> { 8 }  # SRA H
+    # cb_table[0x2D] = -> { 8 }  # SRA L
+    # cb_table[0x2E] = -> { 16 } # SRA (HL)
+    # cb_table[0x2F] = -> { 8 }  # SRA A
+
+    # ============================================================
+    # CB-prefix - SWAP r (上位 4bit と下位 4bit を入れ替え、Z=結果0、N=H=C=0)
+    # ============================================================
+    # cb_table[0x30] = -> { 8 }  # SWAP B
+    # cb_table[0x31] = -> { 8 }  # SWAP C
+    # cb_table[0x32] = -> { 8 }  # SWAP D
+    # cb_table[0x33] = -> { 8 }  # SWAP E
+    # cb_table[0x34] = -> { 8 }  # SWAP H
+    # cb_table[0x35] = -> { 8 }  # SWAP L
+    # cb_table[0x36] = -> { 16 } # SWAP (HL)
+    # cb_table[0x37] = -> { 8 }  # SWAP A
+
+    # ============================================================
+    # CB-prefix - SRL r (論理右シフト、bit0→C、bit7=0、Z=結果0、N=H=0)
+    # ============================================================
+    # cb_table[0x38] = -> { 8 }  # SRL B
+    # cb_table[0x39] = -> { 8 }  # SRL C
+    # cb_table[0x3A] = -> { 8 }  # SRL D
+    # cb_table[0x3B] = -> { 8 }  # SRL E
+    # cb_table[0x3C] = -> { 8 }  # SRL H
+    # cb_table[0x3D] = -> { 8 }  # SRL L
+    # cb_table[0x3E] = -> { 16 } # SRL (HL)
+    # cb_table[0x3F] = -> { 8 }  # SRL A
+
+    # ============================================================
+    # CB-prefix - BIT n,r (r の bit n を Z にコピー、N=0、H=1、C は保持)
+    # (HL) 版だけ 12 サイクル (RES/SET の (HL) 16 と違うので注意)
+    # ============================================================
+    # cb_table[0x40] = -> { 8 }  # BIT 0,B
+    # cb_table[0x41] = -> { 8 }  # BIT 0,C
+    # cb_table[0x42] = -> { 8 }  # BIT 0,D
+    # cb_table[0x43] = -> { 8 }  # BIT 0,E
+    # cb_table[0x44] = -> { 8 }  # BIT 0,H
+    # cb_table[0x45] = -> { 8 }  # BIT 0,L
+    # cb_table[0x46] = -> { 12 } # BIT 0,(HL)
+    # cb_table[0x47] = -> { 8 }  # BIT 0,A
+    # cb_table[0x48] = -> { 8 }  # BIT 1,B
+    # cb_table[0x49] = -> { 8 }  # BIT 1,C
+    # cb_table[0x4A] = -> { 8 }  # BIT 1,D
+    # cb_table[0x4B] = -> { 8 }  # BIT 1,E
+    # cb_table[0x4C] = -> { 8 }  # BIT 1,H
+    # cb_table[0x4D] = -> { 8 }  # BIT 1,L
+    # cb_table[0x4E] = -> { 12 } # BIT 1,(HL)
+    # cb_table[0x4F] = -> { 8 }  # BIT 1,A
+    # cb_table[0x50] = -> { 8 }  # BIT 2,B
+    # cb_table[0x51] = -> { 8 }  # BIT 2,C
+    # cb_table[0x52] = -> { 8 }  # BIT 2,D
+    # cb_table[0x53] = -> { 8 }  # BIT 2,E
+    # cb_table[0x54] = -> { 8 }  # BIT 2,H
+    # cb_table[0x55] = -> { 8 }  # BIT 2,L
+    # cb_table[0x56] = -> { 12 } # BIT 2,(HL)
+    # cb_table[0x57] = -> { 8 }  # BIT 2,A
+    # cb_table[0x58] = -> { 8 }  # BIT 3,B
+    # cb_table[0x59] = -> { 8 }  # BIT 3,C
+    # cb_table[0x5A] = -> { 8 }  # BIT 3,D
+    # cb_table[0x5B] = -> { 8 }  # BIT 3,E
+    # cb_table[0x5C] = -> { 8 }  # BIT 3,H
+    # cb_table[0x5D] = -> { 8 }  # BIT 3,L
+    # cb_table[0x5E] = -> { 12 } # BIT 3,(HL)
+    # cb_table[0x5F] = -> { 8 }  # BIT 3,A
+    # cb_table[0x60] = -> { 8 }  # BIT 4,B
+    # cb_table[0x61] = -> { 8 }  # BIT 4,C
+    # cb_table[0x62] = -> { 8 }  # BIT 4,D
+    # cb_table[0x63] = -> { 8 }  # BIT 4,E
+    # cb_table[0x64] = -> { 8 }  # BIT 4,H
+    # cb_table[0x65] = -> { 8 }  # BIT 4,L
+    # cb_table[0x66] = -> { 12 } # BIT 4,(HL)
+    # cb_table[0x67] = -> { 8 }  # BIT 4,A
+    # cb_table[0x68] = -> { 8 }  # BIT 5,B
+    # cb_table[0x69] = -> { 8 }  # BIT 5,C
+    # cb_table[0x6A] = -> { 8 }  # BIT 5,D
+    # cb_table[0x6B] = -> { 8 }  # BIT 5,E
+    cb_table[0x6C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,H: bit5 が 0 なら Z=1。N=0、H=1、C=保持
+    # cb_table[0x6D] = -> { 8 }  # BIT 5,L
+    # cb_table[0x6E] = -> { 12 } # BIT 5,(HL)
+    # cb_table[0x6F] = -> { 8 }  # BIT 5,A
+    # cb_table[0x70] = -> { 8 }  # BIT 6,B
+    # cb_table[0x71] = -> { 8 }  # BIT 6,C
+    # cb_table[0x72] = -> { 8 }  # BIT 6,D
+    # cb_table[0x73] = -> { 8 }  # BIT 6,E
+    # cb_table[0x74] = -> { 8 }  # BIT 6,H
+    # cb_table[0x75] = -> { 8 }  # BIT 6,L
+    # cb_table[0x76] = -> { 12 } # BIT 6,(HL)
+    # cb_table[0x77] = -> { 8 }  # BIT 6,A
+    # cb_table[0x78] = -> { 8 }  # BIT 7,B
+    # cb_table[0x79] = -> { 8 }  # BIT 7,C
+    # cb_table[0x7A] = -> { 8 }  # BIT 7,D
+    # cb_table[0x7B] = -> { 8 }  # BIT 7,E
+    # cb_table[0x7C] = -> { 8 }  # BIT 7,H ← ブートROM の VBlank 待ちで使われることがある
+    # cb_table[0x7D] = -> { 8 }  # BIT 7,L
+    # cb_table[0x7E] = -> { 12 } # BIT 7,(HL)
+    # cb_table[0x7F] = -> { 8 }  # BIT 7,A
+
+    # ============================================================
+    # CB-prefix - RES n,r (r の bit n を 0 にクリア、フラグ変化なし)
+    # ============================================================
+    # cb_table[0x80] = -> { 8 }  # RES 0,B
+    # cb_table[0x81] = -> { 8 }  # RES 0,C
+    # cb_table[0x82] = -> { 8 }  # RES 0,D
+    # cb_table[0x83] = -> { 8 }  # RES 0,E
+    # cb_table[0x84] = -> { 8 }  # RES 0,H
+    # cb_table[0x85] = -> { 8 }  # RES 0,L
+    # cb_table[0x86] = -> { 16 } # RES 0,(HL)
+    # cb_table[0x87] = -> { 8 }  # RES 0,A
+    # cb_table[0x88] = -> { 8 }  # RES 1,B
+    # cb_table[0x89] = -> { 8 }  # RES 1,C
+    # cb_table[0x8A] = -> { 8 }  # RES 1,D
+    # cb_table[0x8B] = -> { 8 }  # RES 1,E
+    # cb_table[0x8C] = -> { 8 }  # RES 1,H
+    # cb_table[0x8D] = -> { 8 }  # RES 1,L
+    # cb_table[0x8E] = -> { 16 } # RES 1,(HL)
+    # cb_table[0x8F] = -> { 8 }  # RES 1,A
+    # cb_table[0x90] = -> { 8 }  # RES 2,B
+    # cb_table[0x91] = -> { 8 }  # RES 2,C
+    # cb_table[0x92] = -> { 8 }  # RES 2,D
+    # cb_table[0x93] = -> { 8 }  # RES 2,E
+    # cb_table[0x94] = -> { 8 }  # RES 2,H
+    # cb_table[0x95] = -> { 8 }  # RES 2,L
+    # cb_table[0x96] = -> { 16 } # RES 2,(HL)
+    # cb_table[0x97] = -> { 8 }  # RES 2,A
+    # cb_table[0x98] = -> { 8 }  # RES 3,B
+    # cb_table[0x99] = -> { 8 }  # RES 3,C
+    # cb_table[0x9A] = -> { 8 }  # RES 3,D
+    # cb_table[0x9B] = -> { 8 }  # RES 3,E
+    # cb_table[0x9C] = -> { 8 }  # RES 3,H
+    # cb_table[0x9D] = -> { 8 }  # RES 3,L
+    # cb_table[0x9E] = -> { 16 } # RES 3,(HL)
+    # cb_table[0x9F] = -> { 8 }  # RES 3,A
+    # cb_table[0xA0] = -> { 8 }  # RES 4,B
+    # cb_table[0xA1] = -> { 8 }  # RES 4,C
+    # cb_table[0xA2] = -> { 8 }  # RES 4,D
+    # cb_table[0xA3] = -> { 8 }  # RES 4,E
+    # cb_table[0xA4] = -> { 8 }  # RES 4,H
+    # cb_table[0xA5] = -> { 8 }  # RES 4,L
+    # cb_table[0xA6] = -> { 16 } # RES 4,(HL)
+    # cb_table[0xA7] = -> { 8 }  # RES 4,A
+    # cb_table[0xA8] = -> { 8 }  # RES 5,B
+    # cb_table[0xA9] = -> { 8 }  # RES 5,C
+    # cb_table[0xAA] = -> { 8 }  # RES 5,D
+    # cb_table[0xAB] = -> { 8 }  # RES 5,E
+    # cb_table[0xAC] = -> { 8 }  # RES 5,H
+    # cb_table[0xAD] = -> { 8 }  # RES 5,L
+    # cb_table[0xAE] = -> { 16 } # RES 5,(HL)
+    # cb_table[0xAF] = -> { 8 }  # RES 5,A
+    # cb_table[0xB0] = -> { 8 }  # RES 6,B
+    # cb_table[0xB1] = -> { 8 }  # RES 6,C
+    # cb_table[0xB2] = -> { 8 }  # RES 6,D
+    # cb_table[0xB3] = -> { 8 }  # RES 6,E
+    # cb_table[0xB4] = -> { 8 }  # RES 6,H
+    # cb_table[0xB5] = -> { 8 }  # RES 6,L
+    # cb_table[0xB6] = -> { 16 } # RES 6,(HL)
+    # cb_table[0xB7] = -> { 8 }  # RES 6,A
+    # cb_table[0xB8] = -> { 8 }  # RES 7,B
+    # cb_table[0xB9] = -> { 8 }  # RES 7,C
+    # cb_table[0xBA] = -> { 8 }  # RES 7,D
+    # cb_table[0xBB] = -> { 8 }  # RES 7,E
+    # cb_table[0xBC] = -> { 8 }  # RES 7,H
+    # cb_table[0xBD] = -> { 8 }  # RES 7,L
+    # cb_table[0xBE] = -> { 16 } # RES 7,(HL)
+    # cb_table[0xBF] = -> { 8 }  # RES 7,A
+
+    # ============================================================
+    # CB-prefix - SET n,r (r の bit n を 1 にセット、フラグ変化なし)
+    # ============================================================
+    # cb_table[0xC0] = -> { 8 }  # SET 0,B
+    # cb_table[0xC1] = -> { 8 }  # SET 0,C
+    # cb_table[0xC2] = -> { 8 }  # SET 0,D
+    # cb_table[0xC3] = -> { 8 }  # SET 0,E
+    # cb_table[0xC4] = -> { 8 }  # SET 0,H
+    # cb_table[0xC5] = -> { 8 }  # SET 0,L
+    # cb_table[0xC6] = -> { 16 } # SET 0,(HL)
+    # cb_table[0xC7] = -> { 8 }  # SET 0,A
+    # cb_table[0xC8] = -> { 8 }  # SET 1,B
+    # cb_table[0xC9] = -> { 8 }  # SET 1,C
+    # cb_table[0xCA] = -> { 8 }  # SET 1,D
+    # cb_table[0xCB] = -> { 8 }  # SET 1,E
+    # cb_table[0xCC] = -> { 8 }  # SET 1,H
+    # cb_table[0xCD] = -> { 8 }  # SET 1,L
+    # cb_table[0xCE] = -> { 16 } # SET 1,(HL)
+    # cb_table[0xCF] = -> { 8 }  # SET 1,A
+    # cb_table[0xD0] = -> { 8 }  # SET 2,B
+    # cb_table[0xD1] = -> { 8 }  # SET 2,C
+    # cb_table[0xD2] = -> { 8 }  # SET 2,D
+    # cb_table[0xD3] = -> { 8 }  # SET 2,E
+    # cb_table[0xD4] = -> { 8 }  # SET 2,H
+    # cb_table[0xD5] = -> { 8 }  # SET 2,L
+    # cb_table[0xD6] = -> { 16 } # SET 2,(HL)
+    # cb_table[0xD7] = -> { 8 }  # SET 2,A
+    # cb_table[0xD8] = -> { 8 }  # SET 3,B
+    # cb_table[0xD9] = -> { 8 }  # SET 3,C
+    # cb_table[0xDA] = -> { 8 }  # SET 3,D
+    # cb_table[0xDB] = -> { 8 }  # SET 3,E
+    # cb_table[0xDC] = -> { 8 }  # SET 3,H
+    # cb_table[0xDD] = -> { 8 }  # SET 3,L
+    # cb_table[0xDE] = -> { 16 } # SET 3,(HL)
+    # cb_table[0xDF] = -> { 8 }  # SET 3,A
+    # cb_table[0xE0] = -> { 8 }  # SET 4,B
+    # cb_table[0xE1] = -> { 8 }  # SET 4,C
+    # cb_table[0xE2] = -> { 8 }  # SET 4,D
+    # cb_table[0xE3] = -> { 8 }  # SET 4,E
+    # cb_table[0xE4] = -> { 8 }  # SET 4,H
+    # cb_table[0xE5] = -> { 8 }  # SET 4,L
+    # cb_table[0xE6] = -> { 16 } # SET 4,(HL)
+    # cb_table[0xE7] = -> { 8 }  # SET 4,A
+    # cb_table[0xE8] = -> { 8 }  # SET 5,B
+    # cb_table[0xE9] = -> { 8 }  # SET 5,C
+    # cb_table[0xEA] = -> { 8 }  # SET 5,D
+    # cb_table[0xEB] = -> { 8 }  # SET 5,E
+    # cb_table[0xEC] = -> { 8 }  # SET 5,H
+    # cb_table[0xED] = -> { 8 }  # SET 5,L
+    # cb_table[0xEE] = -> { 16 } # SET 5,(HL)
+    # cb_table[0xEF] = -> { 8 }  # SET 5,A
+    # cb_table[0xF0] = -> { 8 }  # SET 6,B
+    # cb_table[0xF1] = -> { 8 }  # SET 6,C
+    # cb_table[0xF2] = -> { 8 }  # SET 6,D
+    # cb_table[0xF3] = -> { 8 }  # SET 6,E
+    # cb_table[0xF4] = -> { 8 }  # SET 6,H
+    # cb_table[0xF5] = -> { 8 }  # SET 6,L
+    # cb_table[0xF6] = -> { 16 } # SET 6,(HL)
+    # cb_table[0xF7] = -> { 8 }  # SET 6,A
+    # cb_table[0xF8] = -> { 8 }  # SET 7,B
+    # cb_table[0xF9] = -> { 8 }  # SET 7,C
+    # cb_table[0xFA] = -> { 8 }  # SET 7,D
+    # cb_table[0xFB] = -> { 8 }  # SET 7,E
+    # cb_table[0xFC] = -> { 8 }  # SET 7,H
+    # cb_table[0xFD] = -> { 8 }  # SET 7,L
+    # cb_table[0xFE] = -> { 16 } # SET 7,(HL)
+    # cb_table[0xFF] = -> { 8 }  # SET 7,A
+
+    cb_table
   end
 end
