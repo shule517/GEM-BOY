@@ -10,20 +10,18 @@ RSpec.describe CPU do
     context 'skip_boot を指定しないとき(ブートROM 経由起動)' do
       subject { described_class.new(mmu) }
 
-      it '全レジスタが 0、IME と halted が false で初期化される' do
+      it 'SP=0, PC=0、IME と halted が false で初期化される' do
         cpu = subject
-        expect(cpu.a).to eq 0
-        expect(cpu.b).to eq 0
-        expect(cpu.c).to eq 0
-        expect(cpu.d).to eq 0
-        expect(cpu.e).to eq 0
-        expect(cpu.h).to eq 0
-        expect(cpu.l).to eq 0
-        expect(cpu.f).to eq 0
         expect(cpu.sp).to eq 0
         expect(cpu.pc).to eq 0
         expect(cpu.ime).to eq false
         expect(cpu.halted).to eq false
+      end
+
+      it 'register が 0 初期化された Register として渡される' do
+        expect(subject.register).to be_a Register
+        expect(subject.register.a).to eq 0
+        expect(subject.register.f).to eq 0
       end
     end
 
@@ -31,17 +29,6 @@ RSpec.describe CPU do
       # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
       # ブートROM 完走後の DMG 実機値を最初からセットして起動する
       subject { described_class.new(mmu, skip_boot: true) }
-
-      it 'A=0x01, F=0xB0(DMG識別値 + Z=1,N=0,H=1,C=1)' do
-        expect(subject.a).to eq 0x01
-        expect(subject.f).to eq 0xB0
-      end
-
-      it 'BC=0x0013, DE=0x00D8, HL=0x014D' do
-        expect(subject.bc).to eq 0x0013
-        expect(subject.de).to eq 0x00D8
-        expect(subject.hl).to eq 0x014D
-      end
 
       it 'SP=0xFFFE(HRAM末端)' do
         expect(subject.sp).to eq 0xFFFE
@@ -54,6 +41,14 @@ RSpec.describe CPU do
       it 'IME=false, halted=false' do
         expect(subject.ime).to eq false
         expect(subject.halted).to eq false
+      end
+
+      it 'register が skip_boot: true の Register として渡される' do
+        expect(subject.register.a).to eq 0x01
+        expect(subject.register.f).to eq 0xB0
+        expect(subject.register.bc).to eq 0x0013
+        expect(subject.register.de).to eq 0x00D8
+        expect(subject.register.hl).to eq 0x014D
       end
     end
   end
@@ -199,433 +194,6 @@ RSpec.describe CPU do
     end
   end
 
-  describe '#set_flags' do
-    # F レジスタの bit7=Z, bit6=N, bit5=H, bit4=C を引数で更新する private ヘルパ。
-    # 引数を渡したビットだけ書き換え、省略したビットは現状を保持する。
-    subject { cpu.set_flags(**args) }
-    let(:cpu) { described_class.new(mmu) }
-    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
-    let(:args) { {} }
-
-    # F レジスタの bit レイアウト(上位 4bit がフラグ、下位 4bit は常に 0)
-    #   bit7  bit6  bit5  bit4  bit3-0
-    #   Z     N     H     C     (常に 0)
-
-    context '全フラグを true に指定したとき' do
-      let(:args) { { zero: true, negative: true, half_carry: true, carry: true } }
-
-      it 'Z=1, N=1, H=1, C=1 になる' do
-        subject
-        expect(cpu.f).to eq 0b11110000
-      end
-    end
-
-    context '全フラグを false に指定したとき' do
-      let(:args) { { zero: false, negative: false, half_carry: false, carry: false } }
-      before { cpu.f = 0b11110000 }  # 全 1 から始めて 0 になることを確認
-
-      it 'Z=0, N=0, H=0, C=0 になる' do
-        subject
-        expect(cpu.f).to eq 0b00000000
-      end
-    end
-
-    context 'zero だけ true、他は省略したとき' do
-      let(:args) { { zero: true } }
-      before { cpu.f = 0b00000000 }  # Z=0, N=0, H=0, C=0
-
-      it 'Z bit だけ立ち、N/H/C は保持される' do
-        subject
-        expect(cpu.f).to eq 0b10000000  # Z=1, N=0, H=0, C=0
-      end
-    end
-
-    context 'carry だけ false、他は省略したとき' do
-      let(:args) { { carry: false } }
-      before { cpu.f = 0b11110000 }  # Z=1, N=1, H=1, C=1
-
-      it 'C bit だけクリア、Z/N/H は保持される' do
-        subject
-        expect(cpu.f).to eq 0b11100000  # Z=1, N=1, H=1, C=0
-      end
-    end
-
-    context '引数を一切渡さなかったとき' do
-      let(:args) { {} }
-      before { cpu.f = 0b10100000 }  # Z=1, N=0, H=1, C=0
-
-      it 'F は変化しない' do
-        subject
-        expect(cpu.f).to eq 0b10100000
-      end
-    end
-  end
-
-  describe '#bc' do
-    # B + C を 16bit に合成して返す getter。B が上位、C が下位。
-    # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
-    subject { cpu.bc }
-    let(:cpu) { described_class.new(mmu) }
-    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
-
-    context 'B=0x12, C=0x34 のとき' do
-      before do
-        cpu.b = 0x12
-        cpu.c = 0x34
-      end
-
-      it '0x1234 を返す' do
-        is_expected.to eq 0x1234
-      end
-    end
-
-    context 'B=0x00, C=0x00 のとき' do
-      it '0x0000 を返す' do
-        is_expected.to eq 0x0000
-      end
-    end
-
-    context 'B=0xFF, C=0xFF のとき' do
-      before do
-        cpu.b = 0xFF
-        cpu.c = 0xFF
-      end
-
-      it '0xFFFF を返す' do
-        is_expected.to eq 0xFFFF
-      end
-    end
-
-    context 'B=0x00, C=0xFF のとき' do
-      before do
-        cpu.b = 0x00
-        cpu.c = 0xFF
-      end
-
-      it '0x00FF を返す' do
-        is_expected.to eq 0x00FF
-      end
-    end
-
-    context 'B=0xFF, C=0x00 のとき' do
-      before do
-        cpu.b = 0xFF
-        cpu.c = 0x00
-      end
-
-      it '0xFF00 を返す' do
-        is_expected.to eq 0xFF00
-      end
-    end
-  end
-
-  describe '#de' do
-    # D + E を 16bit に合成して返す getter。D が上位、E が下位。
-    subject { cpu.de }
-    let(:cpu) { described_class.new(mmu) }
-    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
-
-    context 'D=0x12, E=0x34 のとき' do
-      before do
-        cpu.d = 0x12
-        cpu.e = 0x34
-      end
-
-      it '0x1234 を返す' do
-        is_expected.to eq 0x1234
-      end
-    end
-
-    context 'D=0x00, E=0x00 のとき' do
-      it '0x0000 を返す' do
-        is_expected.to eq 0x0000
-      end
-    end
-
-    context 'D=0xFF, E=0xFF のとき' do
-      before do
-        cpu.d = 0xFF
-        cpu.e = 0xFF
-      end
-
-      it '0xFFFF を返す' do
-        is_expected.to eq 0xFFFF
-      end
-    end
-
-    context 'D=0x00, E=0xFF のとき' do
-      before do
-        cpu.d = 0x00
-        cpu.e = 0xFF
-      end
-
-      it '0x00FF を返す' do
-        is_expected.to eq 0x00FF
-      end
-    end
-
-    context 'D=0xFF, E=0x00 のとき' do
-      before do
-        cpu.d = 0xFF
-        cpu.e = 0x00
-      end
-
-      it '0xFF00 を返す' do
-        is_expected.to eq 0xFF00
-      end
-    end
-  end
-
-  describe '#hl' do
-    # H + L を 16bit に合成して返す getter。H が上位、L が下位。
-    subject { cpu.hl }
-    let(:cpu) { described_class.new(mmu) }
-    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
-
-    context 'H=0x12, L=0x34 のとき' do
-      before do
-        cpu.h = 0x12
-        cpu.l = 0x34
-      end
-
-      it '0x1234 を返す' do
-        is_expected.to eq 0x1234
-      end
-    end
-
-    context 'H=0x00, L=0x00 のとき' do
-      it '0x0000 を返す' do
-        is_expected.to eq 0x0000
-      end
-    end
-
-    context 'H=0xFF, L=0xFF のとき' do
-      before do
-        cpu.h = 0xFF
-        cpu.l = 0xFF
-      end
-
-      it '0xFFFF を返す' do
-        is_expected.to eq 0xFFFF
-      end
-    end
-
-    context 'H=0x00, L=0xFF のとき' do
-      before do
-        cpu.h = 0x00
-        cpu.l = 0xFF
-      end
-
-      it '0x00FF を返す' do
-        is_expected.to eq 0x00FF
-      end
-    end
-
-    context 'H=0xFF, L=0x00 のとき' do
-      before do
-        cpu.h = 0xFF
-        cpu.l = 0x00
-      end
-
-      it '0xFF00 を返す' do
-        is_expected.to eq 0xFF00
-      end
-    end
-
-    context 'setter で代入した直後に getter で読み戻したとき' do
-      # bc=, de=, hl= で書いた値と bc, de, hl で読んだ値が一致すること(往復確認)
-      before { cpu.hl = 0xABCD }
-
-      it '元の値 (0xABCD) が返る' do
-        is_expected.to eq 0xABCD
-      end
-    end
-  end
-
-  describe '#bc=' do
-    # 16bit 値を BC ペアに振り分ける setter。B が上位、C が下位。
-    # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
-    subject { cpu.bc = value }
-    let(:cpu) { described_class.new(mmu) }
-    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
-
-    context '0x1234 を渡したとき' do
-      let(:value) { 0x1234 }
-
-      it 'B=0x12, C=0x34 になる' do
-        subject
-        expect(cpu.b).to eq 0x12
-        expect(cpu.c).to eq 0x34
-      end
-    end
-
-    context '0x0000 を渡したとき' do
-      let(:value) { 0x0000 }
-      before do
-        cpu.b = 0xAA
-        cpu.c = 0xBB
-      end
-
-      it 'B=0x00, C=0x00 で上書きされる' do
-        subject
-        expect(cpu.b).to eq 0x00
-        expect(cpu.c).to eq 0x00
-      end
-    end
-
-    context '0xFFFF を渡したとき' do
-      let(:value) { 0xFFFF }
-
-      it 'B=0xFF, C=0xFF になる' do
-        subject
-        expect(cpu.b).to eq 0xFF
-        expect(cpu.c).to eq 0xFF
-      end
-    end
-
-    context '0x00FF (上位がゼロ) を渡したとき' do
-      let(:value) { 0x00FF }
-
-      it 'B=0x00, C=0xFF になる' do
-        subject
-        expect(cpu.b).to eq 0x00
-        expect(cpu.c).to eq 0xFF
-      end
-    end
-
-    context '0xFF00 (下位がゼロ) を渡したとき' do
-      let(:value) { 0xFF00 }
-
-      it 'B=0xFF, C=0x00 になる' do
-        subject
-        expect(cpu.b).to eq 0xFF
-        expect(cpu.c).to eq 0x00
-      end
-    end
-  end
-
-  describe '#de=' do
-    # 16bit 値を DE ペアに振り分ける setter。D が上位、E が下位。
-    subject { cpu.de = value }
-    let(:cpu) { described_class.new(mmu) }
-    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
-
-    context '0x1234 を渡したとき' do
-      let(:value) { 0x1234 }
-
-      it 'D=0x12, E=0x34 になる' do
-        subject
-        expect(cpu.d).to eq 0x12
-        expect(cpu.e).to eq 0x34
-      end
-    end
-
-    context '0x0000 を渡したとき' do
-      let(:value) { 0x0000 }
-      before do
-        cpu.d = 0xAA
-        cpu.e = 0xBB
-      end
-
-      it 'D=0x00, E=0x00 で上書きされる' do
-        subject
-        expect(cpu.d).to eq 0x00
-        expect(cpu.e).to eq 0x00
-      end
-    end
-
-    context '0xFFFF を渡したとき' do
-      let(:value) { 0xFFFF }
-
-      it 'D=0xFF, E=0xFF になる' do
-        subject
-        expect(cpu.d).to eq 0xFF
-        expect(cpu.e).to eq 0xFF
-      end
-    end
-
-    context '0x00FF (上位がゼロ) を渡したとき' do
-      let(:value) { 0x00FF }
-
-      it 'D=0x00, E=0xFF になる' do
-        subject
-        expect(cpu.d).to eq 0x00
-        expect(cpu.e).to eq 0xFF
-      end
-    end
-
-    context '0xFF00 (下位がゼロ) を渡したとき' do
-      let(:value) { 0xFF00 }
-
-      it 'D=0xFF, E=0x00 になる' do
-        subject
-        expect(cpu.d).to eq 0xFF
-        expect(cpu.e).to eq 0x00
-      end
-    end
-  end
-
-  describe '#hl=' do
-    # 16bit 値を HL ペアに振り分ける setter。H が上位、L が下位。
-    subject { cpu.hl = value }
-    let(:cpu) { described_class.new(mmu) }
-    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
-
-    context '0x1234 を渡したとき' do
-      let(:value) { 0x1234 }
-
-      it 'H=0x12, L=0x34 になる' do
-        subject
-        expect(cpu.h).to eq 0x12
-        expect(cpu.l).to eq 0x34
-      end
-    end
-
-    context '0x0000 を渡したとき' do
-      let(:value) { 0x0000 }
-      before do
-        cpu.h = 0xAA
-        cpu.l = 0xBB
-      end
-
-      it 'H=0x00, L=0x00 で上書きされる' do
-        subject
-        expect(cpu.h).to eq 0x00
-        expect(cpu.l).to eq 0x00
-      end
-    end
-
-    context '0xFFFF を渡したとき' do
-      let(:value) { 0xFFFF }
-
-      it 'H=0xFF, L=0xFF になる' do
-        subject
-        expect(cpu.h).to eq 0xFF
-        expect(cpu.l).to eq 0xFF
-      end
-    end
-
-    context '0x00FF (上位がゼロ) を渡したとき' do
-      let(:value) { 0x00FF }
-
-      it 'H=0x00, L=0xFF になる' do
-        subject
-        expect(cpu.h).to eq 0x00
-        expect(cpu.l).to eq 0xFF
-      end
-    end
-
-    context '0xFF00 (下位がゼロ) を渡したとき' do
-      let(:value) { 0xFF00 }
-
-      it 'H=0xFF, L=0x00 になる' do
-        subject
-        expect(cpu.h).to eq 0xFF
-        expect(cpu.l).to eq 0x00
-      end
-    end
-  end
-
   describe '#build_opcode_table' do
     # build_opcode_table が返すテーブル(initialize から呼ばれて cpu.opcodes に格納される)を
     # 取り出し、各 opcode の lambda を直接呼んで振る舞いを検証する。
@@ -658,8 +226,8 @@ RSpec.describe CPU do
 
         it '12 サイクルを返し、L=0x34, H=0x12, PC が 2 進む' do
           expect(subject[0x21].call).to eq 12
-          expect(cpu.l).to eq 0x34
-          expect(cpu.h).to eq 0x12
+          expect(cpu.register.l).to eq 0x34
+          expect(cpu.register.h).to eq 0x12
           expect(cpu.pc).to eq 0x0002
         end
       end
@@ -670,8 +238,8 @@ RSpec.describe CPU do
 
         it 'L=0x00, H=0x00, PC が 2 進む' do
           expect(subject[0x21].call).to eq 12
-          expect(cpu.l).to eq 0x00
-          expect(cpu.h).to eq 0x00
+          expect(cpu.register.l).to eq 0x00
+          expect(cpu.register.h).to eq 0x00
           expect(cpu.pc).to eq 0x0002
         end
       end
@@ -682,8 +250,8 @@ RSpec.describe CPU do
 
         it 'L=0xFF, H=0xFF, PC が 2 進む' do
           expect(subject[0x21].call).to eq 12
-          expect(cpu.l).to eq 0xFF
-          expect(cpu.h).to eq 0xFF
+          expect(cpu.register.l).to eq 0xFF
+          expect(cpu.register.h).to eq 0xFF
           expect(cpu.pc).to eq 0x0002
         end
       end
@@ -692,14 +260,14 @@ RSpec.describe CPU do
         # LD は宛先を上書きする。事前値が残らないことを確認する。
         let(:bytes) { [0x34, 0x12] }
         before do
-          cpu.h = 0xAA
-          cpu.l = 0xBB
+          cpu.register.h = 0xAA
+          cpu.register.l = 0xBB
         end
 
         it 'H/L が新しい値 (H=0x12, L=0x34) で上書きされる' do
           expect(subject[0x21].call).to eq 12
-          expect(cpu.l).to eq 0x34
-          expect(cpu.h).to eq 0x12
+          expect(cpu.register.l).to eq 0x34
+          expect(cpu.register.h).to eq 0x12
         end
       end
 
@@ -707,11 +275,11 @@ RSpec.describe CPU do
         # LD HL,u16 はフラグを一切変更しない命令。
         # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#ld-r16-n16
         let(:bytes) { [0x34, 0x12] }
-        before { cpu.f = 0b11110000 } # Z=1, N=1, H=1, C=1
+        before { cpu.register.f = 0b11110000 } # Z=1, N=1, H=1, C=1
 
         it 'F レジスタは保持される' do
           subject[0x21].call
-          expect(cpu.f).to eq 0b11110000
+          expect(cpu.register.f).to eq 0b11110000
         end
       end
     end
@@ -730,12 +298,12 @@ RSpec.describe CPU do
 
     context 'table[0xAF] (XOR A,A) を呼び出したとき' do
       # A の初期値に関係なく A^A は必ず 0 になる。事前に非ゼロを入れて確実に上書きされることを確認する。
-      before { cpu.a = 0x42 }
+      before { cpu.register.a = 0x42 }
 
       it '4 サイクルを返し、A=0x00, F=0x80 (Z=1, N=H=C=0), PC は進まない' do
         expect(subject[0xAF].call).to eq 4
-        expect(cpu.a).to eq 0x00
-        expect(cpu.f).to eq 0x80
+        expect(cpu.register.a).to eq 0x00
+        expect(cpu.register.f).to eq 0x80
         expect(cpu.pc).to eq 0x0000
       end
     end

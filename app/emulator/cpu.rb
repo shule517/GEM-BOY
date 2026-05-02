@@ -1,4 +1,5 @@
 require 'app/emulator/bit'
+require 'app/emulator/register'
 
 # CPU (Sharp LR35902)
 #
@@ -9,57 +10,34 @@ require 'app/emulator/bit'
 # `@opcodes` テーブルへ追加していく方針。未実装のオペコードを踏むと例外で停止するため、
 # ブートROM が実際に必要とする命令だけが自然に浮かび上がる(ROADMAP.md / B-1 参照)。
 #
-# === レジスタ ===
-# Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
-#
-#   8bit:  A  B  C  D  E  H  L  F     汎用 7 + フラグ 1
-#   16bit: SP  PC                     スタックポインタ + プログラムカウンタ
-#   pair:  AF, BC, DE, HL             8bit ペアを 16bit としても扱える(B-2 で追加)
-#
-# F レジスタの bit 構成:
-#
-#   bit7  Z (Zero)        演算結果が 0 のとき 1
-#   bit6  N (Subtract)    直前が減算系なら 1(DAA で参照)
-#   bit5  H (Half-Carry)  下位 4bit からの繰り上がり/下がり
-#   bit4  C (Carry)       上位からの繰り上がり/下がり
-#   bit3                  常に0
-#   bit2                  常に0
-#   bit1                  常に0
-#   bit0                  常に0
+# レジスタ (A/F/B/C/D/E/H/L とそのペア、フラグ操作) は Register クラスに分離している。
+# CPU 自身は `@register` を持ち、SP / PC / IME / halted のような CPU 制御状態だけを保持する。
 #
 # === 命令ディスパッチ ===
 # gbops オペコード表: https://izik1.github.io/gbops/
 #
-# `@opcodes` は 256 要素の配列で、各要素が「その命令を実行して消費サイクル数を返す lambda」。
-# CB-prefix 命令(0xCB に続く 2 バイト目)は B-3 で別テーブルとして追加する。
+# `@opcodes` は 256 要素の配列で、各要素が「その命令を実行して消費サイクル数を返す lambda」
+# CB-prefix 命令(0xCB に続く 2 バイト目)は B-3 で別テーブルとして追加する
 class CPU
-  # レジスタ: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#cpu-registers-and-flags
-  attr_accessor :a, :f, # 8bitレジスタ: Accumulator, Flags(High / Low)
-                :b, :c, # 8bitレジスタ(High / Low)
-                :d, :e, # 8bitレジスタ(High / Low)
-                :h, :l, # 8bitレジスタ(High / Low)
-                :sp, # スタックポインタ
+  attr_accessor :sp, # スタックポインタ
                 :pc, # プログラムカウンタ 今メモリのどこを読んでいるか
                 :ime, # Interrupt Master Enable(割り込みマスタ有効フラグ) 1の時に処理を割り込む https://gbdev.io/pandocs/Interrupts.html
                 :halted, # CPUの一時停止中フラグ https://gbdev.io/pandocs/halt.html
                 :opcodes, # CPUの命令一覧 https://izik1.github.io/gbops/
                 :mmu
+  attr_reader :register # 8bit レジスタ (A/F/B/C/D/E/H/L) とフラグ操作
 
   def initialize(mmu, skip_boot: false)
     @mmu = mmu
+    @register = Register.new(skip_boot: skip_boot)
 
     if skip_boot
       # ブートROM 完走後の DMG 実機値(skip_boot 起動でブートROM をスキップ)
       # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
-      @a = 0x01; @f = 0xB0 # A: DMG識別値、F: Z=1,N=0,H=1,C=1
-      @b = 0x00; @c = 0x13
-      @d = 0x00; @e = 0xD8
-      @h = 0x01; @l = 0x4D # HL: カートリッジヘッダのチェックサム関連
       @sp = 0xFFFE         # HRAM末端
       @pc = 0x0100         # カートリッジコードの開始位置
     else
       # ブートROM 経由で起動するので全レジスタ 0 から始める
-      @a = @b = @c = @d = @e = @h = @l = @f = 0
       @sp = 0 # スタックポインタ
       @pc = 0 # プログラムカウンタ
     end
@@ -110,57 +88,6 @@ class CPU
     Bit.u8_to_i8(fetch_u8)
   end
 
-  # F レジスタ(bit7=Z, bit6=N, bit5=H, bit4=C、下位 4bit は常に 0)の各ビットを更新する。
-  # true なら 1、false なら 0に変更する。
-  # 引数名は gbops 表記に揃えている(`negative` は Pan Docs 正式名では Subtract フラグ)。
-  # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#the-flags-register-lower-8-bits-of-af-register
-  def set_flags(zero: nil, negative: nil, half_carry: nil, carry: nil)
-    self.zero = zero unless zero.nil?                   # bit7 Zero
-    self.negative = negative unless negative.nil?       # bit6 Negative (Subtract)
-    self.half_carry = half_carry unless half_carry.nil? # bit5 Half Carry
-    self.carry = carry unless carry.nil?                # bit4 Carry
-  end
-
-  def zero = Bit.bit_at(f, 7)
-  def negative = Bit.bit_at(f, 6)
-  def half_carry = Bit.bit_at(f, 5)
-  def carry = Bit.bit_at(f, 4)
-
-  def zero=(value)
-    self.f = (f & 0b01111111) | (value ? 1 << 7 : 0) # bit7 Zero
-  end
-
-  def negative=(value)
-    self.f = (f & 0b10111111) | (value ? 1 << 6 : 0) # bit6 Negative (Subtract)
-  end
-
-  def half_carry=(value)
-    self.f = (f & 0b11011111) | (value ? 1 << 5 : 0) # bit5 Half Carry
-  end
-
-  def carry=(value)
-    self.f = (f & 0b11101111) | (value ? 1 << 4 : 0) # bit4 Carry
-  end
-
-  def bc = Bit.make_u16(high: b, low: c)
-  def de = Bit.make_u16(high: d, low: e)
-  def hl = Bit.make_u16(high: h, low: l)
-
-  def bc=(value)
-    self.b = Bit.high_byte(value)
-    self.c = Bit.low_byte(value)
-  end
-
-  def de=(value)
-    self.d = Bit.high_byte(value)
-    self.e = Bit.low_byte(value)
-  end
-
-  def hl=(value)
-    self.h = Bit.high_byte(value)
-    self.l = Bit.low_byte(value)
-  end
-
   private
 
   # opcodeテーブル
@@ -182,66 +109,66 @@ class CPU
     # ============================================================
     # 8bit ロード - LD r,u8 (即値ロード)
     # ============================================================
-    table[0x06] = -> { self.b = fetch_u8; 8 } # LD B,u8
-    table[0x0E] = -> { self.c = fetch_u8; 8 } # LD C,u8
-    table[0x16] = -> { self.d = fetch_u8; 8 } # LD D,u8
-    table[0x1E] = -> { self.e = fetch_u8; 8 } # LD E,u8
-    table[0x26] = -> { self.h = fetch_u8; 8 } # LD H,u8
-    table[0x2E] = -> { self.l = fetch_u8; 8 } # LD L,u8
+    table[0x06] = -> { register.b = fetch_u8; 8 } # LD B,u8
+    table[0x0E] = -> { register.c = fetch_u8; 8 } # LD C,u8
+    table[0x16] = -> { register.d = fetch_u8; 8 } # LD D,u8
+    table[0x1E] = -> { register.e = fetch_u8; 8 } # LD E,u8
+    table[0x26] = -> { register.h = fetch_u8; 8 } # LD H,u8
+    table[0x2E] = -> { register.l = fetch_u8; 8 } # LD L,u8
     # table[0x36] = -> { 12 } # LD (HL),u8
-    table[0x3E] = -> { self.a = fetch_u8; 8 } # LD A,u8
+    table[0x3E] = -> { register.a = fetch_u8; 8 } # LD A,u8
 
     # ============================================================
     # 8bit ロード - LD r,r' (レジスタ間転送)
     # ============================================================
     table[0x40] = -> { 4 } # LD B,B → 無意味な処理のため何もしない
-    table[0x41] = -> { self.b = c; 4 }  # LD B,C
-    table[0x42] = -> { self.b = d; 4 }  # LD B,D
-    table[0x43] = -> { self.b = e; 4 }  # LD B,E
-    table[0x44] = -> { self.b = h; 4 }  # LD B,H
-    table[0x45] = -> { self.b = l; 4 }  # LD B,L
+    table[0x41] = -> { register.b = register.c; 4 }  # LD B,C
+    table[0x42] = -> { register.b = register.d; 4 }  # LD B,D
+    table[0x43] = -> { register.b = register.e; 4 }  # LD B,E
+    table[0x44] = -> { register.b = register.h; 4 }  # LD B,H
+    table[0x45] = -> { register.b = register.l; 4 }  # LD B,L
     # table[0x46] = -> { 8 }  # LD B,(HL)
-    table[0x47] = -> { self.b = a; 4 }  # LD B,A
-    table[0x48] = -> { self.c = b; 4 }  # LD C,B
+    table[0x47] = -> { register.b = register.a; 4 }  # LD B,A
+    table[0x48] = -> { register.c = register.b; 4 }  # LD C,B
     table[0x49] = -> { 4 }  # LD C,C → 無意味な処理のため何もしない
-    table[0x4A] = -> { self.c = d; 4 }  # LD C,D
-    table[0x4B] = -> { self.c = e; 4 }  # LD C,E
-    table[0x4C] = -> { self.c = h; 4 }  # LD C,H
-    table[0x4D] = -> { self.c = l; 4 }  # LD C,L
+    table[0x4A] = -> { register.c = register.d; 4 }  # LD C,D
+    table[0x4B] = -> { register.c = register.e; 4 }  # LD C,E
+    table[0x4C] = -> { register.c = register.h; 4 }  # LD C,H
+    table[0x4D] = -> { register.c = register.l; 4 }  # LD C,L
     # table[0x4E] = -> { 8 }  # LD C,(HL)
-    table[0x4F] = -> { self.c = a; 4 }  # LD C,A
-    table[0x50] = -> { self.d = b; 4 }  # LD D,B
-    table[0x51] = -> { self.d = c; 4 }  # LD D,C
+    table[0x4F] = -> { register.c = register.a; 4 }  # LD C,A
+    table[0x50] = -> { register.d = register.b; 4 }  # LD D,B
+    table[0x51] = -> { register.d = register.c; 4 }  # LD D,C
     table[0x52] = -> { 4 }  # LD D,D → 無意味な処理のため何もしない
-    table[0x53] = -> { self.d = e; 4 }  # LD D,E
-    table[0x54] = -> { self.d = h; 4 }  # LD D,H
-    table[0x55] = -> { self.d = l; 4 }  # LD D,L
+    table[0x53] = -> { register.d = register.e; 4 }  # LD D,E
+    table[0x54] = -> { register.d = register.h; 4 }  # LD D,H
+    table[0x55] = -> { register.d = register.l; 4 }  # LD D,L
     # table[0x56] = -> { 8 }  # LD D,(HL)
-    table[0x57] = -> { self.d = a; 4 }  # LD D,A
-    table[0x58] = -> { self.e = b; 4 }  # LD E,B
-    table[0x59] = -> { self.e = c; 4 }  # LD E,C
-    table[0x5A] = -> { self.e = d; 4 }  # LD E,D
+    table[0x57] = -> { register.d = register.a; 4 }  # LD D,A
+    table[0x58] = -> { register.e = register.b; 4 }  # LD E,B
+    table[0x59] = -> { register.e = register.c; 4 }  # LD E,C
+    table[0x5A] = -> { register.e = register.d; 4 }  # LD E,D
     table[0x5B] = -> { 4 }  # LD E,E → 無意味な処理のため何もしない
-    table[0x5C] = -> { self.e = h; 4 }  # LD E,H
-    table[0x5D] = -> { self.e = l; 4 }  # LD E,L
+    table[0x5C] = -> { register.e = register.h; 4 }  # LD E,H
+    table[0x5D] = -> { register.e = register.l; 4 }  # LD E,L
     # table[0x5E] = -> { 8 }  # LD E,(HL)
-    table[0x5F] = -> { self.e = a; 4 }  # LD E,A
-    table[0x60] = -> { self.h = b; 4 }  # LD H,B
-    table[0x61] = -> { self.h = c; 4 }  # LD H,C
-    table[0x62] = -> { self.h = d; 4 }  # LD H,D
-    table[0x63] = -> { self.h = e; 4 }  # LD H,E
+    table[0x5F] = -> { register.e = register.a; 4 }  # LD E,A
+    table[0x60] = -> { register.h = register.b; 4 }  # LD H,B
+    table[0x61] = -> { register.h = register.c; 4 }  # LD H,C
+    table[0x62] = -> { register.h = register.d; 4 }  # LD H,D
+    table[0x63] = -> { register.h = register.e; 4 }  # LD H,E
     table[0x64] = -> { 4 }  # LD H,H → 無意味な処理のため何もしない
-    table[0x65] = -> { self.h = l; 4 }  # LD H,L
+    table[0x65] = -> { register.h = register.l; 4 }  # LD H,L
     # table[0x66] = -> { 8 }  # LD H,(HL)
-    table[0x67] = -> { self.h = a; 4 }  # LD H,A
-    table[0x68] = -> { self.l = b; 4 }  # LD L,B
-    table[0x69] = -> { self.l = c; 4 }  # LD L,C
-    table[0x6A] = -> { self.l = d; 4 }  # LD L,D
-    table[0x6B] = -> { self.l = e; 4 }  # LD L,E
-    table[0x6C] = -> { self.l = h; 4 }  # LD L,H
+    table[0x67] = -> { register.h = register.a; 4 }  # LD H,A
+    table[0x68] = -> { register.l = register.b; 4 }  # LD L,B
+    table[0x69] = -> { register.l = register.c; 4 }  # LD L,C
+    table[0x6A] = -> { register.l = register.d; 4 }  # LD L,D
+    table[0x6B] = -> { register.l = register.e; 4 }  # LD L,E
+    table[0x6C] = -> { register.l = register.h; 4 }  # LD L,H
     table[0x6D] = -> { 4 }  # LD L,L → 無意味な処理のため何もしない
     # table[0x6E] = -> { 8 }  # LD L,(HL)
-    table[0x6F] = -> { self.l = a; 4 }  # LD L,A
+    table[0x6F] = -> { register.l = register.a; 4 }  # LD L,A
     # table[0x70] = -> { 8 }  # LD (HL),B
     # table[0x71] = -> { 8 }  # LD (HL),C
     # table[0x72] = -> { 8 }  # LD (HL),D
@@ -249,51 +176,51 @@ class CPU
     # table[0x74] = -> { 8 }  # LD (HL),H
     # table[0x75] = -> { 8 }  # LD (HL),L
     # table[0x77] = -> { 8 }  # LD (HL),A
-    table[0x78] = -> { self.a = b; 4 }  # LD A,B
-    table[0x79] = -> { self.a = c; 4 }  # LD A,C
-    table[0x7A] = -> { self.a = d; 4 }  # LD A,D
-    table[0x7B] = -> { self.a = e; 4 }  # LD A,E
-    table[0x7C] = -> { self.a = h; 4 }  # LD A,H
-    table[0x7D] = -> { self.a = l; 4 }  # LD A,L
+    table[0x78] = -> { register.a = register.b; 4 }  # LD A,B
+    table[0x79] = -> { register.a = register.c; 4 }  # LD A,C
+    table[0x7A] = -> { register.a = register.d; 4 }  # LD A,D
+    table[0x7B] = -> { register.a = register.e; 4 }  # LD A,E
+    table[0x7C] = -> { register.a = register.h; 4 }  # LD A,H
+    table[0x7D] = -> { register.a = register.l; 4 }  # LD A,L
     # table[0x7E] = -> { 8 }  # LD A,(HL)
     table[0x7F] = -> { 4 }  # LD A,A → 無意味な処理のため何もしない
 
     # ============================================================
     # 8bit ロード - LD A,(rr) / LD (rr),A (レジスタペア間接)
     # ============================================================
-    table[0x02] = -> { mmu.write_u8(address: bc, value: a); 8 } # LD (BC),A
-    table[0x0A] = -> { self.a = mmu.read_u8(address: bc); 8 } # LD A,(BC)
-    table[0x12] = -> { mmu.write_u8(address: de, value: a); 8 } # LD (DE),A
-    table[0x1A] = -> { self.a = mmu.read_u8(address: de); 8 } # LD A,(DE)
-    table[0x22] = -> { mmu.write_u8(address: hl, value: a); self.hl += 1; 8 } # LD (HL+),A
-    table[0x2A] = -> { self.a = mmu.read_u8(address: hl); self.hl += 1; 8 } # LD A,(HL+)
-    table[0x32] = -> { mmu.write_u8(address: hl, value: a); self.hl -= 1; 8 } # LD (HL-),A
-    table[0x3A] = -> { self.a = mmu.read_u8(address: hl); self.hl -= 1; 8 }  # LD A,(HL-)
+    table[0x02] = -> { mmu.write_u8(address: register.bc, value: register.a); 8 } # LD (BC),A
+    table[0x0A] = -> { register.a = mmu.read_u8(address: register.bc); 8 } # LD A,(BC)
+    table[0x12] = -> { mmu.write_u8(address: register.de, value: register.a); 8 } # LD (DE),A
+    table[0x1A] = -> { register.a = mmu.read_u8(address: register.de); 8 } # LD A,(DE)
+    table[0x22] = -> { mmu.write_u8(address: register.hl, value: register.a); register.hl += 1; 8 } # LD (HL+),A
+    table[0x2A] = -> { register.a = mmu.read_u8(address: register.hl); register.hl += 1; 8 } # LD A,(HL+)
+    table[0x32] = -> { mmu.write_u8(address: register.hl, value: register.a); register.hl -= 1; 8 } # LD (HL-),A
+    table[0x3A] = -> { register.a = mmu.read_u8(address: register.hl); register.hl -= 1; 8 }  # LD A,(HL-)
 
     # ============================================================
     # 8bit ロード - LD A,(u16) / LD (u16),A (絶対アドレス)
     # ============================================================
-    table[0xEA] = -> { mmu.write_u8(address: fetch_u16, value: a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
-    table[0xFA] = -> { self.a = mmu.read_u8(address: fetch_u16); 16 } # LD A,(u16) → ()はそのアドレスの先という意味
+    table[0xEA] = -> { mmu.write_u8(address: fetch_u16, value: register.a); 16 } # LD (u16),A: u16番地のメモリにAを書き込む
+    table[0xFA] = -> { register.a = mmu.read_u8(address: fetch_u16); 16 } # LD A,(u16) → ()はそのアドレスの先という意味
 
     # ============================================================
     # 8bit ロード - I/O ポート (0xFF00 + offset)
     # ============================================================
-    table[0xE0] = -> { mmu.write_u8(address: 0xFF00 + fetch_u8, value: a); 12 } # LD (FF00+u8),A
-    table[0xE2] = -> { mmu.write_u8(address: 0xFF00 + c, value: a); 8 }  # LD (FF00+C),A
-    table[0xF0] = -> { self.a = mmu.read_u8(address: 0xFF00 + fetch_u8); 12 } # LD A,(FF00+u8)
-    table[0xF2] = -> { self.a = mmu.read_u8(address: 0xFF00 + c); 8 }  # LD A,(FF00+C)
+    table[0xE0] = -> { mmu.write_u8(address: 0xFF00 + fetch_u8, value: register.a); 12 } # LD (FF00+u8),A
+    table[0xE2] = -> { mmu.write_u8(address: 0xFF00 + register.c, value: register.a); 8 }  # LD (FF00+C),A
+    table[0xF0] = -> { register.a = mmu.read_u8(address: 0xFF00 + fetch_u8); 12 } # LD A,(FF00+u8)
+    table[0xF2] = -> { register.a = mmu.read_u8(address: 0xFF00 + register.c); 8 }  # LD A,(FF00+C)
 
     # ============================================================
     # 16bit ロード - LD rr,u16
     # ============================================================
-    table[0x01] = -> { self.bc = fetch_u16; 12 } # LD BC,u16
-    table[0x11] = -> { self.de = fetch_u16; 12 } # LD DE,u16
-    table[0x21] = -> { self.hl = fetch_u16; 12 } # LD HL,u16
+    table[0x01] = -> { register.bc = fetch_u16; 12 } # LD BC,u16
+    table[0x11] = -> { register.de = fetch_u16; 12 } # LD DE,u16
+    table[0x21] = -> { register.hl = fetch_u16; 12 } # LD HL,u16
     table[0x31] = -> { self.sp = fetch_u16; 12 } # LD SP,u16
     table[0x08] = -> { mmu.write_u16(address: fetch_u16, value: sp); 20 } # LD (u16),SP
-    table[0xF8] = -> { self.hl = Bit.wrap_u16(sp + fetch_i8); self.negative = 0; self.negative = 0; self.half_carry = 1; self.carry = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
-    table[0xF9] = -> { self.sp = hl; 8 } # LD SP,HL
+    table[0xF8] = -> { register.hl = Bit.wrap_u16(sp + fetch_i8); register.negative = 0; register.negative = 0; register.half_carry = 1; register.carry = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
+    table[0xF9] = -> { self.sp = register.hl; 8 } # LD SP,HL
 
     # ============================================================
     # スタック - PUSH / POP
@@ -310,31 +237,31 @@ class CPU
     # ============================================================
     # 8bit 算術 - INC
     # ============================================================
-    table[0x04] = -> { half_carry_result = Bit.low_4bits(b) + 1 > 0x0F; self.b = Bit.wrap_u8(b + 1); set_flags(zero: b == 0, negative: false, half_carry: half_carry_result); 4 } # INC B: B+1。Cフラグは保持(他更新)、Hは下位4bitからの繰り上がり
-    table[0x0C] = -> { half_carry_result = Bit.low_4bits(c) + 1 > 0x0F; self.c = Bit.wrap_u8(c + 1); set_flags(zero: c == 0, negative: false, half_carry: half_carry_result); 4 } # INC C
-    table[0x14] = -> { half_carry_result = Bit.low_4bits(d) + 1 > 0x0F; self.d = Bit.wrap_u8(d + 1); set_flags(zero: d == 0, negative: false, half_carry: half_carry_result); 4 } # INC D
-    table[0x1C] = -> { half_carry_result = Bit.low_4bits(e) + 1 > 0x0F; self.e = Bit.wrap_u8(e + 1); set_flags(zero: e == 0, negative: false, half_carry: half_carry_result); 4 } # INC E
-    table[0x24] = -> { half_carry_result = Bit.low_4bits(h) + 1 > 0x0F; self.h = Bit.wrap_u8(h + 1); set_flags(zero: h == 0, negative: false, half_carry: half_carry_result); 4 } # INC H
-    table[0x2C] = -> { half_carry_result = Bit.low_4bits(l) + 1 > 0x0F; self.l = Bit.wrap_u8(l + 1); set_flags(zero: l == 0, negative: false, half_carry: half_carry_result); 4 } # INC L
+    table[0x04] = -> { half_carry_result = Bit.low_4bits(register.b) + 1 > 0x0F; register.b = Bit.wrap_u8(register.b + 1); register.set_flags(zero: register.b == 0, negative: false, half_carry: half_carry_result); 4 } # INC B: B+1。Cフラグは保持(他更新)、Hは下位4bitからの繰り上がり
+    table[0x0C] = -> { half_carry_result = Bit.low_4bits(register.c) + 1 > 0x0F; register.c = Bit.wrap_u8(register.c + 1); register.set_flags(zero: register.c == 0, negative: false, half_carry: half_carry_result); 4 } # INC C
+    table[0x14] = -> { half_carry_result = Bit.low_4bits(register.d) + 1 > 0x0F; register.d = Bit.wrap_u8(register.d + 1); register.set_flags(zero: register.d == 0, negative: false, half_carry: half_carry_result); 4 } # INC D
+    table[0x1C] = -> { half_carry_result = Bit.low_4bits(register.e) + 1 > 0x0F; register.e = Bit.wrap_u8(register.e + 1); register.set_flags(zero: register.e == 0, negative: false, half_carry: half_carry_result); 4 } # INC E
+    table[0x24] = -> { half_carry_result = Bit.low_4bits(register.h) + 1 > 0x0F; register.h = Bit.wrap_u8(register.h + 1); register.set_flags(zero: register.h == 0, negative: false, half_carry: half_carry_result); 4 } # INC H
+    table[0x2C] = -> { half_carry_result = Bit.low_4bits(register.l) + 1 > 0x0F; register.l = Bit.wrap_u8(register.l + 1); register.set_flags(zero: register.l == 0, negative: false, half_carry: half_carry_result); 4 } # INC L
     # table[0x34] = -> { 12 } # INC (HL)
-    table[0x3C] = -> { half_carry_result = Bit.low_4bits(a) + 1 > 0x0F; self.a = Bit.wrap_u8(a + 1); set_flags(zero: a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
+    table[0x3C] = -> { half_carry_result = Bit.low_4bits(register.a) + 1 > 0x0F; register.a = Bit.wrap_u8(register.a + 1); register.set_flags(zero: register.a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
 
     # ============================================================
     # 8bit 算術 - DEC
     # ============================================================
-    table[0x05] = -> { half_carry_result = Bit.low_4bits(b) == 0; self.b = Bit.wrap_u8(b - 1); set_flags(zero: b == 0, negative: true, half_carry: half_carry_result); 4 } # DEC B
-    table[0x0D] = -> { half_carry_result = Bit.low_4bits(c) == 0; self.c = Bit.wrap_u8(c - 1); set_flags(zero: c == 0, negative: true, half_carry: half_carry_result); 4 } # DEC C: C-1。Cフラグは保持(他更新)、Hは下位4bitが0なら借り発生
-    table[0x15] = -> { half_carry_result = Bit.low_4bits(d) == 0; self.d = Bit.wrap_u8(d - 1); set_flags(zero: d == 0, negative: true, half_carry: half_carry_result); 4 } # DEC D
-    table[0x1D] = -> { half_carry_result = Bit.low_4bits(e) == 0; self.e = Bit.wrap_u8(e - 1); set_flags(zero: e == 0, negative: true, half_carry: half_carry_result); 4 } # DEC E
-    table[0x25] = -> { half_carry_result = Bit.low_4bits(h) == 0; self.h = Bit.wrap_u8(h - 1); set_flags(zero: h == 0, negative: true, half_carry: half_carry_result); 4 } # DEC H
-    table[0x2D] = -> { half_carry_result = Bit.low_4bits(l) == 0; self.l = Bit.wrap_u8(l - 1); set_flags(zero: l == 0, negative: true, half_carry: half_carry_result); 4 } # DEC L
+    table[0x05] = -> { half_carry_result = Bit.low_4bits(register.b) == 0; register.b = Bit.wrap_u8(register.b - 1); register.set_flags(zero: register.b == 0, negative: true, half_carry: half_carry_result); 4 } # DEC B
+    table[0x0D] = -> { half_carry_result = Bit.low_4bits(register.c) == 0; register.c = Bit.wrap_u8(register.c - 1); register.set_flags(zero: register.c == 0, negative: true, half_carry: half_carry_result); 4 } # DEC C: C-1。Cフラグは保持(他更新)、Hは下位4bitが0なら借り発生
+    table[0x15] = -> { half_carry_result = Bit.low_4bits(register.d) == 0; register.d = Bit.wrap_u8(register.d - 1); register.set_flags(zero: register.d == 0, negative: true, half_carry: half_carry_result); 4 } # DEC D
+    table[0x1D] = -> { half_carry_result = Bit.low_4bits(register.e) == 0; register.e = Bit.wrap_u8(register.e - 1); register.set_flags(zero: register.e == 0, negative: true, half_carry: half_carry_result); 4 } # DEC E
+    table[0x25] = -> { half_carry_result = Bit.low_4bits(register.h) == 0; register.h = Bit.wrap_u8(register.h - 1); register.set_flags(zero: register.h == 0, negative: true, half_carry: half_carry_result); 4 } # DEC H
+    table[0x2D] = -> { half_carry_result = Bit.low_4bits(register.l) == 0; register.l = Bit.wrap_u8(register.l - 1); register.set_flags(zero: register.l == 0, negative: true, half_carry: half_carry_result); 4 } # DEC L
     # table[0x35] = -> { 12 } # DEC (HL)
-    table[0x3D] = -> { half_carry_result = Bit.low_4bits(a) == 0; self.a = Bit.wrap_u8(a - 1); set_flags(zero: a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
+    table[0x3D] = -> { half_carry_result = Bit.low_4bits(register.a) == 0; register.a = Bit.wrap_u8(register.a - 1); register.set_flags(zero: register.a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
 
     # ============================================================
     # 8bit 算術 - ADD A
     # ============================================================
-    # TODO: 未実装 table[0x80] = -> { self.a = Bit.wrap_u8(a + b); set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # ADD A,B
+    # TODO: 未実装 table[0x80] = -> { register.a = Bit.wrap_u8(register.a + register.b); register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 }  # ADD A,B
     # table[0x81] = -> { 4 }  # ADD A,C
     # table[0x82] = -> { 4 }  # ADD A,D
     # table[0x83] = -> { 4 }  # ADD A,E
@@ -399,41 +326,41 @@ class CPU
     # ============================================================
     # 8bit 論理 - XOR
     # ============================================================
-    table[0xA8] = -> { self.a = a ^ b; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,B
-    table[0xA9] = -> { self.a = a ^ c; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,C
-    table[0xAA] = -> { self.a = a ^ d; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,D
-    table[0xAB] = -> { self.a = a ^ e; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,E
-    table[0xAC] = -> { self.a = a ^ h; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,H
-    table[0xAD] = -> { self.a = a ^ l; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,L
-    table[0xAE] = -> { byte = mmu.read_u8(address: hl); self.a = a ^ byte; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
-    table[0xAF] = -> { self.a = 0; set_flags(zero: true, negative: false, half_carry: false, carry: false); 4 } # XOR A,A
-    table[0xEE] = -> { byte = fetch_u8; self.a = a ^ byte; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,u8
+    table[0xA8] = -> { register.a = register.a ^ register.b; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,B
+    table[0xA9] = -> { register.a = register.a ^ register.c; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,C
+    table[0xAA] = -> { register.a = register.a ^ register.d; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,D
+    table[0xAB] = -> { register.a = register.a ^ register.e; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,E
+    table[0xAC] = -> { register.a = register.a ^ register.h; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,H
+    table[0xAD] = -> { register.a = register.a ^ register.l; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,L
+    table[0xAE] = -> { byte = mmu.read_u8(address: register.hl); register.a = register.a ^ byte; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
+    table[0xAF] = -> { register.a = 0; register.set_flags(zero: true, negative: false, half_carry: false, carry: false); 4 } # XOR A,A
+    table[0xEE] = -> { byte = fetch_u8; register.a = register.a ^ byte; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,u8
 
     # ============================================================
     # 8bit 論理 - OR
     # ============================================================
-    table[0xB0] = -> { self.a = a | b; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,B
-    table[0xB1] = -> { self.a = a | c; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,C
-    table[0xB2] = -> { self.a = a | d; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,D
-    table[0xB3] = -> { self.a = a | e; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,E
-    table[0xB4] = -> { self.a = a | h; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,H
-    table[0xB5] = -> { self.a = a | l; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,L
-    table[0xB6] = -> { self.a = a | mmu.read_u8(address: hl); set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
-    table[0xB7] = -> { set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,A → a | aしても結果は同じ
-    table[0xF6] = -> { self.a = a | fetch_u8; set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,u8
+    table[0xB0] = -> { register.a = register.a | register.b; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,B
+    table[0xB1] = -> { register.a = register.a | register.c; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,C
+    table[0xB2] = -> { register.a = register.a | register.d; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,D
+    table[0xB3] = -> { register.a = register.a | register.e; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,E
+    table[0xB4] = -> { register.a = register.a | register.h; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,H
+    table[0xB5] = -> { register.a = register.a | register.l; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,L
+    table[0xB6] = -> { register.a = register.a | mmu.read_u8(address: register.hl); register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
+    table[0xB7] = -> { register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,A → a | aしても結果は同じ
+    table[0xF6] = -> { register.a = register.a | fetch_u8; register.set_flags(zero: register.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,u8
 
     # ============================================================
     # 8bit 比較 - CP (Compare)
     # ============================================================
-    table[0xB8] = -> { set_flags(zero: a == b, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(b), carry: a < b); 4 }  # CP A,B
-    table[0xB9] = -> { set_flags(zero: a == c, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(c), carry: a < c); 4 }  # CP A,C
-    table[0xBA] = -> { set_flags(zero: a == d, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(d), carry: a < d); 4 }  # CP A,D
-    table[0xBB] = -> { set_flags(zero: a == e, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(e), carry: a < e); 4 }  # CP A,E
-    table[0xBC] = -> { set_flags(zero: a == h, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(h), carry: a < h); 4 }  # CP A,H
-    table[0xBD] = -> { set_flags(zero: a == l, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(l), carry: a < l); 4 }  # CP A,L
-    table[0xBE] = -> { byte = mmu.read_u8(address: hl); set_flags(zero: a == byte, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(byte), carry: a < byte); 8 }  # CP A,(HL)
-    table[0xBF] = -> { set_flags(zero: true, negative: true, half_carry: false, carry: false); 4 }  # CP A,A
-    table[0xFE] = -> { byte = fetch_u8; set_flags(zero: a == byte, negative: true, half_carry: Bit.low_4bits(a) < Bit.low_4bits(byte), carry: a < byte); 8 } # CP A,u8: Compare(比較)
+    table[0xB8] = -> { register.set_flags(zero: register.a == register.b, negative: true, half_carry: Bit.low_4bits(register.a) < Bit.low_4bits(register.b), carry: register.a < register.b); 4 }  # CP A,B
+    table[0xB9] = -> { register.set_flags(zero: register.a == register.c, negative: true, half_carry: Bit.low_4bits(register.a) < Bit.low_4bits(register.c), carry: register.a < register.c); 4 }  # CP A,C
+    table[0xBA] = -> { register.set_flags(zero: register.a == register.d, negative: true, half_carry: Bit.low_4bits(register.a) < Bit.low_4bits(register.d), carry: register.a < register.d); 4 }  # CP A,D
+    table[0xBB] = -> { register.set_flags(zero: register.a == register.e, negative: true, half_carry: Bit.low_4bits(register.a) < Bit.low_4bits(register.e), carry: register.a < register.e); 4 }  # CP A,E
+    table[0xBC] = -> { register.set_flags(zero: register.a == register.h, negative: true, half_carry: Bit.low_4bits(register.a) < Bit.low_4bits(register.h), carry: register.a < register.h); 4 }  # CP A,H
+    table[0xBD] = -> { register.set_flags(zero: register.a == register.l, negative: true, half_carry: Bit.low_4bits(register.a) < Bit.low_4bits(register.l), carry: register.a < register.l); 4 }  # CP A,L
+    table[0xBE] = -> { byte = mmu.read_u8(address: register.hl); register.set_flags(zero: register.a == byte, negative: true, half_carry: Bit.low_4bits(register.a) < Bit.low_4bits(byte), carry: register.a < byte); 8 }  # CP A,(HL)
+    table[0xBF] = -> { register.set_flags(zero: true, negative: true, half_carry: false, carry: false); 4 }  # CP A,A
+    table[0xFE] = -> { byte = fetch_u8; register.set_flags(zero: register.a == byte, negative: true, half_carry: Bit.low_4bits(register.a) < Bit.low_4bits(byte), carry: register.a < byte); 8 } # CP A,u8: Compare(比較)
 
     # ============================================================
     # 16bit 算術 - ADD HL / INC rr / DEC rr / ADD SP,i8
@@ -442,13 +369,13 @@ class CPU
     # table[0x19] = -> { 8 }  # ADD HL,DE
     # table[0x29] = -> { 8 }  # ADD HL,HL
     # table[0x39] = -> { 8 }  # ADD HL,SP
-    table[0x03] = -> { self.bc = Bit.wrap_u16(bc + 1); 8 } # INC BC
-    table[0x13] = -> { self.de = Bit.wrap_u16(de + 1); 8 } # INC DE
-    table[0x23] = -> { self.hl = Bit.wrap_u16(hl + 1); 8 } # INC HL
+    table[0x03] = -> { register.bc = Bit.wrap_u16(register.bc + 1); 8 } # INC BC
+    table[0x13] = -> { register.de = Bit.wrap_u16(register.de + 1); 8 } # INC DE
+    table[0x23] = -> { register.hl = Bit.wrap_u16(register.hl + 1); 8 } # INC HL
     table[0x33] = -> { self.sp = Bit.wrap_u16(sp + 1); 8 } # INC SP
-    table[0x0B] = -> { self.bc = Bit.wrap_u16(bc - 1); 8 } # DEC BC
-    table[0x1B] = -> { self.de = Bit.wrap_u16(de - 1); 8 } # DEC DE
-    table[0x2B] = -> { self.hl = Bit.wrap_u16(hl - 1); 8 } # DEC HL
+    table[0x0B] = -> { register.bc = Bit.wrap_u16(register.bc - 1); 8 } # DEC BC
+    table[0x1B] = -> { register.de = Bit.wrap_u16(register.de - 1); 8 } # DEC DE
+    table[0x2B] = -> { register.hl = Bit.wrap_u16(register.hl - 1); 8 } # DEC HL
     table[0x3B] = -> { self.sp = Bit.wrap_u16(sp - 1); 8 } # DEC SP
     # table[0xE8] = -> { 16 } # ADD SP,i8
 
@@ -472,7 +399,7 @@ class CPU
     # ジャンプ - JP (絶対ジャンプ)
     # ============================================================
     table[0xC3] = -> { self.pc = fetch_u16; 16 } # JP u16
-    table[0xE9] = -> { self.pc = hl; 4 } # JP HL
+    table[0xE9] = -> { self.pc = register.hl; 4 } # JP HL
     # table[0xC2] = -> { 16 } # JP NZ,u16 (taken: 16 / not taken: 12)
     # table[0xCA] = -> { 16 } # JP Z,u16  (taken: 16 / not taken: 12)
     # table[0xD2] = -> { 16 } # JP NC,u16 (taken: 16 / not taken: 12)
@@ -486,7 +413,7 @@ class CPU
     # fetch_i8 を先に呼ぶことで、PC が「次の命令の先頭」を指した状態でオフセット加算する
     table[0x20] = -> do
       offset_i8 = fetch_i8
-      if zero == 0
+      if register.zero == 0
         self.pc = Bit.wrap_u16(pc + offset_i8)
         12 # 分岐成立
       else
