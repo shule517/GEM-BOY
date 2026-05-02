@@ -98,12 +98,23 @@ class CPU
 
   # 論理演算 (OR / XOR) 後のフラグを更新する
   # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#OR_A,r8
-  # AND だけは H = 1 なので別ヘルパで扱う
+  # AND だけは H = 1 なので set_logical_and_flags で扱う
   def set_logical_flags(result)
     registers.set_flags(
       zero: result == 0, # Z: 結果がゼロなら 1
       negative: false,   # N: 0 (論理演算なので減算ではない)
       half_carry: false, # H: 0 (論理演算は半キャリー無し)
+      carry: false,      # C: 0 (論理演算はキャリー無し)
+    )
+  end
+
+  # 論理 AND 後のフラグを更新する。OR / XOR と違い H = 1 にセットする (Z80 系の特殊仕様)
+  # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#AND_A,r8
+  def set_logical_and_flags(result)
+    registers.set_flags(
+      zero: result == 0, # Z: 結果がゼロなら 1
+      negative: false,   # N: 0 (論理演算なので減算ではない)
+      half_carry: true,  # H: 1 (AND だけの特殊仕様)
       carry: false,      # C: 0 (論理演算はキャリー無し)
     )
   end
@@ -331,15 +342,15 @@ class CPU
     # ============================================================
     # 8bit 論理 - AND
     # ============================================================
-    # table[0xA0] = -> { 4 }  # AND A,B
-    # table[0xA1] = -> { 4 }  # AND A,C
-    # table[0xA2] = -> { 4 }  # AND A,D
-    # table[0xA3] = -> { 4 }  # AND A,E
-    # table[0xA4] = -> { 4 }  # AND A,H
-    # table[0xA5] = -> { 4 }  # AND A,L
-    # table[0xA6] = -> { 8 }  # AND A,(HL)
-    # table[0xA7] = -> { 4 }  # AND A,A
-    # table[0xE6] = -> { 8 }  # AND A,u8
+    table[0xA0] = -> { registers.a = registers.a & registers.b; set_logical_and_flags(registers.a); 4 } # AND A,B
+    table[0xA1] = -> { registers.a = registers.a & registers.c; set_logical_and_flags(registers.a); 4 } # AND A,C
+    table[0xA2] = -> { registers.a = registers.a & registers.d; set_logical_and_flags(registers.a); 4 } # AND A,D
+    table[0xA3] = -> { registers.a = registers.a & registers.e; set_logical_and_flags(registers.a); 4 } # AND A,E
+    table[0xA4] = -> { registers.a = registers.a & registers.h; set_logical_and_flags(registers.a); 4 } # AND A,H
+    table[0xA5] = -> { registers.a = registers.a & registers.l; set_logical_and_flags(registers.a); 4 } # AND A,L
+    table[0xA6] = -> { registers.a = registers.a & read_at_hl; set_logical_and_flags(registers.a); 8 } # AND A,(HL)
+    table[0xA7] = -> { registers.a = registers.a & registers.a; set_logical_and_flags(registers.a); 4 } # AND A,A
+    table[0xE6] = -> { registers.a = registers.a & fetch_u8; set_logical_and_flags(registers.a); 8 } # AND A,u8
 
     # ============================================================
     # 8bit 論理 - XOR
