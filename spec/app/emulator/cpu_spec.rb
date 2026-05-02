@@ -18,10 +18,10 @@ RSpec.describe CPU do
         expect(cpu.halted).to eq false
       end
 
-      it 'register が 0 初期化された Register として渡される' do
-        expect(subject.register).to be_a Register
-        expect(subject.register.a).to eq 0
-        expect(subject.register.f).to eq 0
+      it 'registers が 0 初期化された CpuRegisters として渡される' do
+        expect(subject.registers).to be_a CpuRegisters
+        expect(subject.registers.a).to eq 0
+        expect(subject.registers.f).to eq 0
       end
     end
 
@@ -43,12 +43,12 @@ RSpec.describe CPU do
         expect(subject.halted).to eq false
       end
 
-      it 'register が skip_boot: true の Register として渡される' do
-        expect(subject.register.a).to eq 0x01
-        expect(subject.register.f).to eq 0xB0
-        expect(subject.register.bc).to eq 0x0013
-        expect(subject.register.de).to eq 0x00D8
-        expect(subject.register.hl).to eq 0x014D
+      it 'registers が skip_boot: true の CpuRegisters として渡される' do
+        expect(subject.registers.a).to eq 0x01
+        expect(subject.registers.f).to eq 0xB0
+        expect(subject.registers.bc).to eq 0x0013
+        expect(subject.registers.de).to eq 0x00D8
+        expect(subject.registers.hl).to eq 0x014D
       end
     end
   end
@@ -226,8 +226,8 @@ RSpec.describe CPU do
 
         it '12 サイクルを返し、L=0x34, H=0x12, PC が 2 進む' do
           expect(subject[0x21].call).to eq 12
-          expect(cpu.register.l).to eq 0x34
-          expect(cpu.register.h).to eq 0x12
+          expect(cpu.registers.l).to eq 0x34
+          expect(cpu.registers.h).to eq 0x12
           expect(cpu.pc).to eq 0x0002
         end
       end
@@ -238,8 +238,8 @@ RSpec.describe CPU do
 
         it 'L=0x00, H=0x00, PC が 2 進む' do
           expect(subject[0x21].call).to eq 12
-          expect(cpu.register.l).to eq 0x00
-          expect(cpu.register.h).to eq 0x00
+          expect(cpu.registers.l).to eq 0x00
+          expect(cpu.registers.h).to eq 0x00
           expect(cpu.pc).to eq 0x0002
         end
       end
@@ -250,8 +250,8 @@ RSpec.describe CPU do
 
         it 'L=0xFF, H=0xFF, PC が 2 進む' do
           expect(subject[0x21].call).to eq 12
-          expect(cpu.register.l).to eq 0xFF
-          expect(cpu.register.h).to eq 0xFF
+          expect(cpu.registers.l).to eq 0xFF
+          expect(cpu.registers.h).to eq 0xFF
           expect(cpu.pc).to eq 0x0002
         end
       end
@@ -260,14 +260,14 @@ RSpec.describe CPU do
         # LD は宛先を上書きする。事前値が残らないことを確認する。
         let(:bytes) { [0x34, 0x12] }
         before do
-          cpu.register.h = 0xAA
-          cpu.register.l = 0xBB
+          cpu.registers.h = 0xAA
+          cpu.registers.l = 0xBB
         end
 
         it 'H/L が新しい値 (H=0x12, L=0x34) で上書きされる' do
           expect(subject[0x21].call).to eq 12
-          expect(cpu.register.l).to eq 0x34
-          expect(cpu.register.h).to eq 0x12
+          expect(cpu.registers.l).to eq 0x34
+          expect(cpu.registers.h).to eq 0x12
         end
       end
 
@@ -275,11 +275,11 @@ RSpec.describe CPU do
         # LD HL,u16 はフラグを一切変更しない命令。
         # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#ld-r16-n16
         let(:bytes) { [0x34, 0x12] }
-        before { cpu.register.f = 0b11110000 } # Z=1, N=1, H=1, C=1
+        before { cpu.registers.f = 0b11110000 } # Z=1, N=1, H=1, C=1
 
         it 'F レジスタは保持される' do
           subject[0x21].call
-          expect(cpu.register.f).to eq 0b11110000
+          expect(cpu.registers.f).to eq 0b11110000
         end
       end
     end
@@ -298,12 +298,12 @@ RSpec.describe CPU do
 
     context 'table[0xAF] (XOR A,A) を呼び出したとき' do
       # A の初期値に関係なく A^A は必ず 0 になる。事前に非ゼロを入れて確実に上書きされることを確認する。
-      before { cpu.register.a = 0x42 }
+      before { cpu.registers.a = 0x42 }
 
       it '4 サイクルを返し、A=0x00, F=0x80 (Z=1, N=H=C=0), PC は進まない' do
         expect(subject[0xAF].call).to eq 4
-        expect(cpu.register.a).to eq 0x00
-        expect(cpu.register.f).to eq 0x80
+        expect(cpu.registers.a).to eq 0x00
+        expect(cpu.registers.f).to eq 0x80
         expect(cpu.pc).to eq 0x0000
       end
     end

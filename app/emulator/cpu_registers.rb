@@ -19,7 +19,7 @@ require 'app/emulator/bit'
 #   bit2                  常に0
 #   bit1                  常に0
 #   bit0                  常に0
-class Register
+class CpuRegisters
   # レジスタ: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#cpu-registers-and-flags
   attr_accessor :a, :f, # 8bitレジスタ: Accumulator, Flags(High / Low)
                 :b, :c, # 8bitレジスタ(High / Low)
