@@ -121,7 +121,7 @@ class CPU
     table[0x1E] = -> { registers.e = fetch_u8; 8 } # LD E,u8
     table[0x26] = -> { registers.h = fetch_u8; 8 } # LD H,u8
     table[0x2E] = -> { registers.l = fetch_u8; 8 } # LD L,u8
-    # table[0x36] = -> { 12 } # LD (HL),u8
+    table[0x36] = -> { write_at_hl(fetch_u8); 12 } # LD (HL),u8
     table[0x3E] = -> { registers.a = fetch_u8; 8 } # LD A,u8
 
     # ============================================================
@@ -133,7 +133,7 @@ class CPU
     table[0x43] = -> { registers.b = registers.e; 4 }  # LD B,E
     table[0x44] = -> { registers.b = registers.h; 4 }  # LD B,H
     table[0x45] = -> { registers.b = registers.l; 4 }  # LD B,L
-    # table[0x46] = -> { 8 }  # LD B,(HL)
+    table[0x46] = -> { registers.b = read_at_hl; 8 }   # LD B,(HL)
     table[0x47] = -> { registers.b = registers.a; 4 }  # LD B,A
     table[0x48] = -> { registers.c = registers.b; 4 }  # LD C,B
     table[0x49] = -> { 4 }  # LD C,C → 無意味な処理のため何もしない
@@ -141,7 +141,7 @@ class CPU
     table[0x4B] = -> { registers.c = registers.e; 4 }  # LD C,E
     table[0x4C] = -> { registers.c = registers.h; 4 }  # LD C,H
     table[0x4D] = -> { registers.c = registers.l; 4 }  # LD C,L
-    # table[0x4E] = -> { 8 }  # LD C,(HL)
+    table[0x4E] = -> { registers.c = read_at_hl; 8 }   # LD C,(HL)
     table[0x4F] = -> { registers.c = registers.a; 4 }  # LD C,A
     table[0x50] = -> { registers.d = registers.b; 4 }  # LD D,B
     table[0x51] = -> { registers.d = registers.c; 4 }  # LD D,C
@@ -149,7 +149,7 @@ class CPU
     table[0x53] = -> { registers.d = registers.e; 4 }  # LD D,E
     table[0x54] = -> { registers.d = registers.h; 4 }  # LD D,H
     table[0x55] = -> { registers.d = registers.l; 4 }  # LD D,L
-    # table[0x56] = -> { 8 }  # LD D,(HL)
+    table[0x56] = -> { registers.d = read_at_hl; 8 }   # LD D,(HL)
     table[0x57] = -> { registers.d = registers.a; 4 }  # LD D,A
     table[0x58] = -> { registers.e = registers.b; 4 }  # LD E,B
     table[0x59] = -> { registers.e = registers.c; 4 }  # LD E,C
@@ -157,7 +157,7 @@ class CPU
     table[0x5B] = -> { 4 }  # LD E,E → 無意味な処理のため何もしない
     table[0x5C] = -> { registers.e = registers.h; 4 }  # LD E,H
     table[0x5D] = -> { registers.e = registers.l; 4 }  # LD E,L
-    # table[0x5E] = -> { 8 }  # LD E,(HL)
+    table[0x5E] = -> { registers.e = read_at_hl; 8 }   # LD E,(HL)
     table[0x5F] = -> { registers.e = registers.a; 4 }  # LD E,A
     table[0x60] = -> { registers.h = registers.b; 4 }  # LD H,B
     table[0x61] = -> { registers.h = registers.c; 4 }  # LD H,C
@@ -165,7 +165,7 @@ class CPU
     table[0x63] = -> { registers.h = registers.e; 4 }  # LD H,E
     table[0x64] = -> { 4 }  # LD H,H → 無意味な処理のため何もしない
     table[0x65] = -> { registers.h = registers.l; 4 }  # LD H,L
-    # table[0x66] = -> { 8 }  # LD H,(HL)
+    table[0x66] = -> { registers.h = read_at_hl; 8 }   # LD H,(HL)
     table[0x67] = -> { registers.h = registers.a; 4 }  # LD H,A
     table[0x68] = -> { registers.l = registers.b; 4 }  # LD L,B
     table[0x69] = -> { registers.l = registers.c; 4 }  # LD L,C
@@ -173,22 +173,22 @@ class CPU
     table[0x6B] = -> { registers.l = registers.e; 4 }  # LD L,E
     table[0x6C] = -> { registers.l = registers.h; 4 }  # LD L,H
     table[0x6D] = -> { 4 }  # LD L,L → 無意味な処理のため何もしない
-    # table[0x6E] = -> { 8 }  # LD L,(HL)
+    table[0x6E] = -> { registers.l = read_at_hl; 8 }   # LD L,(HL)
     table[0x6F] = -> { registers.l = registers.a; 4 }  # LD L,A
-    # table[0x70] = -> { 8 }  # LD (HL),B
-    # table[0x71] = -> { 8 }  # LD (HL),C
-    # table[0x72] = -> { 8 }  # LD (HL),D
-    # table[0x73] = -> { 8 }  # LD (HL),E
-    # table[0x74] = -> { 8 }  # LD (HL),H
-    # table[0x75] = -> { 8 }  # LD (HL),L
-    # table[0x77] = -> { 8 }  # LD (HL),A
+    table[0x70] = -> { write_at_hl(registers.b); 8 }   # LD (HL),B
+    table[0x71] = -> { write_at_hl(registers.c); 8 }   # LD (HL),C
+    table[0x72] = -> { write_at_hl(registers.d); 8 }   # LD (HL),D
+    table[0x73] = -> { write_at_hl(registers.e); 8 }   # LD (HL),E
+    table[0x74] = -> { write_at_hl(registers.h); 8 }   # LD (HL),H
+    table[0x75] = -> { write_at_hl(registers.l); 8 }   # LD (HL),L
+    table[0x77] = -> { write_at_hl(registers.a); 8 }   # LD (HL),A
     table[0x78] = -> { registers.a = registers.b; 4 }  # LD A,B
     table[0x79] = -> { registers.a = registers.c; 4 }  # LD A,C
     table[0x7A] = -> { registers.a = registers.d; 4 }  # LD A,D
     table[0x7B] = -> { registers.a = registers.e; 4 }  # LD A,E
     table[0x7C] = -> { registers.a = registers.h; 4 }  # LD A,H
     table[0x7D] = -> { registers.a = registers.l; 4 }  # LD A,L
-    # table[0x7E] = -> { 8 }  # LD A,(HL)
+    table[0x7E] = -> { registers.a = read_at_hl; 8 }   # LD A,(HL)
     table[0x7F] = -> { 4 }  # LD A,A → 無意味な処理のため何もしない
 
     # ============================================================
@@ -338,9 +338,9 @@ class CPU
     table[0xAB] = -> { registers.a = registers.a ^ registers.e; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,E
     table[0xAC] = -> { registers.a = registers.a ^ registers.h; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,H
     table[0xAD] = -> { registers.a = registers.a ^ registers.l; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,L
-    table[0xAE] = -> { byte = read_at_hl; registers.a = registers.a ^ byte; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
+    table[0xAE] = -> { registers.a = registers.a ^ read_at_hl; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
     table[0xAF] = -> { registers.a = 0; registers.set_flags(zero: true, negative: false, half_carry: false, carry: false); 4 } # XOR A,A
-    table[0xEE] = -> { byte = fetch_u8; registers.a = registers.a ^ byte; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,u8
+    table[0xEE] = -> { registers.a = registers.a ^ fetch_u8; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,u8
 
     # ============================================================
     # 8bit 論理 - OR
