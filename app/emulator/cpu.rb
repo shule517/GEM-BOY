@@ -59,7 +59,7 @@ class CPU
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
   def fetch_u8
     byte = mmu.read_u8(address: registers.pc) # PCから1バイト読み込む
-    registers.pc = Bit.wrap_u16(registers.pc + 1) # PCを1つ進める
+    registers.pc_increment # PCを1つ進める
     byte
   end
 
@@ -274,7 +274,7 @@ class CPU
     # table[0xC5] = -> { 16 } # PUSH BC
     # table[0xD5] = -> { 16 } # PUSH DE
     # table[0xE5] = -> { 16 } # PUSH HL
-    table[0xF5] = -> { registers.sp = Bit.wrap_u16(registers.sp - 1); mmu.write_u8(address: registers.sp, value: registers.a); registers.sp = Bit.wrap_u16(registers.sp - 1);; mmu.write_u8(address: registers.sp, value: registers.f); 16 } # PUSH AF
+    table[0xF5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.a); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.f); 16 } # PUSH AF
 
     # ============================================================
     # 8bit 算術 - INC
@@ -564,7 +564,7 @@ class CPU
     # CB-prefix - RL r (Carry 経由の左ローテート、Z=結果0、N=H=0)
     # ============================================================
     # cb_table[0x10] = -> { 8 }  # RL B
-    # cb_table[0x11] = -> { 8 }  # RL C ← ブートROM のロゴ展開で頻発
+    cb_table[0x11] = -> { carry = registers.c[7]; registers.c = Bit.wrap_u8(Bit.set_bit(registers.c << 1, 0, registers.carry_flag)); registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # RL C
     # cb_table[0x12] = -> { 8 }  # RL D
     # cb_table[0x13] = -> { 8 }  # RL E
     # cb_table[0x14] = -> { 8 }  # RL H

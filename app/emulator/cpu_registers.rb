@@ -109,9 +109,11 @@ class CpuRegisters
   def de_increment = self.de = Bit.wrap_u16(de + 1)
   def hl_increment = self.hl = Bit.wrap_u16(hl + 1)
   def sp_increment = self.sp = Bit.wrap_u16(sp + 1)
+  def pc_increment = self.pc = Bit.wrap_u16(pc + 1)
 
   def bc_decrement = self.bc = Bit.wrap_u16(bc - 1)
   def de_decrement = self.de = Bit.wrap_u16(de - 1)
   def hl_decrement = self.hl = Bit.wrap_u16(hl - 1)
   def sp_decrement = self.sp = Bit.wrap_u16(sp - 1)
+  def pc_decrement = self.pc = Bit.wrap_u16(pc - 1)
 end
