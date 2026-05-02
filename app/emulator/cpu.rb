@@ -96,6 +96,18 @@ class CPU
   # (HL) で指す番地に 1 バイト書く。LD (HL+),A / LD (HL-),A などで使う
   def write_at_hl(value) = mmu.write_u8(address: registers.hl, value: value)
 
+  # 論理演算 (OR / XOR) 後のフラグを更新する
+  # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#OR_A,r8
+  # AND だけは H = 1 なので別ヘルパで扱う
+  def set_logical_flags(result)
+    registers.set_flags(
+      zero: result == 0, # Z: 結果がゼロなら 1
+      negative: false,   # N: 0 (論理演算なので減算ではない)
+      half_carry: false, # H: 0 (論理演算は半キャリー無し)
+      carry: false,      # C: 0 (論理演算はキャリー無し)
+    )
+  end
+
   # opcodeテーブル
   # CPUの命令一覧 https://izik1.github.io/gbops/
   # GB CPU 命令リファレンス(RGBDS 公式マニュアル) https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
@@ -332,28 +344,28 @@ class CPU
     # ============================================================
     # 8bit 論理 - XOR
     # ============================================================
-    table[0xA8] = -> { registers.a = registers.a ^ registers.b; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,B
-    table[0xA9] = -> { registers.a = registers.a ^ registers.c; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,C
-    table[0xAA] = -> { registers.a = registers.a ^ registers.d; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,D
-    table[0xAB] = -> { registers.a = registers.a ^ registers.e; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,E
-    table[0xAC] = -> { registers.a = registers.a ^ registers.h; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,H
-    table[0xAD] = -> { registers.a = registers.a ^ registers.l; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,L
-    table[0xAE] = -> { registers.a = registers.a ^ read_at_hl; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
-    table[0xAF] = -> { registers.a = 0; registers.set_flags(zero: true, negative: false, half_carry: false, carry: false); 4 } # XOR A,A
-    table[0xEE] = -> { registers.a = registers.a ^ fetch_u8; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,u8
+    table[0xA8] = -> { registers.a = registers.a ^ registers.b; set_logical_flags(registers.a); 4 } # XOR A,B
+    table[0xA9] = -> { registers.a = registers.a ^ registers.c; set_logical_flags(registers.a); 4 } # XOR A,C
+    table[0xAA] = -> { registers.a = registers.a ^ registers.d; set_logical_flags(registers.a); 4 } # XOR A,D
+    table[0xAB] = -> { registers.a = registers.a ^ registers.e; set_logical_flags(registers.a); 4 } # XOR A,E
+    table[0xAC] = -> { registers.a = registers.a ^ registers.h; set_logical_flags(registers.a); 4 } # XOR A,H
+    table[0xAD] = -> { registers.a = registers.a ^ registers.l; set_logical_flags(registers.a); 4 } # XOR A,L
+    table[0xAE] = -> { registers.a = registers.a ^ read_at_hl; set_logical_flags(registers.a); 8 }  # XOR A,(HL)
+    table[0xAF] = -> { registers.a = 0; set_logical_flags(registers.a); 4 } # XOR A,A
+    table[0xEE] = -> { registers.a = registers.a ^ fetch_u8; set_logical_flags(registers.a); 8 }  # XOR A,u8
 
     # ============================================================
     # 8bit 論理 - OR
     # ============================================================
-    table[0xB0] = -> { registers.a = registers.a | registers.b; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,B
-    table[0xB1] = -> { registers.a = registers.a | registers.c; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,C
-    table[0xB2] = -> { registers.a = registers.a | registers.d; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,D
-    table[0xB3] = -> { registers.a = registers.a | registers.e; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,E
-    table[0xB4] = -> { registers.a = registers.a | registers.h; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,H
-    table[0xB5] = -> { registers.a = registers.a | registers.l; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,L
-    table[0xB6] = -> { registers.a = registers.a | read_at_hl; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
-    table[0xB7] = -> { registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,A → a | aしても結果は同じ
-    table[0xF6] = -> { registers.a = registers.a | fetch_u8; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 } # OR A,u8
+    table[0xB0] = -> { registers.a = registers.a | registers.b; set_logical_flags(registers.a); 4 } # OR A,B
+    table[0xB1] = -> { registers.a = registers.a | registers.c; set_logical_flags(registers.a); 4 } # OR A,C
+    table[0xB2] = -> { registers.a = registers.a | registers.d; set_logical_flags(registers.a); 4 } # OR A,D
+    table[0xB3] = -> { registers.a = registers.a | registers.e; set_logical_flags(registers.a); 4 } # OR A,E
+    table[0xB4] = -> { registers.a = registers.a | registers.h; set_logical_flags(registers.a); 4 } # OR A,H
+    table[0xB5] = -> { registers.a = registers.a | registers.l; set_logical_flags(registers.a); 4 } # OR A,L
+    table[0xB6] = -> { registers.a = registers.a | read_at_hl; set_logical_flags(registers.a); 8 }  # OR A,(HL)
+    table[0xB7] = -> { set_logical_flags(registers.a); 4 } # OR A,A → a | aしても結果は同じ
+    table[0xF6] = -> { registers.a = registers.a | fetch_u8; set_logical_flags(registers.a); 8 } # OR A,u8
 
     # ============================================================
     # 8bit 比較 - CP (Compare)
