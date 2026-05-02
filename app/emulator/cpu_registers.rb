@@ -20,6 +20,13 @@ require 'app/emulator/bit'
 #   bit1                  常に0
 #   bit0                  常に0
 class CpuRegisters
+  # F レジスタ内のフラグ位置(bit3-0 は常に 0)
+  # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#the-flags-register-lower-8-bits-of-af-register
+  FLAG_Z_BIT = 7 # Zero
+  FLAG_N_BIT = 6 # Negative (Subtract)
+  FLAG_H_BIT = 5 # Half Carry
+  FLAG_C_BIT = 4 # Carry
+
   # レジスタ: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#cpu-registers-and-flags
   attr_accessor :a, :f, # 8bitレジスタ: Accumulator, Flags(High / Low)
                 :b, :c, # 8bitレジスタ(High / Low)
@@ -49,31 +56,31 @@ class CpuRegisters
   # 引数名は gbops 表記に揃えている(`negative` は Pan Docs 正式名では Subtract フラグ)
   # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#the-flags-register-lower-8-bits-of-af-register
   def set_flags(zero: nil, negative: nil, half_carry: nil, carry: nil)
-    self.zero = zero unless zero.nil?                   # bit7 Zero
-    self.negative = negative unless negative.nil?       # bit6 Negative (Subtract)
-    self.half_carry = half_carry unless half_carry.nil? # bit5 Half Carry
-    self.carry = carry unless carry.nil?                # bit4 Carry
+    self.zero_flag = zero unless zero.nil?                   # bit7 Zero
+    self.negative_flag = negative unless negative.nil?       # bit6 Negative (Subtract)
+    self.half_carry_flag = half_carry unless half_carry.nil? # bit5 Half Carry
+    self.carry_flag = carry unless carry.nil?                # bit4 Carry
   end
 
-  def zero = Bit.bit_at(f, 7)
-  def negative = Bit.bit_at(f, 6)
-  def half_carry = Bit.bit_at(f, 5)
-  def carry = Bit.bit_at(f, 4)
+  def zero_flag = Bit.bit_at(f, FLAG_Z_BIT)
+  def negative_flag = Bit.bit_at(f, FLAG_N_BIT)
+  def half_carry_flag = Bit.bit_at(f, FLAG_H_BIT)
+  def carry_flag = Bit.bit_at(f, FLAG_C_BIT)
 
-  def zero=(value)
-    self.f = Bit.set_bit(f, 7, value) # bit7 Zero
+  def zero_flag=(value)
+    self.f = Bit.set_bit(f, FLAG_Z_BIT, value) # bit7 Zero
   end
 
-  def negative=(value)
-    self.f = Bit.set_bit(f, 6, value) # bit6 Negative (Subtract)
+  def negative_flag=(value)
+    self.f = Bit.set_bit(f, FLAG_N_BIT, value) # bit6 Negative (Subtract)
   end
 
-  def half_carry=(value)
-    self.f = Bit.set_bit(f, 5, value) # bit5 Half Carry
+  def half_carry_flag=(value)
+    self.f = Bit.set_bit(f, FLAG_H_BIT, value) # bit5 Half Carry
   end
 
-  def carry=(value)
-    self.f = Bit.set_bit(f, 4, value) # bit4 Carry
+  def carry_flag=(value)
+    self.f = Bit.set_bit(f, FLAG_C_BIT, value) # bit4 Carry
   end
 
   def bc = Bit.make_u16(high: b, low: c)

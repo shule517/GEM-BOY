@@ -206,7 +206,7 @@ class CPU
     table[0x21] = -> { registers.hl = fetch_u16; 12 } # LD HL,u16
     table[0x31] = -> { registers.sp = fetch_u16; 12 } # LD SP,u16
     table[0x08] = -> { mmu.write_u16(address: fetch_u16, value: registers.sp); 20 } # LD (u16),SP
-    table[0xF8] = -> { registers.hl = Bit.wrap_u16(registers.sp + fetch_i8); registers.negative = 0; registers.negative = 0; registers.half_carry = 1; registers.carry = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
+    table[0xF8] = -> { registers.hl = Bit.wrap_u16(registers.sp + fetch_i8); registers.negative_flag = 0; registers.negative_flag = 0; registers.half_carry_flag = 1; registers.carry_flag = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
     table[0xF9] = -> { registers.sp = registers.hl; 8 } # LD SP,HL
 
     # ============================================================
@@ -400,7 +400,7 @@ class CPU
     # fetch_i8 を先に呼ぶことで、PC が「次の命令の先頭」を指した状態でオフセット加算する
     table[0x20] = -> do
       offset_i8 = fetch_i8
-      if registers.zero == 0
+      if registers.zero_flag == 0
         registers.pc = Bit.wrap_u16(registers.pc + offset_i8)
         12 # 分岐成立
       else
