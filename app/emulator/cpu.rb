@@ -346,14 +346,14 @@ class CPU
     # 8bit 論理 - OR
     # ============================================================
     table[0xB0] = -> { registers.a = registers.a | registers.b; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,B
-    table[0xB1] = -> { registers.a = registers.a | registers.c; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,C
-    table[0xB2] = -> { registers.a = registers.a | registers.d; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,D
-    table[0xB3] = -> { registers.a = registers.a | registers.e; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,E
-    table[0xB4] = -> { registers.a = registers.a | registers.h; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,H
-    table[0xB5] = -> { registers.a = registers.a | registers.l; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,L
+    table[0xB1] = -> { registers.a = registers.a | registers.c; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,C
+    table[0xB2] = -> { registers.a = registers.a | registers.d; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,D
+    table[0xB3] = -> { registers.a = registers.a | registers.e; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,E
+    table[0xB4] = -> { registers.a = registers.a | registers.h; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,H
+    table[0xB5] = -> { registers.a = registers.a | registers.l; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,L
     table[0xB6] = -> { registers.a = registers.a | read_at_hl; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
-    table[0xB7] = -> { registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,A → a | aしても結果は同じ
-    table[0xF6] = -> { registers.a = registers.a | fetch_u8; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,u8
+    table[0xB7] = -> { registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,A → a | aしても結果は同じ
+    table[0xF6] = -> { registers.a = registers.a | fetch_u8; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 } # OR A,u8
 
     # ============================================================
     # 8bit 比較 - CP (Compare)
