@@ -291,10 +291,10 @@ class CPU
     # ============================================================
     # 16bit 算術 - INC rr (フラグ全保持)
     # ============================================================
-    table[0x03] = -> { registers.bc = Bit.wrap_u16(registers.bc + 1); 8 } # INC BC
-    table[0x13] = -> { registers.de = Bit.wrap_u16(registers.de + 1); 8 } # INC DE
-    table[0x23] = -> { registers.hl = Bit.wrap_u16(registers.hl + 1); 8 } # INC HL
-    table[0x33] = -> { registers.sp = Bit.wrap_u16(registers.sp + 1); 8 } # INC SP
+    table[0x03] = -> { registers.bc_increment; 8 } # INC BC
+    table[0x13] = -> { registers.de_increment; 8 } # INC DE
+    table[0x23] = -> { registers.hl_increment; 8 } # INC HL
+    table[0x33] = -> { registers.sp_increment; 8 } # INC SP
 
     # ============================================================
     # 8bit 算術 - DEC
@@ -311,10 +311,10 @@ class CPU
     # ============================================================
     # 16bit 算術 - DEC rr (フラグ全保持)
     # ============================================================
-    table[0x0B] = -> { registers.bc = Bit.wrap_u16(registers.bc - 1); 8 } # DEC BC
-    table[0x1B] = -> { registers.de = Bit.wrap_u16(registers.de - 1); 8 } # DEC DE
-    table[0x2B] = -> { registers.hl = Bit.wrap_u16(registers.hl - 1); 8 } # DEC HL
-    table[0x3B] = -> { registers.sp = Bit.wrap_u16(registers.sp - 1); 8 } # DEC SP
+    table[0x0B] = -> { registers.bc_decrement; 8 } # DEC BC
+    table[0x1B] = -> { registers.de_decrement; 8 } # DEC DE
+    table[0x2B] = -> { registers.hl_decrement; 8 } # DEC HL
+    table[0x3B] = -> { registers.sp_decrement; 8 } # DEC SP
 
     # ============================================================
     # 8bit 算術 - ADD A
