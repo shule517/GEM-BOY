@@ -86,16 +86,16 @@ class PPU
     scx = @mmu.read_u8(address: SCX) # ViewportのX座標
     bgp = @mmu.read_u8(address: BGP) # BGパレット(色)
 
-    bg_y = Bit.wrap_u8(scy + ly) # スクロール込みのBG上のY座標
-    tilemap_row = bg_y / 8       # タイルマップ上の行番号(0..31)
-    pixel_y = bg_y % 8           # タイル内のY座標(0..7)
+    bg_y = Bit.wrap_u8(scy + ly)  # スクロール込みのBG上のY座標
+    tilemap_row = (bg_y / 8).to_i # タイルマップ上の行番号(0..31)
+    pixel_y = bg_y % 8            # タイル内のY座標(0..7)
 
     tile_map_address = bg_tile_map_address
     tile_data_unsigned = bg_tile_data_unsigned?
 
     SCREEN_WIDTH.times do |screen_x|
       bg_x = Bit.wrap_u8(scx + screen_x) # スクロール込みのBG上のX座標
-      tilemap_col = bg_x / 8             # タイルマップ上の列番号(0..31)
+      tilemap_col = (bg_x / 8).to_i      # タイルマップ上の列番号(0..31)
       pixel_x = bg_x % 8                 # タイル内のX座標(0..7)
 
       tile_number   = @mmu.read_u8(address: tile_map_address + tilemap_row * 32 + tilemap_col) # マップから絵柄番号を取得
