@@ -10,18 +10,17 @@ RSpec.describe CPU do
     context 'skip_boot を指定しないとき(ブートROM 経由起動)' do
       subject { described_class.new(mmu) }
 
-      it 'SP=0, PC=0、IME と halted が false で初期化される' do
-        cpu = subject
-        expect(cpu.sp).to eq 0
-        expect(cpu.pc).to eq 0
-        expect(cpu.ime).to eq false
-        expect(cpu.halted).to eq false
+      it 'IME=false, halted=false' do
+        expect(subject.ime).to eq false
+        expect(subject.halted).to eq false
       end
 
       it 'registers が 0 初期化された CpuRegisters として渡される' do
         expect(subject.registers).to be_a CpuRegisters
         expect(subject.registers.a).to eq 0
         expect(subject.registers.f).to eq 0
+        expect(subject.registers.sp).to eq 0
+        expect(subject.registers.pc).to eq 0
       end
     end
 
@@ -29,14 +28,6 @@ RSpec.describe CPU do
       # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
       # ブートROM 完走後の DMG 実機値を最初からセットして起動する
       subject { described_class.new(mmu, skip_boot: true) }
-
-      it 'SP=0xFFFE(HRAM末端)' do
-        expect(subject.sp).to eq 0xFFFE
-      end
-
-      it 'PC=0x0100(カートリッジコード開始位置)' do
-        expect(subject.pc).to eq 0x0100
-      end
 
       it 'IME=false, halted=false' do
         expect(subject.ime).to eq false
@@ -49,6 +40,8 @@ RSpec.describe CPU do
         expect(subject.registers.bc).to eq 0x0013
         expect(subject.registers.de).to eq 0x00D8
         expect(subject.registers.hl).to eq 0x014D
+        expect(subject.registers.sp).to eq 0xFFFE
+        expect(subject.registers.pc).to eq 0x0100
       end
     end
   end
@@ -69,7 +62,7 @@ RSpec.describe CPU do
 
       it 'fetch_u8 で PC を 1 進めて 4 サイクルを返す' do
         is_expected.to eq 4
-        expect(cpu.pc).to eq 0x0001
+        expect(cpu.registers.pc).to eq 0x0001
       end
     end
 
@@ -87,17 +80,17 @@ RSpec.describe CPU do
 
       it '4 サイクル消費して PC は進まない(命令を fetch しない)' do
         is_expected.to eq 4
-        expect(cpu.pc).to eq 0x0000
+        expect(cpu.registers.pc).to eq 0x0000
       end
     end
 
     context 'PC が 0xFFFF を超えて折り返すとき' do
       let(:bytes) { [0x00] }
-      before { cpu.pc = 0xFFFF }
+      before { cpu.registers.pc = 0xFFFF }
 
       it 'PC は 0x0000 に wrap する' do
         is_expected.to eq 4
-        expect(cpu.pc).to eq 0x0000
+        expect(cpu.registers.pc).to eq 0x0000
       end
     end
   end
@@ -111,7 +104,7 @@ RSpec.describe CPU do
 
     it 'NOP 4 個分を実行して 16 サイクル消費し PC が 4 進む' do
       is_expected.to eq 16
-      expect(cpu.pc).to eq 4
+      expect(cpu.registers.pc).to eq 4
     end
   end
 
@@ -133,7 +126,7 @@ RSpec.describe CPU do
 
       it '0 を返し PC が 1 進む' do
         is_expected.to eq 0
-        expect(cpu.pc).to eq 0x0001
+        expect(cpu.registers.pc).to eq 0x0001
       end
     end
 
@@ -142,7 +135,7 @@ RSpec.describe CPU do
 
       it '+127 を返し PC が 1 進む' do
         is_expected.to eq 127
-        expect(cpu.pc).to eq 0x0001
+        expect(cpu.registers.pc).to eq 0x0001
       end
     end
 
@@ -152,7 +145,7 @@ RSpec.describe CPU do
 
       it '-128 を返し PC が 1 進む' do
         is_expected.to eq(-128)
-        expect(cpu.pc).to eq 0x0001
+        expect(cpu.registers.pc).to eq 0x0001
       end
     end
 
@@ -162,7 +155,7 @@ RSpec.describe CPU do
 
       it '-1 を返し PC が 1 進む' do
         is_expected.to eq(-1)
-        expect(cpu.pc).to eq 0x0001
+        expect(cpu.registers.pc).to eq 0x0001
       end
     end
 
@@ -172,7 +165,7 @@ RSpec.describe CPU do
 
       it '-2 を返し PC が 1 進む' do
         is_expected.to eq(-2)
-        expect(cpu.pc).to eq 0x0001
+        expect(cpu.registers.pc).to eq 0x0001
       end
     end
 
@@ -181,7 +174,7 @@ RSpec.describe CPU do
       # 値の符号解釈とは独立したラップ挙動を確認する。
       let(:bytes) { [0x00] }
       before do
-        cpu.pc = 0xFFFF
+        cpu.registers.pc = 0xFFFF
         # 0xFFFF は ROM 範囲外なので MMU.write で直接書ける場所ではない。
         # ここでは PC ラップだけ確認したいので、MMU が 0xFFFF をどう読むかに依存しない
         # アサーション (PC が 0x0000 になる) のみ行う。
@@ -189,7 +182,7 @@ RSpec.describe CPU do
 
       it 'PC は 0x0000 へラップする' do
         subject
-        expect(cpu.pc).to eq 0x0000
+        expect(cpu.registers.pc).to eq 0x0000
       end
     end
   end
@@ -212,7 +205,7 @@ RSpec.describe CPU do
     context 'table[0x00] (NOP) を呼び出したとき' do
       it '4 サイクルを返す(レジスタは変化しない)' do
         expect(subject[0x00].call).to eq 4
-        expect(cpu.pc).to eq 0x0000
+        expect(cpu.registers.pc).to eq 0x0000
       end
     end
 
@@ -228,7 +221,7 @@ RSpec.describe CPU do
           expect(subject[0x21].call).to eq 12
           expect(cpu.registers.l).to eq 0x34
           expect(cpu.registers.h).to eq 0x12
-          expect(cpu.pc).to eq 0x0002
+          expect(cpu.registers.pc).to eq 0x0002
         end
       end
 
@@ -240,7 +233,7 @@ RSpec.describe CPU do
           expect(subject[0x21].call).to eq 12
           expect(cpu.registers.l).to eq 0x00
           expect(cpu.registers.h).to eq 0x00
-          expect(cpu.pc).to eq 0x0002
+          expect(cpu.registers.pc).to eq 0x0002
         end
       end
 
@@ -252,7 +245,7 @@ RSpec.describe CPU do
           expect(subject[0x21].call).to eq 12
           expect(cpu.registers.l).to eq 0xFF
           expect(cpu.registers.h).to eq 0xFF
-          expect(cpu.pc).to eq 0x0002
+          expect(cpu.registers.pc).to eq 0x0002
         end
       end
 
@@ -291,8 +284,8 @@ RSpec.describe CPU do
 
       it '12 サイクルを返し、SP=0x1234, PC が 2 進む' do
         expect(subject[0x31].call).to eq 12
-        expect(cpu.sp).to eq 0x1234
-        expect(cpu.pc).to eq 0x0002
+        expect(cpu.registers.sp).to eq 0x1234
+        expect(cpu.registers.pc).to eq 0x0002
       end
     end
 
@@ -304,7 +297,7 @@ RSpec.describe CPU do
         expect(subject[0xAF].call).to eq 4
         expect(cpu.registers.a).to eq 0x00
         expect(cpu.registers.f).to eq 0x80
-        expect(cpu.pc).to eq 0x0000
+        expect(cpu.registers.pc).to eq 0x0000
       end
     end
   end
@@ -333,7 +326,7 @@ RSpec.describe CPU do
       end
 
       expect(cpu.halted).to eq true
-      expect(cpu.pc).to eq 0x01B9
+      expect(cpu.registers.pc).to eq 0x01B9
     end
   end
 
@@ -357,9 +350,9 @@ RSpec.describe CPU do
       # ブートROM は実機で約 70,000 T-cycle 程度で完走する。
       # 上限 200,000 T-cycle まで run を繰り返し、PC が 0x0100 (カートリッジ先頭) に到達するか確認する。
       elapsed = 0
-      elapsed += cpu.run(1000) while cpu.pc < 0x0100 && elapsed < 200_000
+      elapsed += cpu.run(1000) while cpu.registers.pc < 0x0100 && elapsed < 200_000
 
-      expect(cpu.pc).to eq 0x0100
+      expect(cpu.registers.pc).to eq 0x0100
     end
   end
 end

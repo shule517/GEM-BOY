@@ -19,29 +19,16 @@ require 'app/emulator/cpu_registers'
 # `@opcodes` は 256 要素の配列で、各要素が「その命令を実行して消費サイクル数を返す lambda」
 # CB-prefix 命令(0xCB に続く 2 バイト目)は B-3 で別テーブルとして追加する
 class CPU
-  attr_accessor :sp, # スタックポインタ
-                :pc, # プログラムカウンタ 今メモリのどこを読んでいるか
-                :ime, # Interrupt Master Enable(割り込みマスタ有効フラグ) 1の時に処理を割り込む https://gbdev.io/pandocs/Interrupts.html
+  attr_accessor :ime, # Interrupt Master Enable(割り込みマスタ有効フラグ) 1の時に処理を割り込む https://gbdev.io/pandocs/Interrupts.html
                 :halted, # CPUの一時停止中フラグ https://gbdev.io/pandocs/halt.html
                 :opcodes, # CPUの命令一覧 https://izik1.github.io/gbops/
                 :mmu
-  attr_reader :registers # 8bit レジスタ (A/F/B/C/D/E/H/L) とフラグ操作
+  attr_reader :registers # 8bit レジスタ (A/F/B/C/D/E/H/L) と SP / PC、フラグ操作
 
   def initialize(mmu, skip_boot: false)
     @mmu = mmu
     @registers = CpuRegisters.new(skip_boot: skip_boot)
-
-    if skip_boot
-      # ブートROM 完走後の DMG 実機値(skip_boot 起動でブートROM をスキップ)
-      # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
-      @sp = 0xFFFE # HRAM末端
-      @pc = 0x0100 # カートリッジコードの開始位置
-    else
-      # ブートROM 経由で起動するので全レジスタ 0 から始める
-      @sp = 0 # スタックポインタ
-      @pc = 0 # プログラムカウンタ
-    end
-    @ime = false  # 割り込み許可フラグ(Interrupt Master Enable)
+    @ime = false   # 割り込み許可フラグ(Interrupt Master Enable)
     @halted = false # CPUの一時停止中フラグ
 
     @opcodes = build_opcode_table
@@ -52,9 +39,9 @@ class CPU
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
 
     opcode = fetch_u8
-    puts "opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(pc - 1).to_s(16).rjust(4, '0').upcase})"
+    puts "opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})"
     handler = opcodes[opcode]
-    raise "未実装の opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(pc - 1).to_s(16).rjust(4, '0').upcase})" if handler.nil?
+    raise "未実装の opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})" if handler.nil?
     handler.call
   end
 
@@ -69,8 +56,8 @@ class CPU
 
   # PCは、16bitレジスタ(Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html)
   def fetch_u8
-    byte = mmu.read_u8(address: pc) # PCから1バイト読み込む
-    self.pc = Bit.wrap_u16(pc + 1) # PCを1つ進める
+    byte = mmu.read_u8(address: registers.pc) # PCから1バイト読み込む
+    registers.pc = Bit.wrap_u16(registers.pc + 1) # PCを1つ進める
     byte
   end
 
@@ -217,10 +204,10 @@ class CPU
     table[0x01] = -> { registers.bc = fetch_u16; 12 } # LD BC,u16
     table[0x11] = -> { registers.de = fetch_u16; 12 } # LD DE,u16
     table[0x21] = -> { registers.hl = fetch_u16; 12 } # LD HL,u16
-    table[0x31] = -> { self.sp = fetch_u16; 12 } # LD SP,u16
-    table[0x08] = -> { mmu.write_u16(address: fetch_u16, value: sp); 20 } # LD (u16),SP
-    table[0xF8] = -> { registers.hl = Bit.wrap_u16(sp + fetch_i8); registers.negative = 0; registers.negative = 0; registers.half_carry = 1; registers.carry = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
-    table[0xF9] = -> { self.sp = registers.hl; 8 } # LD SP,HL
+    table[0x31] = -> { registers.sp = fetch_u16; 12 } # LD SP,u16
+    table[0x08] = -> { mmu.write_u16(address: fetch_u16, value: registers.sp); 20 } # LD (u16),SP
+    table[0xF8] = -> { registers.hl = Bit.wrap_u16(registers.sp + fetch_i8); registers.negative = 0; registers.negative = 0; registers.half_carry = 1; registers.carry = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
+    table[0xF9] = -> { registers.sp = registers.hl; 8 } # LD SP,HL
 
     # ============================================================
     # スタック - PUSH / POP
@@ -372,11 +359,11 @@ class CPU
     table[0x03] = -> { registers.bc = Bit.wrap_u16(registers.bc + 1); 8 } # INC BC
     table[0x13] = -> { registers.de = Bit.wrap_u16(registers.de + 1); 8 } # INC DE
     table[0x23] = -> { registers.hl = Bit.wrap_u16(registers.hl + 1); 8 } # INC HL
-    table[0x33] = -> { self.sp = Bit.wrap_u16(sp + 1); 8 } # INC SP
+    table[0x33] = -> { registers.sp = Bit.wrap_u16(registers.sp + 1); 8 } # INC SP
     table[0x0B] = -> { registers.bc = Bit.wrap_u16(registers.bc - 1); 8 } # DEC BC
     table[0x1B] = -> { registers.de = Bit.wrap_u16(registers.de - 1); 8 } # DEC DE
     table[0x2B] = -> { registers.hl = Bit.wrap_u16(registers.hl - 1); 8 } # DEC HL
-    table[0x3B] = -> { self.sp = Bit.wrap_u16(sp - 1); 8 } # DEC SP
+    table[0x3B] = -> { registers.sp = Bit.wrap_u16(registers.sp - 1); 8 } # DEC SP
     # table[0xE8] = -> { 16 } # ADD SP,i8
 
     # ============================================================
@@ -398,8 +385,8 @@ class CPU
     # ============================================================
     # ジャンプ - JP (絶対ジャンプ)
     # ============================================================
-    table[0xC3] = -> { self.pc = fetch_u16; 16 } # JP u16
-    table[0xE9] = -> { self.pc = registers.hl; 4 } # JP HL
+    table[0xC3] = -> { registers.pc = fetch_u16; 16 } # JP u16
+    table[0xE9] = -> { registers.pc = registers.hl; 4 } # JP HL
     # table[0xC2] = -> { 16 } # JP NZ,u16 (taken: 16 / not taken: 12)
     # table[0xCA] = -> { 16 } # JP Z,u16  (taken: 16 / not taken: 12)
     # table[0xD2] = -> { 16 } # JP NC,u16 (taken: 16 / not taken: 12)
@@ -408,13 +395,13 @@ class CPU
     # ============================================================
     # ジャンプ - JR (相対ジャンプ)
     # ============================================================
-    table[0x18] = -> { offset_i8 = fetch_i8; self.pc = Bit.wrap_u16(pc + offset_i8); 12 } # JR i8: 無条件相対ジャンプ。fetch_i8 後のPC(=次の命令の先頭)を起点にオフセット加算
+    table[0x18] = -> { offset_i8 = fetch_i8; registers.pc = Bit.wrap_u16(registers.pc + offset_i8); 12 } # JR i8: 無条件相対ジャンプ。fetch_i8 後のPC(=次の命令の先頭)を起点にオフセット加算
     # JR NZ,i8: Z フラグが 0 のとき、JR命令直後のアドレスから符号付き8bit分だけPCを動かす
     # fetch_i8 を先に呼ぶことで、PC が「次の命令の先頭」を指した状態でオフセット加算する
     table[0x20] = -> do
       offset_i8 = fetch_i8
       if registers.zero == 0
-        self.pc = Bit.wrap_u16(pc + offset_i8)
+        registers.pc = Bit.wrap_u16(registers.pc + offset_i8)
         12 # 分岐成立
       else
         8  # 分岐不成立
@@ -427,12 +414,12 @@ class CPU
     # ============================================================
     # コール / リターン
     # ============================================================
-    table[0xCD] = -> { address = fetch_u16; self.sp = Bit.wrap_u16(sp - 2); mmu.write_u16(address: sp, value: pc); self.pc = address; 24 } # CALL u16: 戻りアドレス(=次の命令のPC)をstackに積んでから呼び出し先にjump
+    table[0xCD] = -> { address = fetch_u16; registers.sp = Bit.wrap_u16(registers.sp - 2); mmu.write_u16(address: registers.sp, value: registers.pc); registers.pc = address; 24 } # CALL u16: 戻りアドレス(=次の命令のPC)をstackに積んでから呼び出し先にjump
     # table[0xC4] = -> { 24 } # CALL NZ,u16 (taken: 24 / not taken: 12)
     # table[0xCC] = -> { 24 } # CALL Z,u16  (taken: 24 / not taken: 12)
     # table[0xD4] = -> { 24 } # CALL NC,u16 (taken: 24 / not taken: 12)
     # table[0xDC] = -> { 24 } # CALL C,u16  (taken: 24 / not taken: 12)
-    table[0xC9] = -> { self.pc = mmu.read_u16(address: sp); self.sp = Bit.wrap_u16(sp + 2); 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
+    table[0xC9] = -> { registers.pc = mmu.read_u16(address: registers.sp); registers.sp = Bit.wrap_u16(registers.sp + 2); 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
     # table[0xD9] = -> { 16 } # RETI
     # table[0xC0] = -> { 20 } # RET NZ (taken: 20 / not taken: 8)
     # table[0xC8] = -> { 20 } # RET Z  (taken: 20 / not taken: 8)

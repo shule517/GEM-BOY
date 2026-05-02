@@ -15,6 +15,8 @@ RSpec.describe CpuRegisters do
         expect(registers.h).to eq 0
         expect(registers.l).to eq 0
         expect(registers.f).to eq 0
+        expect(registers.sp).to eq 0
+        expect(registers.pc).to eq 0
       end
     end
 
@@ -32,6 +34,14 @@ RSpec.describe CpuRegisters do
         expect(subject.bc).to eq 0x0013
         expect(subject.de).to eq 0x00D8
         expect(subject.hl).to eq 0x014D
+      end
+
+      it 'SP=0xFFFE(HRAM末端)' do
+        expect(subject.sp).to eq 0xFFFE
+      end
+
+      it 'PC=0x0100(カートリッジコード開始位置)' do
+        expect(subject.pc).to eq 0x0100
       end
     end
   end

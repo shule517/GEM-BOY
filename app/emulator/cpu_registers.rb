@@ -24,7 +24,9 @@ class CpuRegisters
   attr_accessor :a, :f, # 8bitレジスタ: Accumulator, Flags(High / Low)
                 :b, :c, # 8bitレジスタ(High / Low)
                 :d, :e, # 8bitレジスタ(High / Low)
-                :h, :l  # 8bitレジスタ(High / Low)
+                :h, :l, # 8bitレジスタ(High / Low)
+                :sp, # スタックポインタ
+                :pc # プログラムカウンタ 今メモリのどこを読んでいるか
 
   def initialize(skip_boot: false)
     if skip_boot
@@ -34,9 +36,11 @@ class CpuRegisters
       @b = 0x00; @c = 0x13
       @d = 0x00; @e = 0xD8
       @h = 0x01; @l = 0x4D # HL: カートリッジヘッダのチェックサム関連
+      @sp = 0xFFFE         # HRAM末端
+      @pc = 0x0100         # カートリッジコードの開始位置
     else
       # ブートROM 経由で起動するので全レジスタ 0 から始める
-      @a = @b = @c = @d = @e = @h = @l = @f = 0
+      @a = @b = @c = @d = @e = @h = @l = @f = @sp = @pc = 0
     end
   end
 
