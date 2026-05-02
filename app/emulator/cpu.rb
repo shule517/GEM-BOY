@@ -77,6 +77,25 @@ class CPU
 
   private
 
+  # (BC) で指す番地から 1 バイト読む。LD A,(BC) で使う
+  # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html
+  def read_at_bc = mmu.read_u8(address: registers.bc)
+
+  # (BC) で指す番地に 1 バイト書く。LD (BC),A で使う
+  def write_at_bc(value) = mmu.write_u8(address: registers.bc, value: value)
+
+  # (DE) で指す番地から 1 バイト読む。LD A,(DE) で使う
+  def read_at_de = mmu.read_u8(address: registers.de)
+
+  # (DE) で指す番地に 1 バイト書く。LD (DE),A で使う
+  def write_at_de(value) = mmu.write_u8(address: registers.de, value: value)
+
+  # (HL) で指す番地から 1 バイト読む。XOR A,(HL) / OR A,(HL) / CP A,(HL) / LD A,(HL+) などで使う
+  def read_at_hl = mmu.read_u8(address: registers.hl)
+
+  # (HL) で指す番地に 1 バイト書く。LD (HL+),A / LD (HL-),A などで使う
+  def write_at_hl(value) = mmu.write_u8(address: registers.hl, value: value)
+
   # opcodeテーブル
   # CPUの命令一覧 https://izik1.github.io/gbops/
   # GB CPU 命令リファレンス(RGBDS 公式マニュアル) https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
@@ -175,14 +194,14 @@ class CPU
     # ============================================================
     # 8bit ロード - LD A,(rr) / LD (rr),A (レジスタペア間接)
     # ============================================================
-    table[0x02] = -> { mmu.write_u8(address: registers.bc, value: registers.a); 8 } # LD (BC),A
-    table[0x0A] = -> { registers.a = mmu.read_u8(address: registers.bc); 8 } # LD A,(BC)
-    table[0x12] = -> { mmu.write_u8(address: registers.de, value: registers.a); 8 } # LD (DE),A
-    table[0x1A] = -> { registers.a = mmu.read_u8(address: registers.de); 8 } # LD A,(DE)
-    table[0x22] = -> { mmu.write_u8(address: registers.hl, value: registers.a); registers.hl += 1; 8 } # LD (HL+),A
-    table[0x2A] = -> { registers.a = mmu.read_u8(address: registers.hl); registers.hl += 1; 8 } # LD A,(HL+)
-    table[0x32] = -> { mmu.write_u8(address: registers.hl, value: registers.a); registers.hl -= 1; 8 } # LD (HL-),A
-    table[0x3A] = -> { registers.a = mmu.read_u8(address: registers.hl); registers.hl -= 1; 8 }  # LD A,(HL-)
+    table[0x02] = -> { write_at_bc(registers.a); 8 } # LD (BC),A
+    table[0x0A] = -> { registers.a = read_at_bc; 8 } # LD A,(BC)
+    table[0x12] = -> { write_at_de(registers.a); 8 } # LD (DE),A
+    table[0x1A] = -> { registers.a = read_at_de; 8 } # LD A,(DE)
+    table[0x22] = -> { write_at_hl(registers.a); registers.hl += 1; 8 } # LD (HL+),A
+    table[0x2A] = -> { registers.a = read_at_hl; registers.hl += 1; 8 } # LD A,(HL+)
+    table[0x32] = -> { write_at_hl(registers.a); registers.hl -= 1; 8 } # LD (HL-),A
+    table[0x3A] = -> { registers.a = read_at_hl; registers.hl -= 1; 8 }  # LD A,(HL-)
 
     # ============================================================
     # 8bit ロード - LD A,(u16) / LD (u16),A (絶対アドレス)
@@ -319,7 +338,7 @@ class CPU
     table[0xAB] = -> { registers.a = registers.a ^ registers.e; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,E
     table[0xAC] = -> { registers.a = registers.a ^ registers.h; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,H
     table[0xAD] = -> { registers.a = registers.a ^ registers.l; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,L
-    table[0xAE] = -> { byte = mmu.read_u8(address: registers.hl); registers.a = registers.a ^ byte; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
+    table[0xAE] = -> { byte = read_at_hl; registers.a = registers.a ^ byte; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
     table[0xAF] = -> { registers.a = 0; registers.set_flags(zero: true, negative: false, half_carry: false, carry: false); 4 } # XOR A,A
     table[0xEE] = -> { byte = fetch_u8; registers.a = registers.a ^ byte; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,u8
 
@@ -332,7 +351,7 @@ class CPU
     table[0xB3] = -> { registers.a = registers.a | registers.e; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,E
     table[0xB4] = -> { registers.a = registers.a | registers.h; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,H
     table[0xB5] = -> { registers.a = registers.a | registers.l; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,L
-    table[0xB6] = -> { registers.a = registers.a | mmu.read_u8(address: registers.hl); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
+    table[0xB6] = -> { registers.a = registers.a | read_at_hl; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
     table[0xB7] = -> { registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,A → a | aしても結果は同じ
     table[0xF6] = -> { registers.a = registers.a | fetch_u8; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,u8
 
@@ -345,7 +364,7 @@ class CPU
     table[0xBB] = -> { registers.set_flags(zero: registers.a == registers.e, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.e), carry: registers.a < registers.e); 4 }  # CP A,E
     table[0xBC] = -> { registers.set_flags(zero: registers.a == registers.h, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.h), carry: registers.a < registers.h); 4 }  # CP A,H
     table[0xBD] = -> { registers.set_flags(zero: registers.a == registers.l, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.l), carry: registers.a < registers.l); 4 }  # CP A,L
-    table[0xBE] = -> { byte = mmu.read_u8(address: registers.hl); registers.set_flags(zero: registers.a == byte, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(byte), carry: registers.a < byte); 8 }  # CP A,(HL)
+    table[0xBE] = -> { byte = read_at_hl; registers.set_flags(zero: registers.a == byte, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(byte), carry: registers.a < byte); 8 }  # CP A,(HL)
     table[0xBF] = -> { registers.set_flags(zero: true, negative: true, half_carry: false, carry: false); 4 }  # CP A,A
     table[0xFE] = -> { byte = fetch_u8; registers.set_flags(zero: registers.a == byte, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(byte), carry: registers.a < byte); 8 } # CP A,u8: Compare(比較)
 
