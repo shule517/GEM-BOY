@@ -23,6 +23,18 @@
 ## 言語・コメント
 
 - **コメント・テストの説明文(`it` / `describe` / `context`)は日本語で書く**
+- **例外メッセージや `puts` などの実行時テキストも日本語で書く**。ログを後から読み返すのは自分やチームメンバなので、コメントと同じ理由で日本語に統一する。対応する spec の `raise_error(/.../)` も同じく日本語パターンで合わせる
+- **Pan Docs で使われている技術名詞や正式名称は無理に日本語化しない**。CPU 命令ニーモニック (`NOP` / `LD A,B` 等)、レジスタ名 (`LCDC` / `SCY` / `BGP` 等)、頻出する技術名詞 (`opcode` / `cartridge` / `tile` / `sprite` 等)、変数名は識別子として扱い、Pan Docs の表記そのまま英語で残す。「オペコード」「カートリッジ」のように katakana 化すると Pan Docs と grep が一致しなくなり、仕様書を辿るとき手間が増えるため
+  ```ruby
+  # bad
+  raise "Empty ROM data" if data.nil? || data.empty?
+  raise "Unimplemented opcode 0x#{opcode}" if handler.nil?
+  raise "未実装オペコード 0x#{opcode}" if handler.nil? # Pan Docs 用語を katakana 化している
+
+  # good
+  raise "ROM データが空です" if data.nil? || data.empty?
+  raise "未実装の opcode 0x#{opcode} (PC=0x#{pc})" if handler.nil?
+  ```
 - **Game Boy の仕様をコメントに書くときは、必ず Pan Docs の該当ページ URL を併記する**。引用元が辿れないと「これが正しいのか実装側のクセなのか」が後で判別できなくなるため。複数の仕様セクションを 1 つのクラスにまとめている場合は、各セクションの直前に対応する URL を置く
   ```ruby
   # === メモリマップ ===
@@ -89,8 +101,39 @@ describe '#initialize' do
   context 'nil を渡したとき' do
     let(:data) { nil }
     it '例外を投げる' do
-      expect { subject }.to raise_error(/Empty ROM/)
+      expect { subject }.to raise_error(/ROM データが空/)
     end
   end
 end
 ```
+
+## PRコメント・変更内容の要約
+
+- **PRコメントや変更内容の要約は端的に書く**。見出し3〜4個 + 各見出し配下に箇条書き2〜4行の最小構成にまとめる
+- **含める**: 「何を」変えたかが分かる見出し(例: 「クラス分離」「ビット操作の整理」)、各項目を1行で示す箇条書き、変更前→変更後の式やメソッド名を1行で添えるのはOK
+- **含めない**: コミット一覧表、ファイル単位の +/- 行数、テスト追加の件数や行数、Whyの長文解説、Pan Docs引用、コードスニペット
+  ```markdown
+  # bad(冗長)
+  ## リファクタリング内容
+  `main` から 8コミット / 14ファイル(+767 / -368)。CPU・PPU 周りで散らばっていた…
+
+  ### クラスの分離
+  - **`LcdRegisters` クラスを新設**(`app/emulator/lcd_registers.rb`)
+    - LCDC / SCY / SCX / BGP の読み出しとビットデコードを `PPU` から分離
+    - `lcd_enabled?` / `bg_enabled?` / ... を提供
+    - PPU 側からは `0xFF40` などのマジックナンバーが消え…
+
+  ### コミット一覧
+  | hash | message |
+  |---|---|
+  | `6617107` | LcdRegistersクラスを抜き出した |
+  | ... | ... |
+
+  # good(端的)
+  ## リファクタリング内容
+
+  ### クラス分離
+  - `LcdRegisters` を新設し、LCDC / SCY / SCX / BGP のデコードを PPU から分離
+  - `Register` → `CpuRegisters` にリネーム
+  - `pc` / `sp` を CPU から `CpuRegisters` に移動
+  ```

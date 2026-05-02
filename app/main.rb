@@ -92,7 +92,7 @@ def render_header(args)
   args.outputs.labels << { x: 700, y: 660, text: "ROM: #{File.basename(ROM_PATH)}", r: 200, g: 200, b: 200 }
   args.outputs.labels << { x: 700, y: 630, text: "Title: #{cartridge.title}", r: 200, g: 200, b: 200 }
   args.outputs.labels << { x: 700, y: 600, text: "Size: #{cartridge.size} bytes", r: 200, g: 200, b: 200 }
-  args.outputs.labels << { x: 700, y: 570, text: "PC: 0x#{args.state.cpu.pc.to_s(16).rjust(4, '0').upcase}", r: 200, g: 200, b: 200 }
+  args.outputs.labels << { x: 700, y: 570, text: "PC: 0x#{args.state.cpu.registers.pc.to_s(16).rjust(4, '0').upcase}", r: 200, g: 200, b: 200 }
   args.outputs.labels << { x: 700, y: 540, text: "LY: #{args.state.ppu.ly}", r: 200, g: 200, b: 200 }
 end
 

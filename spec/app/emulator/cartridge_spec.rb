@@ -21,14 +21,14 @@ RSpec.describe Cartridge do
     context 'nil を渡したとき' do
       let(:data) { nil }
       it '例外を投げる' do
-        expect { subject }.to raise_error(/Empty ROM/)
+        expect { subject }.to raise_error(/ROM データが空/)
       end
     end
 
     context '空配列を渡したとき' do
       let(:data) { [] }
       it '例外を投げる' do
-        expect { subject }.to raise_error(/Empty ROM/)
+        expect { subject }.to raise_error(/ROM データが空/)
       end
     end
   end

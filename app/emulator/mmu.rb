@@ -109,7 +109,7 @@ class MMU
   # ROM 領域 (0x0000-0x7FFF) はあえて分岐に入れていない
   # (MBC 対応後はここでバンク切り替えレジスタの判定が入る)
   def write_u8(address:, value:)
-    value &= 0xFF # 1バイトにする(下位8bitのみ)
+    value = Bit.wrap_u8(value) # 1バイトにする
 
     case address
     when 0x8000..0x9FFF then @vram[address - 0x8000] = value
@@ -139,7 +139,7 @@ class MMU
   # 内部状態として I/O を直接触りたいとき用(タイマー割り込み等で使う)。
   # write_u8() を経由するとシリアル判定が走ってしまうので、その副作用を避ける裏口。
   def write_io_direct(address, value)
-    @io[address - 0xFF00] = value & 0xFF
+    @io[address - 0xFF00] = Bit.wrap_u8(value)
   end
 
   private
