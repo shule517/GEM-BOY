@@ -6,7 +6,9 @@ require 'app/emulator/cpu.rb'
 require 'app/emulator/ppu.rb'
 
 ROM_PATH = 'data/hello.gb'
-SKIP_BOOT = true # ブートROMをスキップして直接 PC=0x0100 から起動(D-1)
+BOOT_ROM_PATH = 'data/dmg_boot.bin' # SameBoot v1.0.3互換の256BブートROM
+BOOT_CHIME_PATH = 'data/game-boy-startup.wav' # ブートチャイム(NR14 trigger 検知時に1度だけ再生)
+SKIP_BOOT = false # ブートROMをスキップして直接 PC=0x0100 から起動(D-1)
 
 # 1フレームのT-cycle数(154スキャンライン × 456 cycle = 70224)
 CYCLES_PER_FRAME = 154 * 456
@@ -33,6 +35,7 @@ def tick(args)
   args.outputs.background_color = [30, 30, 30]
 
   step_emulator(args) unless args.state.crashed
+  play_boot_chime(args)
 
   render_framebuffer(args)
   render_header(args)
@@ -47,11 +50,22 @@ end
 
 def setup(args)
   args.state.cartridge = Cartridge.new(args.gtk.read_file(ROM_PATH).bytes)
-  args.state.mmu = MMU.new(args.state.cartridge, skip_boot: SKIP_BOOT)
+  boot_rom = args.gtk.read_file(BOOT_ROM_PATH).bytes # SKIP_BOOT=falseのときMMUが0x0000-0x00FFに重畳する
+  args.state.mmu = MMU.new(args.state.cartridge, skip_boot: SKIP_BOOT, boot_rom: boot_rom)
   args.state.cpu = CPU.new(args.state.mmu, skip_boot: SKIP_BOOT)
   args.state.ppu = PPU.new(args.state.mmu)
   args.state.crashed = false
   args.state.crash_message = nil
+  args.state.boot_chime_played = false
+end
+
+# ブートROM が NR14(0xFF14)の trigger bit を立てた瞬間に WAV を 1 度だけ再生する
+# (APU 本体は未実装。Nintendo ロゴのスクロールイン直後のチャイムを WAV で代替する)
+def play_boot_chime(args)
+  return unless args.state.mmu.chime_triggered
+  return if args.state.boot_chime_played
+  args.outputs.sounds << BOOT_CHIME_PATH
+  args.state.boot_chime_played = true
 end
 
 # 1フレーム分(70224 T-cycle)エミュレーションを進める

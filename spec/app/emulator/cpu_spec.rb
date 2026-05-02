@@ -739,6 +739,77 @@ RSpec.describe CPU do
         expect(cpu.pc).to eq 0x0000
       end
     end
+
+    context 'table[0xCB] (PREFIX CB) を呼び出したとき' do
+      # 0xCB は次の1バイトを fetch して cb_opcodes テーブルへディスパッチする。
+      # ここでは「dispatch が実際に CB ハンドラを呼んでフラグまで反映する」ことを
+      # 1組だけ確認する(個別の CB 命令の振る舞いは #build_cb_opcode_table 側で網羅する)
+      let(:bytes) { [0x6C] } # CB 0x6C = BIT 5,H
+
+      context 'H の bit5 が 0 のとき' do
+        before { cpu.h = 0x00 }
+
+        it '8 サイクルを返し、PC が 1 進み、Z=1 になる' do
+          expect(subject[0xCB].call).to eq 8
+          expect(cpu.pc).to eq 0x0001
+          expect(cpu.zero).to eq 1
+        end
+      end
+    end
+  end
+
+  describe '#build_cb_opcode_table' do
+    # build_cb_opcode_table が返すテーブル(initialize から呼ばれて cpu.cb_opcodes に格納される)を
+    # 取り出し、各 CB-prefix opcode の lambda を直接呼んで振る舞いを検証する。
+    # 0xCB を経由せずテーブルを直接参照するため、PC は進まない点に注意
+    subject { cpu.cb_opcodes }
+    let(:cpu) { described_class.new(mmu) }
+    let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
+
+    context 'table[0x6C] (BIT 5,H) を呼び出したとき' do
+      # H レジスタの bit5 をテストして Z フラグに反映する。N=0、H=1、C は保持
+      # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#bit-u3-r8
+
+      context 'H の bit5 が 0 のとき(H=0x00)' do
+        before do
+          cpu.h = 0x00
+          cpu.f = 0b00010000 # C=1 を入れて保持されることを確認する
+        end
+
+        it '8 サイクルを返し、Z=1, N=0, H=1, C は保持される' do
+          expect(subject[0x6C].call).to eq 8
+          expect(cpu.zero).to eq 1
+          expect(cpu.negative).to eq 0
+          expect(cpu.half_carry).to eq 1
+          expect(cpu.carry).to eq 1
+        end
+      end
+
+      context 'H の bit5 が 1 のとき(H=0x20)' do
+        before do
+          cpu.h = 0x20 # bit5=1
+          cpu.f = 0b00010000 # C=1 を入れて保持されることを確認する
+        end
+
+        it '8 サイクルを返し、Z=0, N=0, H=1, C は保持される' do
+          expect(subject[0x6C].call).to eq 8
+          expect(cpu.zero).to eq 0
+          expect(cpu.negative).to eq 0
+          expect(cpu.half_carry).to eq 1
+          expect(cpu.carry).to eq 1
+        end
+      end
+
+      context 'bit5以外が立っているがbit5は0のとき(H=0xDF)' do
+        # 0xDF = 0b11011111(bit5だけ0)。「bit5だけ」を見ていることを確認する
+        before { cpu.h = 0xDF }
+
+        it 'Z=1 になる(bit5が0なので)' do
+          expect(subject[0x6C].call).to eq 8
+          expect(cpu.zero).to eq 1
+        end
+      end
+    end
   end
 
   describe 'HELLO WORLD 完走 (hello.gb が HALT に到達するまで)' do
@@ -781,15 +852,25 @@ RSpec.describe CPU do
     # Cartridge 配列の先頭を直接書き換える簡易セットアップを使う。
     let(:cpu) { described_class.new(mmu) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
+    let(:ppu) { PPU.new(mmu) }
     let(:boot_rom) { File.binread(File.expand_path('../../../../data/dmg_boot.bin', __FILE__)).bytes }
     let(:tobu)     { File.binread(File.expand_path('../../../../data/tobu.gb', __FILE__)).bytes }
     let(:rom_data) { boot_rom + tobu[boot_rom.size..] }
 
     it 'tobu.gb のロゴ照合を通って PC=0x0100 に到達する' do
-      # ブートROM は実機で約 70,000 T-cycle 程度で完走する。
-      # 上限 200,000 T-cycle まで run を繰り返し、PC が 0x0100 (カートリッジ先頭) に到達するか確認する。
+      # ブートROM は LY(0xFF44)を待つビジーループ(VBlank待ち / ロゴ1pxスクロールごとの待ち)を含むので、
+      # PPU を連動させないと LY が進まず無限ループする
+      # SameBoot は実機で5-6秒(数千万T-cycle)かかるので上限は大きめに取る
+      # cpu.runでチャンク実行すると 0xA0 の JP $00FE → 0xFE の LDH ($50),A 経由で 0x0100 を行き過ぎるため
+      # 1命令ずつ進めて pc=0x0100 をぴったり踏ませる
       elapsed = 0
-      elapsed += cpu.run(1000) while cpu.pc < 0x0100 && elapsed < 200_000
+      loop do
+        break if cpu.pc == 0x0100
+        break if elapsed >= 50_000_000
+        cycles = cpu.step
+        ppu.step(cycles)
+        elapsed += cycles
+      end
 
       expect(cpu.pc).to eq 0x0100
     end

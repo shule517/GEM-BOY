@@ -43,6 +43,7 @@ class CPU
                 :ime, # Interrupt Master Enable(割り込みマスタ有効フラグ) 1の時に処理を割り込む https://gbdev.io/pandocs/Interrupts.html
                 :halted, # CPUの一時停止中フラグ https://gbdev.io/pandocs/halt.html
                 :opcodes, # CPUの命令一覧 https://izik1.github.io/gbops/
+                :cb_opcodes, # CBプレフィックス命令テーブル(0xCBの次バイトで引く) https://izik1.github.io/gbops/
                 :mmu
 
   def initialize(mmu, skip_boot: false)
@@ -67,6 +68,7 @@ class CPU
     @halted = false # CPUの一時停止中フラグ
 
     @opcodes = build_opcode_table
+    @cb_opcodes = build_cb_opcode_table
   end
 
   # １つ命令を実行する
@@ -74,7 +76,7 @@ class CPU
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
 
     opcode = fetch_u8
-    puts "opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} at PC=0x#{((pc - 1) & 0xFFFF).to_s(16).rjust(4, '0').upcase}"
+    # puts "opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} at PC=0x#{((pc - 1) & 0xFFFF).to_s(16).rjust(4, '0').upcase}"
     handler = opcodes[opcode]
     raise "Unimplemented opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} at PC=0x#{((pc - 1) & 0xFFFF).to_s(16).rjust(4, '0').upcase}" if handler.nil?
     handler.call
@@ -177,7 +179,14 @@ class CPU
     table[0x76] = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
     table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグをクリアして割り込みを無効
     # table[0xFB] = -> { 4 }  # EI
-    # table[0xCB] = -> { 4 }  # PREFIX CB (CB-prefix命令へ分岐)
+    # PREFIX CB: 次の1バイトをfetchしてcb_opcodesテーブルへディスパッチする
+    # CB-prefix命令の総サイクル数(prefix分含む)はサブハンドラ側が返す https://izik1.github.io/gbops/
+    table[0xCB] = -> do
+      cb_opcode = fetch_u8
+      handler = cb_opcodes[cb_opcode]
+      raise "Unimplemented CB opcode 0x#{cb_opcode.to_s(16).rjust(2, '0').upcase} at PC=0x#{((pc - 1) & 0xFFFF).to_s(16).rjust(4, '0').upcase}" if handler.nil?
+      handler.call
+    end
 
     # ============================================================
     # 8bit ロード - LD r,u8 (即値ロード)
@@ -298,14 +307,18 @@ class CPU
     # ============================================================
     # スタック - PUSH / POP
     # ============================================================
-    # table[0xC1] = -> { 12 } # POP BC
-    # table[0xD1] = -> { 12 } # POP DE
-    # table[0xE1] = -> { 12 } # POP HL
-    # table[0xF1] = -> { 12 } # POP AF
-    # table[0xC5] = -> { 16 } # PUSH BC
-    # table[0xD5] = -> { 16 } # PUSH DE
-    # table[0xE5] = -> { 16 } # PUSH HL
-    # table[0xF5] = -> { 16 } # PUSH AF
+    # POP rr: SPからu16を読んでrrへ、SP+=2 / cycles=12
+    # POP AF はFレジスタの下位4bitが常に0(未使用)なので 0xF0 でマスクする
+    # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#pop-r16
+    table[0xC1] = -> { value = mmu.read_u16(address: sp); self.bc = value; self.sp = Bit.wrap_u16(sp + 2); 12 } # POP BC
+    table[0xD1] = -> { value = mmu.read_u16(address: sp); self.de = value; self.sp = Bit.wrap_u16(sp + 2); 12 } # POP DE
+    table[0xE1] = -> { value = mmu.read_u16(address: sp); self.hl = value; self.sp = Bit.wrap_u16(sp + 2); 12 } # POP HL
+    table[0xF1] = -> { value = mmu.read_u16(address: sp); self.a = Bit.high_byte(value); self.f = Bit.low_byte(value) & 0xF0; self.sp = Bit.wrap_u16(sp + 2); 12 } # POP AF
+    # PUSH rr: SP-=2、SPへrrをu16で書き込み / cycles=16
+    table[0xC5] = -> { self.sp = Bit.wrap_u16(sp - 2); mmu.write_u16(address: sp, value: bc); 16 } # PUSH BC
+    table[0xD5] = -> { self.sp = Bit.wrap_u16(sp - 2); mmu.write_u16(address: sp, value: de); 16 } # PUSH DE
+    table[0xE5] = -> { self.sp = Bit.wrap_u16(sp - 2); mmu.write_u16(address: sp, value: hl); 16 } # PUSH HL
+    table[0xF5] = -> { self.sp = Bit.wrap_u16(sp - 2); mmu.write_u16(address: sp, value: Bit.make_u16(high: a, low: f)); 16 } # PUSH AF
 
     # ============================================================
     # 8bit 算術 - INC
@@ -332,17 +345,19 @@ class CPU
     table[0x3D] = -> { half_carry_result = Bit.low_4bits(a) == 0; self.a = Bit.wrap_u8(a - 1); set_flags(zero: a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
 
     # ============================================================
-    # 8bit 算術 - ADD A
+    # 8bit 算術 - ADD A,r
     # ============================================================
-    # TODO: 未実装 table[0x80] = -> { self.a = Bit.wrap_u8(a + b); set_flags(zero: a == 0, negative: false, half_carry: false, carry: false); 4 }  # ADD A,B
-    # table[0x81] = -> { 4 }  # ADD A,C
-    # table[0x82] = -> { 4 }  # ADD A,D
-    # table[0x83] = -> { 4 }  # ADD A,E
-    # table[0x84] = -> { 4 }  # ADD A,H
-    # table[0x85] = -> { 4 }  # ADD A,L
-    # table[0x86] = -> { 8 }  # ADD A,(HL)
-    # table[0x87] = -> { 4 }  # ADD A,A
-    # table[0xC6] = -> { 8 }  # ADD A,u8
+    # A = A + r。Z=(結果0)、N=0、H=(下位4bit和が0xFを超える)、C=(8bit和が0xFFを超える)
+    # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#add-a-r8
+    table[0x80] = -> { half = Bit.low_4bits(a) + Bit.low_4bits(b) > 0x0F; full = a + b > 0xFF; self.a = Bit.wrap_u8(a + b); set_flags(zero: a == 0, negative: false, half_carry: half, carry: full); 4 } # ADD A,B
+    table[0x81] = -> { half = Bit.low_4bits(a) + Bit.low_4bits(c) > 0x0F; full = a + c > 0xFF; self.a = Bit.wrap_u8(a + c); set_flags(zero: a == 0, negative: false, half_carry: half, carry: full); 4 } # ADD A,C
+    table[0x82] = -> { half = Bit.low_4bits(a) + Bit.low_4bits(d) > 0x0F; full = a + d > 0xFF; self.a = Bit.wrap_u8(a + d); set_flags(zero: a == 0, negative: false, half_carry: half, carry: full); 4 } # ADD A,D
+    table[0x83] = -> { half = Bit.low_4bits(a) + Bit.low_4bits(e) > 0x0F; full = a + e > 0xFF; self.a = Bit.wrap_u8(a + e); set_flags(zero: a == 0, negative: false, half_carry: half, carry: full); 4 } # ADD A,E
+    table[0x84] = -> { half = Bit.low_4bits(a) + Bit.low_4bits(h) > 0x0F; full = a + h > 0xFF; self.a = Bit.wrap_u8(a + h); set_flags(zero: a == 0, negative: false, half_carry: half, carry: full); 4 } # ADD A,H
+    table[0x85] = -> { half = Bit.low_4bits(a) + Bit.low_4bits(l) > 0x0F; full = a + l > 0xFF; self.a = Bit.wrap_u8(a + l); set_flags(zero: a == 0, negative: false, half_carry: half, carry: full); 4 } # ADD A,L
+    table[0x86] = -> { byte = mmu.read_u8(address: hl); half = Bit.low_4bits(a) + Bit.low_4bits(byte) > 0x0F; full = a + byte > 0xFF; self.a = Bit.wrap_u8(a + byte); set_flags(zero: a == 0, negative: false, half_carry: half, carry: full); 8 } # ADD A,(HL)
+    table[0x87] = -> { half = Bit.low_4bits(a) + Bit.low_4bits(a) > 0x0F; full = a + a > 0xFF; self.a = Bit.wrap_u8(a + a); set_flags(zero: a == 0, negative: false, half_carry: half, carry: full); 4 } # ADD A,A
+    table[0xC6] = -> { byte = fetch_u8; half = Bit.low_4bits(a) + Bit.low_4bits(byte) > 0x0F; full = a + byte > 0xFF; self.a = Bit.wrap_u8(a + byte); set_flags(zero: a == 0, negative: false, half_carry: half, carry: full); 8 } # ADD A,u8
 
     # ============================================================
     # 8bit 算術 - ADC A (キャリー込み加算)
@@ -493,9 +508,36 @@ class CPU
         8  # 分岐不成立
       end
     end
-    # table[0x28] = -> { 12 } # JR Z,i8  (taken: 12 / not taken: 8)
-    # table[0x30] = -> { 12 } # JR NC,i8 (taken: 12 / not taken: 8)
-    # table[0x38] = -> { 12 } # JR C,i8  (taken: 12 / not taken: 8)
+    # JR Z,i8: Zフラグが1のとき分岐
+    table[0x28] = -> do
+      offset_i8 = fetch_i8
+      if zero == 1
+        self.pc = Bit.wrap_u16(pc + offset_i8)
+        12
+      else
+        8
+      end
+    end
+    # JR NC,i8: Cフラグが0のとき分岐
+    table[0x30] = -> do
+      offset_i8 = fetch_i8
+      if carry == 0
+        self.pc = Bit.wrap_u16(pc + offset_i8)
+        12
+      else
+        8
+      end
+    end
+    # JR C,i8: Cフラグが1のとき分岐
+    table[0x38] = -> do
+      offset_i8 = fetch_i8
+      if carry == 1
+        self.pc = Bit.wrap_u16(pc + offset_i8)
+        12
+      else
+        8
+      end
+    end
 
     # ============================================================
     # コール / リターン
@@ -538,6 +580,60 @@ class CPU
     # table[0xF4] = nil # UNUSED
     # table[0xFC] = nil # UNUSED
     # table[0xFD] = nil # UNUSED
+
+    table
+  end
+
+  # CB-prefix オペコードテーブル
+  # 0xCB の直後に続く 1バイトで引く 256要素テーブル
+  # gbops CB-prefix表: https://izik1.github.io/gbops/
+  # GB CPU 命令リファレンス(RGBDS): https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
+  #
+  # サイクル数は prefix の 0xCB fetch 分(4)を含む合計値で返す
+  #   r (B/C/D/E/H/L/A): 8 サイクル
+  #   (HL):              BIT は12、RES/SET/ローテート/シフトは16
+  def build_cb_opcode_table
+    table = Array.new(256, nil)
+
+    # ============================================================
+    # ローテート - RL r (キャリーを介して左に1bit回転)
+    # ============================================================
+    # 古いCフラグ → bit0、bit7 → 新Cフラグ
+    # Z=(結果が0)、N=0、H=0、C=旧bit7
+    # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#rl-r8
+    table[0x11] = -> { old_carry = carry; new_carry = Bit.bit_at(c, 7) == 1; self.c = Bit.wrap_u8((c << 1) | old_carry); set_flags(zero: c == 0, negative: false, half_carry: false, carry: new_carry); 8 } # RL C
+
+    # ============================================================
+    # シフト - SLA r (左算術シフト、bit0=0)
+    # ============================================================
+    # bit7 → Cフラグ、bit0 = 0
+    # Z=(結果が0)、N=0、H=0、C=旧bit7
+    # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#sla-r8
+    table[0x20] = -> { new_carry = Bit.bit_at(b, 7) == 1; self.b = Bit.wrap_u8(b << 1); set_flags(zero: b == 0, negative: false, half_carry: false, carry: new_carry); 8 } # SLA B
+
+    # ============================================================
+    # シフト - SRA r (右算術シフト、bit7保持=符号拡張)
+    # ============================================================
+    # bit0 → Cフラグ、bit7はそのまま(算術シフト)
+    # Z=(結果が0)、N=0、H=0、C=旧bit0
+    # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#sra-r8
+    table[0x2F] = -> { new_carry = Bit.bit_at(a, 0) == 1; self.a = (a >> 1) | (a & 0x80); set_flags(zero: a == 0, negative: false, half_carry: false, carry: new_carry); 8 } # SRA A
+
+    # ============================================================
+    # ビットテスト - BIT n,r (フラグだけ立てる、レジスタは変更しない)
+    # ============================================================
+    # rのnビット目をテスト。Z=!(r & (1<<n))、N=0、H=1、Cは保持
+    # (HL)版は12cycle、レジスタ版は8cycle
+    # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#bit-u3-r8
+    table[0x46] = -> { byte = mmu.read_u8(address: hl); set_flags(zero: Bit.bit_at(byte, 0) == 0, negative: false, half_carry: true); 12 } # BIT 0,(HL)
+    table[0x6C] = -> { set_flags(zero: Bit.bit_at(h, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,H
+
+    # ============================================================
+    # ビットクリア - RES n,r ((HL)版は16cycle)
+    # ============================================================
+    # rのnビット目を0にする。フラグは変化しない
+    # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html#res-u3-r8
+    table[0x86] = -> { byte = mmu.read_u8(address: hl); mmu.write_u8(address: hl, value: byte & 0xFE); 16 } # RES 0,(HL)
 
     table
   end

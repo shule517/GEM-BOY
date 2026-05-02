@@ -211,6 +211,50 @@ RSpec.describe MMU do
     end
   end
 
+  describe '#chime_triggered' do
+    subject { mmu.chime_triggered }
+    let(:mmu) { described_class.new(cartridge) }
+    let(:cartridge) { Cartridge.new(Array.new(0x8000, 0)) }
+
+    context '初期状態' do
+      it 'false である' do
+        is_expected.to eq false
+      end
+    end
+
+    context 'NR14(0xFF14)に trigger bit (bit7) を立てて書き込んだとき' do
+      before { mmu.write_u8(address: MMU::NR14, value: 0x80) }
+      it 'true になる' do
+        is_expected.to eq true
+      end
+    end
+
+    context 'NR14(0xFF14)に trigger bit を立てずに書き込んだとき' do
+      before { mmu.write_u8(address: MMU::NR14, value: 0x40) } # bit6=length enable のみ
+      it 'false のまま' do
+        is_expected.to eq false
+      end
+    end
+
+    context 'NR14 以外のオーディオレジスタに 0x80 を書き込んだとき' do
+      # 例: NR11(0xFF11)の bit7 は wave duty で trigger ではない
+      before { mmu.write_u8(address: 0xFF11, value: 0x80) }
+      it 'false のまま' do
+        is_expected.to eq false
+      end
+    end
+
+    context 'NR14 trigger を 1 度立てた後に trigger なしで再書き込みしたとき' do
+      before do
+        mmu.write_u8(address: MMU::NR14, value: 0x80)
+        mmu.write_u8(address: MMU::NR14, value: 0x00)
+      end
+      it 'true のまま下がらない' do
+        is_expected.to eq true
+      end
+    end
+  end
+
   describe '#initialize' do
     let(:cartridge) { Cartridge.new(Array.new(0x8000, 0)) }
 
