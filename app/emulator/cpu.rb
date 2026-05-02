@@ -34,8 +34,8 @@ class CPU
     if skip_boot
       # ブートROM 完走後の DMG 実機値(skip_boot 起動でブートROM をスキップ)
       # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
-      @sp = 0xFFFE         # HRAM末端
-      @pc = 0x0100         # カートリッジコードの開始位置
+      @sp = 0xFFFE # HRAM末端
+      @pc = 0x0100 # カートリッジコードの開始位置
     else
       # ブートROM 経由で起動するので全レジスタ 0 から始める
       @sp = 0 # スタックポインタ
