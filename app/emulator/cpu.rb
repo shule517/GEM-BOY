@@ -463,18 +463,24 @@ class CPU
     # ジャンプ - JR (相対ジャンプ)
     # ============================================================
     table[0x18] = -> { offset_i8 = fetch_i8; registers.pc = Bit.wrap_u16(registers.pc + offset_i8); 12 } # JR i8: 無条件相対ジャンプ。fetch_i8 後のPC(=次の命令の先頭)を起点にオフセット加算
-    # JR NZ,i8: Z フラグが 0 のとき、JR命令直後のアドレスから符号付き8bit分だけPCを動かす
-    # fetch_i8 を先に呼ぶことで、PC が「次の命令の先頭」を指した状態でオフセット加算する
-    table[0x20] = -> do
+    table[0x20] = -> do # JR NZ,i8
       offset_i8 = fetch_i8
-      if registers.zero_flag == 0
+      if registers.zero_flag == 0 # NZ: Execute if Z is not set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#NZ
         registers.pc = Bit.wrap_u16(registers.pc + offset_i8)
-        12 # 分岐成立
+        12
       else
-        8  # 分岐不成立
+        8
       end
     end
-    # table[0x28] = -> { 12 } # JR Z,i8  (taken: 12 / not taken: 8)
+    table[0x28] = -> do # JR Z,i8  (taken: 12 / not taken: 8)
+      offset_i8 = fetch_i8
+      if registers.zero_flag == 1 # Z: Execute if Z is set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#Z
+        registers.pc = Bit.wrap_u16(registers.pc + offset_i8)
+        12
+      else
+        8
+      end
+    end
     # table[0x30] = -> { 12 } # JR NC,i8 (taken: 12 / not taken: 8)
     # table[0x38] = -> { 12 } # JR C,i8  (taken: 12 / not taken: 8)
 
