@@ -587,14 +587,14 @@ class CPU
     # ============================================================
     # CB-prefix - SLA r (左シフト、bit7→C、bit0=0、Z=結果0、N=H=0)
     # ============================================================
-    # cb_table[0x20] = -> { 8 }  # SLA B
-    # cb_table[0x21] = -> { 8 }  # SLA C
-    # cb_table[0x22] = -> { 8 }  # SLA D
-    # cb_table[0x23] = -> { 8 }  # SLA E
-    # cb_table[0x24] = -> { 8 }  # SLA H
-    # cb_table[0x25] = -> { 8 }  # SLA L
+    cb_table[0x20] = -> { carry = registers.b[7]; registers.b = Bit.wrap_u8(registers.b << 1); registers.set_flags(zero: registers.b == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA B
+    cb_table[0x21] = -> { carry = registers.c[7]; registers.c = Bit.wrap_u8(registers.c << 1); registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA C
+    cb_table[0x22] = -> { carry = registers.d[7]; registers.d = Bit.wrap_u8(registers.d << 1); registers.set_flags(zero: registers.d == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA D
+    cb_table[0x23] = -> { carry = registers.e[7]; registers.e = Bit.wrap_u8(registers.e << 1); registers.set_flags(zero: registers.e == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA E
+    cb_table[0x24] = -> { carry = registers.h[7]; registers.h = Bit.wrap_u8(registers.h << 1); registers.set_flags(zero: registers.h == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA H
+    cb_table[0x25] = -> { carry = registers.l[7]; registers.l = Bit.wrap_u8(registers.l << 1); registers.set_flags(zero: registers.l == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA L
     # cb_table[0x26] = -> { 16 } # SLA (HL)
-    # cb_table[0x27] = -> { 8 }  # SLA A
+    cb_table[0x27] = -> { carry = registers.a[7]; registers.a = Bit.wrap_u8(registers.a << 1); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA A
 
     # ============================================================
     # CB-prefix - SRA r (算術右シフト、bit0→C、bit7 維持、Z=結果0、N=H=0)

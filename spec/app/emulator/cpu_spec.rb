@@ -347,10 +347,11 @@ RSpec.describe CPU do
     let(:rom_data) { boot_rom + tobu[boot_rom.size..] }
 
     it 'tobu.gb のロゴ照合を通って PC=0x0100 に到達する' do
-      # ブートROM は実機で約 70,000 T-cycle 程度で完走する。
-      # 上限 200,000 T-cycle まで run を繰り返し、PC が 0x0100 (カートリッジ先頭) に到達するか確認する。
+      # SameBoy 同梱の dmg_boot.bin は VRAM クリアだけで 8192 iter × 28 cycle = 229,376 cycle 必要
+      # ロゴ展開 + スクロールイン + チャイム待機まで含めると実機で数百万 T-cycle 程度
+      # 上限 400,000 T-cycle まで run を繰り返して、次に詰まる命令を観測する
       elapsed = 0
-      elapsed += cpu.run(1000) while cpu.registers.pc < 0x0100 && elapsed < 200_000
+      elapsed += cpu.run(1000) while cpu.registers.pc < 0x0100 && elapsed < 400_000
 
       expect(cpu.registers.pc).to eq 0x0100
     end
