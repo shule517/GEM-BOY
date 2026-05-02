@@ -489,8 +489,8 @@ RSpec.describe Bit do
       end
     end
 
-    context 'on に true 以外の真値(整数1)を渡したとき' do
-      # F レジスタ setter からは Bit.bit_at の戻り値(0 or 1)が渡されるケースがある
+    context 'on に整数 1 を渡したとき' do
+      # CPU 命令の中には flag を 1/0 の整数で直接立てるものがあるため、true 以外の真値も許容する
       let(:value) { 0x00 }
       let(:n) { 7 }
       let(:on) { 1 }
@@ -500,13 +500,46 @@ RSpec.describe Bit do
       end
     end
 
+    context 'on に整数 0 を渡したとき' do
+      # Ruby では 0 は truthy だが、ビット演算 API では「0 = off」が直感的なのでクリア扱いにする
+      let(:value) { 0xFF }
+      let(:n) { 7 }
+      let(:on) { 0 }
+
+      it '偽として扱い bit7 をクリアして 0x7F を返す' do
+        is_expected.to eq 0x7F
+      end
+    end
+
     context 'on に nil を渡したとき' do
+      # 0/1/true/false の 4 値だけを正規入力とし、それ以外は ArgumentError で弾く
       let(:value) { 0xFF }
       let(:n) { 7 }
       let(:on) { nil }
 
-      it '偽として扱い bit7 をクリアして 0x7F を返す' do
-        is_expected.to eq 0x7F
+      it 'ArgumentError を投げる' do
+        expect { subject }.to raise_error(ArgumentError, /on must be 0, 1, true, or false/)
+      end
+    end
+
+    context 'on に 0 / 1 以外の整数 (2) を渡したとき' do
+      # 「非 0 を on とみなす」のような曖昧な解釈はせず、想定外の整数は弾く
+      let(:value) { 0x00 }
+      let(:n) { 7 }
+      let(:on) { 2 }
+
+      it 'ArgumentError を投げる' do
+        expect { subject }.to raise_error(ArgumentError, /on must be 0, 1, true, or false/)
+      end
+    end
+
+    context 'on に負数 (-1) を渡したとき' do
+      let(:value) { 0x00 }
+      let(:n) { 7 }
+      let(:on) { -1 }
+
+      it 'ArgumentError を投げる' do
+        expect { subject }.to raise_error(ArgumentError, /on must be 0, 1, true, or false/)
       end
     end
 

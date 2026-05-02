@@ -72,10 +72,19 @@ module Bit
   end
 
   # 値の n 番目のビットを on/off に設定した結果を返す(値自体は変更しない)。
-  # on が真なら 1 にセット、偽なら 0 にクリアする。F レジスタの Z/N/H/C 個別更新で使う。
+  # on は 0 / 1 / true / false の 4 値だけを受け付ける(他の整数や nil は ArgumentError):
+  #   - 0 / false → off にクリア
+  #   - 1 / true  → on にセット
+  # F レジスタの Z/N/H/C 個別更新で使う。
   # 例: Bit.set_bit(0b00000000, 7, true)  #=> 0b10000000
   #     Bit.set_bit(0b11111111, 0, false) #=> 0b11111110
+  #     Bit.set_bit(0b00000000, 4, 1)     #=> 0b00010000
+  #     Bit.set_bit(0b11111111, 4, 0)     #=> 0b11101111
   def self.set_bit(value, n, on)
-    on ? value | (1 << n) : value & ~(1 << n)
+    case on
+    when 0, false then value & ~(1 << n) # falseの場合
+    when 1, true  then value | (1 << n) # trueの場合
+    else raise ArgumentError, "on must be 0, 1, true, or false, got: #{on.inspect}"
+    end
   end
 end
