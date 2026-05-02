@@ -766,70 +766,70 @@ class CPU
     # ============================================================
     # CB-prefix - SET n,r (r の bit n を 1 にセット、フラグ変化なし)
     # ============================================================
-    # cb_table[0xC0] = -> { 8 }  # SET 0,B
-    # cb_table[0xC1] = -> { 8 }  # SET 0,C
-    # cb_table[0xC2] = -> { 8 }  # SET 0,D
-    # cb_table[0xC3] = -> { 8 }  # SET 0,E
-    # cb_table[0xC4] = -> { 8 }  # SET 0,H
-    # cb_table[0xC5] = -> { 8 }  # SET 0,L
+    cb_table[0xC0] = -> { registers.b = Bit.set_bit(registers.b, 0, 1); 8 }  # SET 0,B
+    cb_table[0xC1] = -> { registers.c = Bit.set_bit(registers.c, 0, 1); 8 }  # SET 0,C
+    cb_table[0xC2] = -> { registers.d = Bit.set_bit(registers.d, 0, 1); 8 }  # SET 0,D
+    cb_table[0xC3] = -> { registers.e = Bit.set_bit(registers.e, 0, 1); 8 }  # SET 0,E
+    cb_table[0xC4] = -> { registers.h = Bit.set_bit(registers.h, 0, 1); 8 }  # SET 0,H
+    cb_table[0xC5] = -> { registers.l = Bit.set_bit(registers.l, 0, 1); 8 }  # SET 0,L
     # cb_table[0xC6] = -> { 16 } # SET 0,(HL)
-    # cb_table[0xC7] = -> { 8 }  # SET 0,A
-    # cb_table[0xC8] = -> { 8 }  # SET 1,B
-    # cb_table[0xC9] = -> { 8 }  # SET 1,C
-    # cb_table[0xCA] = -> { 8 }  # SET 1,D
-    # cb_table[0xCB] = -> { 8 }  # SET 1,E
-    # cb_table[0xCC] = -> { 8 }  # SET 1,H
-    # cb_table[0xCD] = -> { 8 }  # SET 1,L
+    cb_table[0xC7] = -> { registers.a = Bit.set_bit(registers.a, 0, 1); 8 }  # SET 0,A
+    cb_table[0xC8] = -> { registers.b = Bit.set_bit(registers.b, 1, 1); 8 }  # SET 1,B
+    cb_table[0xC9] = -> { registers.c = Bit.set_bit(registers.c, 1, 1); 8 }  # SET 1,C
+    cb_table[0xCA] = -> { registers.d = Bit.set_bit(registers.d, 1, 1); 8 }  # SET 1,D
+    cb_table[0xCB] = -> { registers.e = Bit.set_bit(registers.e, 1, 1); 8 }  # SET 1,E
+    cb_table[0xCC] = -> { registers.h = Bit.set_bit(registers.h, 1, 1); 8 }  # SET 1,H
+    cb_table[0xCD] = -> { registers.l = Bit.set_bit(registers.l, 1, 1); 8 }  # SET 1,L
     # cb_table[0xCE] = -> { 16 } # SET 1,(HL)
-    # cb_table[0xCF] = -> { 8 }  # SET 1,A
-    # cb_table[0xD0] = -> { 8 }  # SET 2,B
-    # cb_table[0xD1] = -> { 8 }  # SET 2,C
-    # cb_table[0xD2] = -> { 8 }  # SET 2,D
-    # cb_table[0xD3] = -> { 8 }  # SET 2,E
-    # cb_table[0xD4] = -> { 8 }  # SET 2,H
-    # cb_table[0xD5] = -> { 8 }  # SET 2,L
+    cb_table[0xCF] = -> { registers.a = Bit.set_bit(registers.a, 1, 1); 8 }  # SET 1,A
+    cb_table[0xD0] = -> { registers.b = Bit.set_bit(registers.b, 2, 1); 8 }  # SET 2,B
+    cb_table[0xD1] = -> { registers.c = Bit.set_bit(registers.c, 2, 1); 8 }  # SET 2,C
+    cb_table[0xD2] = -> { registers.d = Bit.set_bit(registers.d, 2, 1); 8 }  # SET 2,D
+    cb_table[0xD3] = -> { registers.e = Bit.set_bit(registers.e, 2, 1); 8 }  # SET 2,E
+    cb_table[0xD4] = -> { registers.h = Bit.set_bit(registers.h, 2, 1); 8 }  # SET 2,H
+    cb_table[0xD5] = -> { registers.l = Bit.set_bit(registers.l, 2, 1); 8 }  # SET 2,L
     # cb_table[0xD6] = -> { 16 } # SET 2,(HL)
-    # cb_table[0xD7] = -> { 8 }  # SET 2,A
-    # cb_table[0xD8] = -> { 8 }  # SET 3,B
-    # cb_table[0xD9] = -> { 8 }  # SET 3,C
-    # cb_table[0xDA] = -> { 8 }  # SET 3,D
-    # cb_table[0xDB] = -> { 8 }  # SET 3,E
-    # cb_table[0xDC] = -> { 8 }  # SET 3,H
-    # cb_table[0xDD] = -> { 8 }  # SET 3,L
+    cb_table[0xD7] = -> { registers.a = Bit.set_bit(registers.a, 2, 1); 8 }  # SET 2,A
+    cb_table[0xD8] = -> { registers.b = Bit.set_bit(registers.b, 3, 1); 8 }  # SET 3,B
+    cb_table[0xD9] = -> { registers.c = Bit.set_bit(registers.c, 3, 1); 8 }  # SET 3,C
+    cb_table[0xDA] = -> { registers.d = Bit.set_bit(registers.d, 3, 1); 8 }  # SET 3,D
+    cb_table[0xDB] = -> { registers.e = Bit.set_bit(registers.e, 3, 1); 8 }  # SET 3,E
+    cb_table[0xDC] = -> { registers.h = Bit.set_bit(registers.h, 3, 1); 8 }  # SET 3,H
+    cb_table[0xDD] = -> { registers.l = Bit.set_bit(registers.l, 3, 1); 8 }  # SET 3,L
     # cb_table[0xDE] = -> { 16 } # SET 3,(HL)
-    # cb_table[0xDF] = -> { 8 }  # SET 3,A
-    # cb_table[0xE0] = -> { 8 }  # SET 4,B
-    # cb_table[0xE1] = -> { 8 }  # SET 4,C
-    # cb_table[0xE2] = -> { 8 }  # SET 4,D
-    # cb_table[0xE3] = -> { 8 }  # SET 4,E
-    # cb_table[0xE4] = -> { 8 }  # SET 4,H
-    # cb_table[0xE5] = -> { 8 }  # SET 4,L
+    cb_table[0xDF] = -> { registers.a = Bit.set_bit(registers.a, 3, 1); 8 }  # SET 3,A
+    cb_table[0xE0] = -> { registers.b = Bit.set_bit(registers.b, 4, 1); 8 }  # SET 4,B
+    cb_table[0xE1] = -> { registers.c = Bit.set_bit(registers.c, 4, 1); 8 }  # SET 4,C
+    cb_table[0xE2] = -> { registers.d = Bit.set_bit(registers.d, 4, 1); 8 }  # SET 4,D
+    cb_table[0xE3] = -> { registers.e = Bit.set_bit(registers.e, 4, 1); 8 }  # SET 4,E
+    cb_table[0xE4] = -> { registers.h = Bit.set_bit(registers.h, 4, 1); 8 }  # SET 4,H
+    cb_table[0xE5] = -> { registers.l = Bit.set_bit(registers.l, 4, 1); 8 }  # SET 4,L
     # cb_table[0xE6] = -> { 16 } # SET 4,(HL)
-    # cb_table[0xE7] = -> { 8 }  # SET 4,A
-    # cb_table[0xE8] = -> { 8 }  # SET 5,B
-    # cb_table[0xE9] = -> { 8 }  # SET 5,C
-    # cb_table[0xEA] = -> { 8 }  # SET 5,D
-    # cb_table[0xEB] = -> { 8 }  # SET 5,E
-    # cb_table[0xEC] = -> { 8 }  # SET 5,H
-    # cb_table[0xED] = -> { 8 }  # SET 5,L
+    cb_table[0xE7] = -> { registers.a = Bit.set_bit(registers.a, 4, 1); 8 }  # SET 4,A
+    cb_table[0xE8] = -> { registers.b = Bit.set_bit(registers.b, 5, 1); 8 }  # SET 5,B
+    cb_table[0xE9] = -> { registers.c = Bit.set_bit(registers.c, 5, 1); 8 }  # SET 5,C
+    cb_table[0xEA] = -> { registers.d = Bit.set_bit(registers.d, 5, 1); 8 }  # SET 5,D
+    cb_table[0xEB] = -> { registers.e = Bit.set_bit(registers.e, 5, 1); 8 }  # SET 5,E
+    cb_table[0xEC] = -> { registers.h = Bit.set_bit(registers.h, 5, 1); 8 }  # SET 5,H
+    cb_table[0xED] = -> { registers.l = Bit.set_bit(registers.l, 5, 1); 8 }  # SET 5,L
     # cb_table[0xEE] = -> { 16 } # SET 5,(HL)
-    # cb_table[0xEF] = -> { 8 }  # SET 5,A
-    # cb_table[0xF0] = -> { 8 }  # SET 6,B
-    # cb_table[0xF1] = -> { 8 }  # SET 6,C
-    # cb_table[0xF2] = -> { 8 }  # SET 6,D
-    # cb_table[0xF3] = -> { 8 }  # SET 6,E
-    # cb_table[0xF4] = -> { 8 }  # SET 6,H
-    # cb_table[0xF5] = -> { 8 }  # SET 6,L
+    cb_table[0xEF] = -> { registers.a = Bit.set_bit(registers.a, 5, 1); 8 }  # SET 5,A
+    cb_table[0xF0] = -> { registers.b = Bit.set_bit(registers.b, 6, 1); 8 }  # SET 6,B
+    cb_table[0xF1] = -> { registers.c = Bit.set_bit(registers.c, 6, 1); 8 }  # SET 6,C
+    cb_table[0xF2] = -> { registers.d = Bit.set_bit(registers.d, 6, 1); 8 }  # SET 6,D
+    cb_table[0xF3] = -> { registers.e = Bit.set_bit(registers.e, 6, 1); 8 }  # SET 6,E
+    cb_table[0xF4] = -> { registers.h = Bit.set_bit(registers.h, 6, 1); 8 }  # SET 6,H
+    cb_table[0xF5] = -> { registers.l = Bit.set_bit(registers.l, 6, 1); 8 }  # SET 6,L
     # cb_table[0xF6] = -> { 16 } # SET 6,(HL)
-    # cb_table[0xF7] = -> { 8 }  # SET 6,A
-    # cb_table[0xF8] = -> { 8 }  # SET 7,B
-    # cb_table[0xF9] = -> { 8 }  # SET 7,C
-    # cb_table[0xFA] = -> { 8 }  # SET 7,D
-    # cb_table[0xFB] = -> { 8 }  # SET 7,E
-    # cb_table[0xFC] = -> { 8 }  # SET 7,H
-    # cb_table[0xFD] = -> { 8 }  # SET 7,L
+    cb_table[0xF7] = -> { registers.a = Bit.set_bit(registers.a, 6, 1); 8 }  # SET 6,A
+    cb_table[0xF8] = -> { registers.b = Bit.set_bit(registers.b, 7, 1); 8 }  # SET 7,B
+    cb_table[0xF9] = -> { registers.c = Bit.set_bit(registers.c, 7, 1); 8 }  # SET 7,C
+    cb_table[0xFA] = -> { registers.d = Bit.set_bit(registers.d, 7, 1); 8 }  # SET 7,D
+    cb_table[0xFB] = -> { registers.e = Bit.set_bit(registers.e, 7, 1); 8 }  # SET 7,E
+    cb_table[0xFC] = -> { registers.h = Bit.set_bit(registers.h, 7, 1); 8 }  # SET 7,H
+    cb_table[0xFD] = -> { registers.l = Bit.set_bit(registers.l, 7, 1); 8 }  # SET 7,L
     # cb_table[0xFE] = -> { 16 } # SET 7,(HL)
-    # cb_table[0xFF] = -> { 8 }  # SET 7,A
+    cb_table[0xFF] = -> { registers.a = Bit.set_bit(registers.a, 7, 1); 8 }  # SET 7,A
 
     cb_table
   end
