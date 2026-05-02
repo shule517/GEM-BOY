@@ -77,6 +77,48 @@ class CPU
 
   private
 
+  # (BC) で指す番地から 1 バイト読む。LD A,(BC) で使う
+  # Pan Docs: https://gbdev.io/pandocs/CPU_Instruction_Set.html
+  def read_at_bc = mmu.read_u8(address: registers.bc)
+
+  # (BC) で指す番地に 1 バイト書く。LD (BC),A で使う
+  def write_at_bc(value) = mmu.write_u8(address: registers.bc, value: value)
+
+  # (DE) で指す番地から 1 バイト読む。LD A,(DE) で使う
+  def read_at_de = mmu.read_u8(address: registers.de)
+
+  # (DE) で指す番地に 1 バイト書く。LD (DE),A で使う
+  def write_at_de(value) = mmu.write_u8(address: registers.de, value: value)
+
+  # (HL) で指す番地から 1 バイト読む。XOR A,(HL) / OR A,(HL) / CP A,(HL) / LD A,(HL+) などで使う
+  def read_at_hl = mmu.read_u8(address: registers.hl)
+
+  # (HL) で指す番地に 1 バイト書く。LD (HL+),A / LD (HL-),A などで使う
+  def write_at_hl(value) = mmu.write_u8(address: registers.hl, value: value)
+
+  # 論理演算 (OR / XOR) 後のフラグを更新する
+  # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#OR_A,r8
+  # AND だけは H = 1 なので set_logical_and_flags で扱う
+  def set_logical_flags(result)
+    registers.set_flags(
+      zero: result == 0, # Z: 結果がゼロなら 1
+      negative: false,   # N: 0 (論理演算なので減算ではない)
+      half_carry: false, # H: 0 (論理演算は半キャリー無し)
+      carry: false,      # C: 0 (論理演算はキャリー無し)
+    )
+  end
+
+  # 論理 AND 後のフラグを更新する。OR / XOR と違い H = 1 にセットする (Z80 系の特殊仕様)
+  # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#AND_A,r8
+  def set_logical_and_flags(result)
+    registers.set_flags(
+      zero: result == 0, # Z: 結果がゼロなら 1
+      negative: false,   # N: 0 (論理演算なので減算ではない)
+      half_carry: true,  # H: 1 (AND だけの特殊仕様)
+      carry: false,      # C: 0 (論理演算はキャリー無し)
+    )
+  end
+
   # opcodeテーブル
   # CPUの命令一覧 https://izik1.github.io/gbops/
   # GB CPU 命令リファレンス(RGBDS 公式マニュアル) https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
@@ -87,11 +129,11 @@ class CPU
     # 制御 / システム (Control / System)
     # ============================================================
     table[0x00] = -> { 4 } # NOP: 何もしない。4サイクル進む。
-    # table[0x10] = -> { 4 }  # STOP
+    # table[0x10] = -> { 4 } # STOP
     table[0x76] = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
     table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグをクリアして割り込みを無効
-    # table[0xFB] = -> { 4 }  # EI
-    # table[0xCB] = -> { 4 }  # PREFIX CB (CB-prefix命令へ分岐)
+    # table[0xFB] = -> { 4 } # EI
+    # table[0xCB] = -> { 4 } # PREFIX CB (CB-prefix命令へ分岐)
 
     # ============================================================
     # 8bit ロード - LD r,u8 (即値ロード)
@@ -102,87 +144,87 @@ class CPU
     table[0x1E] = -> { registers.e = fetch_u8; 8 } # LD E,u8
     table[0x26] = -> { registers.h = fetch_u8; 8 } # LD H,u8
     table[0x2E] = -> { registers.l = fetch_u8; 8 } # LD L,u8
-    # table[0x36] = -> { 12 } # LD (HL),u8
+    table[0x36] = -> { write_at_hl(fetch_u8); 12 } # LD (HL),u8
     table[0x3E] = -> { registers.a = fetch_u8; 8 } # LD A,u8
 
     # ============================================================
     # 8bit ロード - LD r,r' (レジスタ間転送)
     # ============================================================
     table[0x40] = -> { 4 } # LD B,B → 無意味な処理のため何もしない
-    table[0x41] = -> { registers.b = registers.c; 4 }  # LD B,C
-    table[0x42] = -> { registers.b = registers.d; 4 }  # LD B,D
-    table[0x43] = -> { registers.b = registers.e; 4 }  # LD B,E
-    table[0x44] = -> { registers.b = registers.h; 4 }  # LD B,H
-    table[0x45] = -> { registers.b = registers.l; 4 }  # LD B,L
-    # table[0x46] = -> { 8 }  # LD B,(HL)
-    table[0x47] = -> { registers.b = registers.a; 4 }  # LD B,A
-    table[0x48] = -> { registers.c = registers.b; 4 }  # LD C,B
-    table[0x49] = -> { 4 }  # LD C,C → 無意味な処理のため何もしない
-    table[0x4A] = -> { registers.c = registers.d; 4 }  # LD C,D
-    table[0x4B] = -> { registers.c = registers.e; 4 }  # LD C,E
-    table[0x4C] = -> { registers.c = registers.h; 4 }  # LD C,H
-    table[0x4D] = -> { registers.c = registers.l; 4 }  # LD C,L
-    # table[0x4E] = -> { 8 }  # LD C,(HL)
-    table[0x4F] = -> { registers.c = registers.a; 4 }  # LD C,A
-    table[0x50] = -> { registers.d = registers.b; 4 }  # LD D,B
-    table[0x51] = -> { registers.d = registers.c; 4 }  # LD D,C
-    table[0x52] = -> { 4 }  # LD D,D → 無意味な処理のため何もしない
-    table[0x53] = -> { registers.d = registers.e; 4 }  # LD D,E
-    table[0x54] = -> { registers.d = registers.h; 4 }  # LD D,H
-    table[0x55] = -> { registers.d = registers.l; 4 }  # LD D,L
-    # table[0x56] = -> { 8 }  # LD D,(HL)
-    table[0x57] = -> { registers.d = registers.a; 4 }  # LD D,A
-    table[0x58] = -> { registers.e = registers.b; 4 }  # LD E,B
-    table[0x59] = -> { registers.e = registers.c; 4 }  # LD E,C
-    table[0x5A] = -> { registers.e = registers.d; 4 }  # LD E,D
-    table[0x5B] = -> { 4 }  # LD E,E → 無意味な処理のため何もしない
-    table[0x5C] = -> { registers.e = registers.h; 4 }  # LD E,H
-    table[0x5D] = -> { registers.e = registers.l; 4 }  # LD E,L
-    # table[0x5E] = -> { 8 }  # LD E,(HL)
-    table[0x5F] = -> { registers.e = registers.a; 4 }  # LD E,A
-    table[0x60] = -> { registers.h = registers.b; 4 }  # LD H,B
-    table[0x61] = -> { registers.h = registers.c; 4 }  # LD H,C
-    table[0x62] = -> { registers.h = registers.d; 4 }  # LD H,D
-    table[0x63] = -> { registers.h = registers.e; 4 }  # LD H,E
-    table[0x64] = -> { 4 }  # LD H,H → 無意味な処理のため何もしない
-    table[0x65] = -> { registers.h = registers.l; 4 }  # LD H,L
-    # table[0x66] = -> { 8 }  # LD H,(HL)
-    table[0x67] = -> { registers.h = registers.a; 4 }  # LD H,A
-    table[0x68] = -> { registers.l = registers.b; 4 }  # LD L,B
-    table[0x69] = -> { registers.l = registers.c; 4 }  # LD L,C
-    table[0x6A] = -> { registers.l = registers.d; 4 }  # LD L,D
-    table[0x6B] = -> { registers.l = registers.e; 4 }  # LD L,E
-    table[0x6C] = -> { registers.l = registers.h; 4 }  # LD L,H
-    table[0x6D] = -> { 4 }  # LD L,L → 無意味な処理のため何もしない
-    # table[0x6E] = -> { 8 }  # LD L,(HL)
-    table[0x6F] = -> { registers.l = registers.a; 4 }  # LD L,A
-    # table[0x70] = -> { 8 }  # LD (HL),B
-    # table[0x71] = -> { 8 }  # LD (HL),C
-    # table[0x72] = -> { 8 }  # LD (HL),D
-    # table[0x73] = -> { 8 }  # LD (HL),E
-    # table[0x74] = -> { 8 }  # LD (HL),H
-    # table[0x75] = -> { 8 }  # LD (HL),L
-    # table[0x77] = -> { 8 }  # LD (HL),A
-    table[0x78] = -> { registers.a = registers.b; 4 }  # LD A,B
-    table[0x79] = -> { registers.a = registers.c; 4 }  # LD A,C
-    table[0x7A] = -> { registers.a = registers.d; 4 }  # LD A,D
-    table[0x7B] = -> { registers.a = registers.e; 4 }  # LD A,E
-    table[0x7C] = -> { registers.a = registers.h; 4 }  # LD A,H
-    table[0x7D] = -> { registers.a = registers.l; 4 }  # LD A,L
-    # table[0x7E] = -> { 8 }  # LD A,(HL)
-    table[0x7F] = -> { 4 }  # LD A,A → 無意味な処理のため何もしない
+    table[0x41] = -> { registers.b = registers.c; 4 } # LD B,C
+    table[0x42] = -> { registers.b = registers.d; 4 } # LD B,D
+    table[0x43] = -> { registers.b = registers.e; 4 } # LD B,E
+    table[0x44] = -> { registers.b = registers.h; 4 } # LD B,H
+    table[0x45] = -> { registers.b = registers.l; 4 } # LD B,L
+    table[0x46] = -> { registers.b = read_at_hl; 8 } # LD B,(HL)
+    table[0x47] = -> { registers.b = registers.a; 4 } # LD B,A
+    table[0x48] = -> { registers.c = registers.b; 4 } # LD C,B
+    table[0x49] = -> { 4 } # LD C,C → 無意味な処理のため何もしない
+    table[0x4A] = -> { registers.c = registers.d; 4 } # LD C,D
+    table[0x4B] = -> { registers.c = registers.e; 4 } # LD C,E
+    table[0x4C] = -> { registers.c = registers.h; 4 } # LD C,H
+    table[0x4D] = -> { registers.c = registers.l; 4 } # LD C,L
+    table[0x4E] = -> { registers.c = read_at_hl; 8 } # LD C,(HL)
+    table[0x4F] = -> { registers.c = registers.a; 4 } # LD C,A
+    table[0x50] = -> { registers.d = registers.b; 4 } # LD D,B
+    table[0x51] = -> { registers.d = registers.c; 4 } # LD D,C
+    table[0x52] = -> { 4 } # LD D,D → 無意味な処理のため何もしない
+    table[0x53] = -> { registers.d = registers.e; 4 } # LD D,E
+    table[0x54] = -> { registers.d = registers.h; 4 } # LD D,H
+    table[0x55] = -> { registers.d = registers.l; 4 } # LD D,L
+    table[0x56] = -> { registers.d = read_at_hl; 8 } # LD D,(HL)
+    table[0x57] = -> { registers.d = registers.a; 4 } # LD D,A
+    table[0x58] = -> { registers.e = registers.b; 4 } # LD E,B
+    table[0x59] = -> { registers.e = registers.c; 4 } # LD E,C
+    table[0x5A] = -> { registers.e = registers.d; 4 } # LD E,D
+    table[0x5B] = -> { 4 } # LD E,E → 無意味な処理のため何もしない
+    table[0x5C] = -> { registers.e = registers.h; 4 } # LD E,H
+    table[0x5D] = -> { registers.e = registers.l; 4 } # LD E,L
+    table[0x5E] = -> { registers.e = read_at_hl; 8 } # LD E,(HL)
+    table[0x5F] = -> { registers.e = registers.a; 4 } # LD E,A
+    table[0x60] = -> { registers.h = registers.b; 4 } # LD H,B
+    table[0x61] = -> { registers.h = registers.c; 4 } # LD H,C
+    table[0x62] = -> { registers.h = registers.d; 4 } # LD H,D
+    table[0x63] = -> { registers.h = registers.e; 4 } # LD H,E
+    table[0x64] = -> { 4 } # LD H,H → 無意味な処理のため何もしない
+    table[0x65] = -> { registers.h = registers.l; 4 } # LD H,L
+    table[0x66] = -> { registers.h = read_at_hl; 8 } # LD H,(HL)
+    table[0x67] = -> { registers.h = registers.a; 4 } # LD H,A
+    table[0x68] = -> { registers.l = registers.b; 4 } # LD L,B
+    table[0x69] = -> { registers.l = registers.c; 4 } # LD L,C
+    table[0x6A] = -> { registers.l = registers.d; 4 } # LD L,D
+    table[0x6B] = -> { registers.l = registers.e; 4 } # LD L,E
+    table[0x6C] = -> { registers.l = registers.h; 4 } # LD L,H
+    table[0x6D] = -> { 4 } # LD L,L → 無意味な処理のため何もしない
+    table[0x6E] = -> { registers.l = read_at_hl; 8 } # LD L,(HL)
+    table[0x6F] = -> { registers.l = registers.a; 4 } # LD L,A
+    table[0x70] = -> { write_at_hl(registers.b); 8 } # LD (HL),B
+    table[0x71] = -> { write_at_hl(registers.c); 8 } # LD (HL),C
+    table[0x72] = -> { write_at_hl(registers.d); 8 } # LD (HL),D
+    table[0x73] = -> { write_at_hl(registers.e); 8 } # LD (HL),E
+    table[0x74] = -> { write_at_hl(registers.h); 8 } # LD (HL),H
+    table[0x75] = -> { write_at_hl(registers.l); 8 } # LD (HL),L
+    table[0x77] = -> { write_at_hl(registers.a); 8 } # LD (HL),A
+    table[0x78] = -> { registers.a = registers.b; 4 } # LD A,B
+    table[0x79] = -> { registers.a = registers.c; 4 } # LD A,C
+    table[0x7A] = -> { registers.a = registers.d; 4 } # LD A,D
+    table[0x7B] = -> { registers.a = registers.e; 4 } # LD A,E
+    table[0x7C] = -> { registers.a = registers.h; 4 } # LD A,H
+    table[0x7D] = -> { registers.a = registers.l; 4 } # LD A,L
+    table[0x7E] = -> { registers.a = read_at_hl; 8 } # LD A,(HL)
+    table[0x7F] = -> { 4 } # LD A,A → 無意味な処理のため何もしない
 
     # ============================================================
     # 8bit ロード - LD A,(rr) / LD (rr),A (レジスタペア間接)
     # ============================================================
-    table[0x02] = -> { mmu.write_u8(address: registers.bc, value: registers.a); 8 } # LD (BC),A
-    table[0x0A] = -> { registers.a = mmu.read_u8(address: registers.bc); 8 } # LD A,(BC)
-    table[0x12] = -> { mmu.write_u8(address: registers.de, value: registers.a); 8 } # LD (DE),A
-    table[0x1A] = -> { registers.a = mmu.read_u8(address: registers.de); 8 } # LD A,(DE)
-    table[0x22] = -> { mmu.write_u8(address: registers.hl, value: registers.a); registers.hl += 1; 8 } # LD (HL+),A
-    table[0x2A] = -> { registers.a = mmu.read_u8(address: registers.hl); registers.hl += 1; 8 } # LD A,(HL+)
-    table[0x32] = -> { mmu.write_u8(address: registers.hl, value: registers.a); registers.hl -= 1; 8 } # LD (HL-),A
-    table[0x3A] = -> { registers.a = mmu.read_u8(address: registers.hl); registers.hl -= 1; 8 }  # LD A,(HL-)
+    table[0x02] = -> { write_at_bc(registers.a); 8 } # LD (BC),A
+    table[0x0A] = -> { registers.a = read_at_bc; 8 } # LD A,(BC)
+    table[0x12] = -> { write_at_de(registers.a); 8 } # LD (DE),A
+    table[0x1A] = -> { registers.a = read_at_de; 8 } # LD A,(DE)
+    table[0x22] = -> { write_at_hl(registers.a); registers.hl += 1; 8 } # LD (HL+),A
+    table[0x2A] = -> { registers.a = read_at_hl; registers.hl += 1; 8 } # LD A,(HL+)
+    table[0x32] = -> { write_at_hl(registers.a); registers.hl -= 1; 8 } # LD (HL-),A
+    table[0x3A] = -> { registers.a = read_at_hl; registers.hl -= 1; 8 } # LD A,(HL-)
 
     # ============================================================
     # 8bit ロード - LD A,(u16) / LD (u16),A (絶対アドレス)
@@ -194,9 +236,9 @@ class CPU
     # 8bit ロード - I/O ポート (0xFF00 + offset)
     # ============================================================
     table[0xE0] = -> { mmu.write_u8(address: 0xFF00 + fetch_u8, value: registers.a); 12 } # LD (FF00+u8),A
-    table[0xE2] = -> { mmu.write_u8(address: 0xFF00 + registers.c, value: registers.a); 8 }  # LD (FF00+C),A
+    table[0xE2] = -> { mmu.write_u8(address: 0xFF00 + registers.c, value: registers.a); 8 } # LD (FF00+C),A
     table[0xF0] = -> { registers.a = mmu.read_u8(address: 0xFF00 + fetch_u8); 12 } # LD A,(FF00+u8)
-    table[0xF2] = -> { registers.a = mmu.read_u8(address: 0xFF00 + registers.c); 8 }  # LD A,(FF00+C)
+    table[0xF2] = -> { registers.a = mmu.read_u8(address: 0xFF00 + registers.c); 8 } # LD A,(FF00+C)
 
     # ============================================================
     # 16bit ロード - LD rr,u16
@@ -234,6 +276,14 @@ class CPU
     table[0x3C] = -> { half_carry_result = Bit.low_4bits(registers.a) + 1 > 0x0F; registers.a = Bit.wrap_u8(registers.a + 1); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
 
     # ============================================================
+    # 16bit 算術 - INC rr (フラグ全保持)
+    # ============================================================
+    table[0x03] = -> { registers.bc = Bit.wrap_u16(registers.bc + 1); 8 } # INC BC
+    table[0x13] = -> { registers.de = Bit.wrap_u16(registers.de + 1); 8 } # INC DE
+    table[0x23] = -> { registers.hl = Bit.wrap_u16(registers.hl + 1); 8 } # INC HL
+    table[0x33] = -> { registers.sp = Bit.wrap_u16(registers.sp + 1); 8 } # INC SP
+
+    # ============================================================
     # 8bit 算術 - DEC
     # ============================================================
     table[0x05] = -> { half_carry_result = Bit.low_4bits(registers.b) == 0; registers.b = Bit.wrap_u8(registers.b - 1); registers.set_flags(zero: registers.b == 0, negative: true, half_carry: half_carry_result); 4 } # DEC B
@@ -246,141 +296,145 @@ class CPU
     table[0x3D] = -> { half_carry_result = Bit.low_4bits(registers.a) == 0; registers.a = Bit.wrap_u8(registers.a - 1); registers.set_flags(zero: registers.a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
 
     # ============================================================
-    # 8bit 算術 - ADD A
+    # 16bit 算術 - DEC rr (フラグ全保持)
     # ============================================================
-    # TODO: 未実装 table[0x80] = -> { registers.a = Bit.wrap_u8(registers.a + registers.b); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # ADD A,B
-    # table[0x81] = -> { 4 }  # ADD A,C
-    # table[0x82] = -> { 4 }  # ADD A,D
-    # table[0x83] = -> { 4 }  # ADD A,E
-    # table[0x84] = -> { 4 }  # ADD A,H
-    # table[0x85] = -> { 4 }  # ADD A,L
-    # table[0x86] = -> { 8 }  # ADD A,(HL)
-    # table[0x87] = -> { 4 }  # ADD A,A
-    # table[0xC6] = -> { 8 }  # ADD A,u8
-
-    # ============================================================
-    # 8bit 算術 - ADC A (キャリー込み加算)
-    # ============================================================
-    # table[0x88] = -> { 4 }  # ADC A,B
-    # table[0x89] = -> { 4 }  # ADC A,C
-    # table[0x8A] = -> { 4 }  # ADC A,D
-    # table[0x8B] = -> { 4 }  # ADC A,E
-    # table[0x8C] = -> { 4 }  # ADC A,H
-    # table[0x8D] = -> { 4 }  # ADC A,L
-    # table[0x8E] = -> { 8 }  # ADC A,(HL)
-    # table[0x8F] = -> { 4 }  # ADC A,A
-    # table[0xCE] = -> { 8 }  # ADC A,u8
-
-    # ============================================================
-    # 8bit 算術 - SUB A
-    # ============================================================
-    # table[0x90] = -> { 4 }  # SUB A,B
-    # table[0x91] = -> { 4 }  # SUB A,C
-    # table[0x92] = -> { 4 }  # SUB A,D
-    # table[0x93] = -> { 4 }  # SUB A,E
-    # table[0x94] = -> { 4 }  # SUB A,H
-    # table[0x95] = -> { 4 }  # SUB A,L
-    # table[0x96] = -> { 8 }  # SUB A,(HL)
-    # table[0x97] = -> { 4 }  # SUB A,A
-    # table[0xD6] = -> { 8 }  # SUB A,u8
-
-    # ============================================================
-    # 8bit 算術 - SBC A (キャリー込み減算)
-    # ============================================================
-    # table[0x98] = -> { 4 }  # SBC A,B
-    # table[0x99] = -> { 4 }  # SBC A,C
-    # table[0x9A] = -> { 4 }  # SBC A,D
-    # table[0x9B] = -> { 4 }  # SBC A,E
-    # table[0x9C] = -> { 4 }  # SBC A,H
-    # table[0x9D] = -> { 4 }  # SBC A,L
-    # table[0x9E] = -> { 8 }  # SBC A,(HL)
-    # table[0x9F] = -> { 4 }  # SBC A,A
-    # table[0xDE] = -> { 8 }  # SBC A,u8
-
-    # ============================================================
-    # 8bit 論理 - AND
-    # ============================================================
-    # table[0xA0] = -> { 4 }  # AND A,B
-    # table[0xA1] = -> { 4 }  # AND A,C
-    # table[0xA2] = -> { 4 }  # AND A,D
-    # table[0xA3] = -> { 4 }  # AND A,E
-    # table[0xA4] = -> { 4 }  # AND A,H
-    # table[0xA5] = -> { 4 }  # AND A,L
-    # table[0xA6] = -> { 8 }  # AND A,(HL)
-    # table[0xA7] = -> { 4 }  # AND A,A
-    # table[0xE6] = -> { 8 }  # AND A,u8
-
-    # ============================================================
-    # 8bit 論理 - XOR
-    # ============================================================
-    table[0xA8] = -> { registers.a = registers.a ^ registers.b; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,B
-    table[0xA9] = -> { registers.a = registers.a ^ registers.c; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,C
-    table[0xAA] = -> { registers.a = registers.a ^ registers.d; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,D
-    table[0xAB] = -> { registers.a = registers.a ^ registers.e; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,E
-    table[0xAC] = -> { registers.a = registers.a ^ registers.h; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,H
-    table[0xAD] = -> { registers.a = registers.a ^ registers.l; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # XOR A,L
-    table[0xAE] = -> { byte = mmu.read_u8(address: registers.hl); registers.a = registers.a ^ byte; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,(HL)
-    table[0xAF] = -> { registers.a = 0; registers.set_flags(zero: true, negative: false, half_carry: false, carry: false); 4 } # XOR A,A
-    table[0xEE] = -> { byte = fetch_u8; registers.a = registers.a ^ byte; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # XOR A,u8
-
-    # ============================================================
-    # 8bit 論理 - OR
-    # ============================================================
-    table[0xB0] = -> { registers.a = registers.a | registers.b; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # OR A,B
-    table[0xB1] = -> { registers.a = registers.a | registers.c; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,C
-    table[0xB2] = -> { registers.a = registers.a | registers.d; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,D
-    table[0xB3] = -> { registers.a = registers.a | registers.e; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,E
-    table[0xB4] = -> { registers.a = registers.a | registers.h; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,H
-    table[0xB5] = -> { registers.a = registers.a | registers.l; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,L
-    table[0xB6] = -> { registers.a = registers.a | mmu.read_u8(address: registers.hl); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,(HL)
-    table[0xB7] = -> { registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 }  # OR A,A → a | aしても結果は同じ
-    table[0xF6] = -> { registers.a = registers.a | fetch_u8; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 8 }  # OR A,u8
-
-    # ============================================================
-    # 8bit 比較 - CP (Compare)
-    # ============================================================
-    table[0xB8] = -> { registers.set_flags(zero: registers.a == registers.b, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.b), carry: registers.a < registers.b); 4 }  # CP A,B
-    table[0xB9] = -> { registers.set_flags(zero: registers.a == registers.c, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.c), carry: registers.a < registers.c); 4 }  # CP A,C
-    table[0xBA] = -> { registers.set_flags(zero: registers.a == registers.d, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.d), carry: registers.a < registers.d); 4 }  # CP A,D
-    table[0xBB] = -> { registers.set_flags(zero: registers.a == registers.e, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.e), carry: registers.a < registers.e); 4 }  # CP A,E
-    table[0xBC] = -> { registers.set_flags(zero: registers.a == registers.h, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.h), carry: registers.a < registers.h); 4 }  # CP A,H
-    table[0xBD] = -> { registers.set_flags(zero: registers.a == registers.l, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.l), carry: registers.a < registers.l); 4 }  # CP A,L
-    table[0xBE] = -> { byte = mmu.read_u8(address: registers.hl); registers.set_flags(zero: registers.a == byte, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(byte), carry: registers.a < byte); 8 }  # CP A,(HL)
-    table[0xBF] = -> { registers.set_flags(zero: true, negative: true, half_carry: false, carry: false); 4 }  # CP A,A
-    table[0xFE] = -> { byte = fetch_u8; registers.set_flags(zero: registers.a == byte, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(byte), carry: registers.a < byte); 8 } # CP A,u8: Compare(比較)
-
-    # ============================================================
-    # 16bit 算術 - ADD HL / INC rr / DEC rr / ADD SP,i8
-    # ============================================================
-    # table[0x09] = -> { 8 }  # ADD HL,BC
-    # table[0x19] = -> { 8 }  # ADD HL,DE
-    # table[0x29] = -> { 8 }  # ADD HL,HL
-    # table[0x39] = -> { 8 }  # ADD HL,SP
-    table[0x03] = -> { registers.bc = Bit.wrap_u16(registers.bc + 1); 8 } # INC BC
-    table[0x13] = -> { registers.de = Bit.wrap_u16(registers.de + 1); 8 } # INC DE
-    table[0x23] = -> { registers.hl = Bit.wrap_u16(registers.hl + 1); 8 } # INC HL
-    table[0x33] = -> { registers.sp = Bit.wrap_u16(registers.sp + 1); 8 } # INC SP
     table[0x0B] = -> { registers.bc = Bit.wrap_u16(registers.bc - 1); 8 } # DEC BC
     table[0x1B] = -> { registers.de = Bit.wrap_u16(registers.de - 1); 8 } # DEC DE
     table[0x2B] = -> { registers.hl = Bit.wrap_u16(registers.hl - 1); 8 } # DEC HL
     table[0x3B] = -> { registers.sp = Bit.wrap_u16(registers.sp - 1); 8 } # DEC SP
+
+    # ============================================================
+    # 8bit 算術 - ADD A
+    # ============================================================
+    # TODO: 未実装 table[0x80] = -> { registers.a = Bit.wrap_u8(registers.a + registers.b); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # ADD A,B
+    # table[0x81] = -> { 4 } # ADD A,C
+    # table[0x82] = -> { 4 } # ADD A,D
+    # table[0x83] = -> { 4 } # ADD A,E
+    # table[0x84] = -> { 4 } # ADD A,H
+    # table[0x85] = -> { 4 } # ADD A,L
+    # table[0x86] = -> { 8 } # ADD A,(HL)
+    # table[0x87] = -> { 4 } # ADD A,A
+    # table[0xC6] = -> { 8 } # ADD A,u8
+
+    # ============================================================
+    # 16bit 算術 - ADD HL,rr (HL に rr を加算、Z は保持、N=0、H/C 計算)
+    # ============================================================
+    # table[0x09] = -> { 8 } # ADD HL,BC
+    # table[0x19] = -> { 8 } # ADD HL,DE
+    # table[0x29] = -> { 8 } # ADD HL,HL
+    # table[0x39] = -> { 8 } # ADD HL,SP
+
+    # ============================================================
+    # 16bit 算術 - ADD SP,i8 (符号付き 8bit を SP に加算、Z=N=0、H/C は下位 8bit 計算)
+    # ============================================================
     # table[0xE8] = -> { 16 } # ADD SP,i8
+
+    # ============================================================
+    # 8bit 算術 - ADC A (キャリー込み加算)
+    # ============================================================
+    # table[0x88] = -> { 4 } # ADC A,B
+    # table[0x89] = -> { 4 } # ADC A,C
+    # table[0x8A] = -> { 4 } # ADC A,D
+    # table[0x8B] = -> { 4 } # ADC A,E
+    # table[0x8C] = -> { 4 } # ADC A,H
+    # table[0x8D] = -> { 4 } # ADC A,L
+    # table[0x8E] = -> { 8 } # ADC A,(HL)
+    # table[0x8F] = -> { 4 } # ADC A,A
+    # table[0xCE] = -> { 8 } # ADC A,u8
+
+    # ============================================================
+    # 8bit 算術 - SUB A
+    # ============================================================
+    # table[0x90] = -> { 4 } # SUB A,B
+    # table[0x91] = -> { 4 } # SUB A,C
+    # table[0x92] = -> { 4 } # SUB A,D
+    # table[0x93] = -> { 4 } # SUB A,E
+    # table[0x94] = -> { 4 } # SUB A,H
+    # table[0x95] = -> { 4 } # SUB A,L
+    # table[0x96] = -> { 8 } # SUB A,(HL)
+    # table[0x97] = -> { 4 } # SUB A,A
+    # table[0xD6] = -> { 8 } # SUB A,u8
+
+    # ============================================================
+    # 8bit 算術 - SBC A (キャリー込み減算)
+    # ============================================================
+    # table[0x98] = -> { 4 } # SBC A,B
+    # table[0x99] = -> { 4 } # SBC A,C
+    # table[0x9A] = -> { 4 } # SBC A,D
+    # table[0x9B] = -> { 4 } # SBC A,E
+    # table[0x9C] = -> { 4 } # SBC A,H
+    # table[0x9D] = -> { 4 } # SBC A,L
+    # table[0x9E] = -> { 8 } # SBC A,(HL)
+    # table[0x9F] = -> { 4 } # SBC A,A
+    # table[0xDE] = -> { 8 } # SBC A,u8
+
+    # ============================================================
+    # 8bit 論理 - AND
+    # ============================================================
+    table[0xA0] = -> { registers.a = registers.a & registers.b; set_logical_and_flags(registers.a); 4 } # AND A,B
+    table[0xA1] = -> { registers.a = registers.a & registers.c; set_logical_and_flags(registers.a); 4 } # AND A,C
+    table[0xA2] = -> { registers.a = registers.a & registers.d; set_logical_and_flags(registers.a); 4 } # AND A,D
+    table[0xA3] = -> { registers.a = registers.a & registers.e; set_logical_and_flags(registers.a); 4 } # AND A,E
+    table[0xA4] = -> { registers.a = registers.a & registers.h; set_logical_and_flags(registers.a); 4 } # AND A,H
+    table[0xA5] = -> { registers.a = registers.a & registers.l; set_logical_and_flags(registers.a); 4 } # AND A,L
+    table[0xA6] = -> { registers.a = registers.a & read_at_hl; set_logical_and_flags(registers.a); 8 } # AND A,(HL)
+    table[0xA7] = -> { registers.a = registers.a & registers.a; set_logical_and_flags(registers.a); 4 } # AND A,A
+    table[0xE6] = -> { registers.a = registers.a & fetch_u8; set_logical_and_flags(registers.a); 8 } # AND A,u8
+
+    # ============================================================
+    # 8bit 論理 - XOR
+    # ============================================================
+    table[0xA8] = -> { registers.a = registers.a ^ registers.b; set_logical_flags(registers.a); 4 } # XOR A,B
+    table[0xA9] = -> { registers.a = registers.a ^ registers.c; set_logical_flags(registers.a); 4 } # XOR A,C
+    table[0xAA] = -> { registers.a = registers.a ^ registers.d; set_logical_flags(registers.a); 4 } # XOR A,D
+    table[0xAB] = -> { registers.a = registers.a ^ registers.e; set_logical_flags(registers.a); 4 } # XOR A,E
+    table[0xAC] = -> { registers.a = registers.a ^ registers.h; set_logical_flags(registers.a); 4 } # XOR A,H
+    table[0xAD] = -> { registers.a = registers.a ^ registers.l; set_logical_flags(registers.a); 4 } # XOR A,L
+    table[0xAE] = -> { registers.a = registers.a ^ read_at_hl; set_logical_flags(registers.a); 8 } # XOR A,(HL)
+    table[0xAF] = -> { registers.a = 0; set_logical_flags(registers.a); 4 } # XOR A,A
+    table[0xEE] = -> { registers.a = registers.a ^ fetch_u8; set_logical_flags(registers.a); 8 } # XOR A,u8
+
+    # ============================================================
+    # 8bit 論理 - OR
+    # ============================================================
+    table[0xB0] = -> { registers.a = registers.a | registers.b; set_logical_flags(registers.a); 4 } # OR A,B
+    table[0xB1] = -> { registers.a = registers.a | registers.c; set_logical_flags(registers.a); 4 } # OR A,C
+    table[0xB2] = -> { registers.a = registers.a | registers.d; set_logical_flags(registers.a); 4 } # OR A,D
+    table[0xB3] = -> { registers.a = registers.a | registers.e; set_logical_flags(registers.a); 4 } # OR A,E
+    table[0xB4] = -> { registers.a = registers.a | registers.h; set_logical_flags(registers.a); 4 } # OR A,H
+    table[0xB5] = -> { registers.a = registers.a | registers.l; set_logical_flags(registers.a); 4 } # OR A,L
+    table[0xB6] = -> { registers.a = registers.a | read_at_hl; set_logical_flags(registers.a); 8 } # OR A,(HL)
+    table[0xB7] = -> { set_logical_flags(registers.a); 4 } # OR A,A → a | aしても結果は同じ
+    table[0xF6] = -> { registers.a = registers.a | fetch_u8; set_logical_flags(registers.a); 8 } # OR A,u8
+
+    # ============================================================
+    # 8bit 比較 - CP (Compare)
+    # ============================================================
+    table[0xB8] = -> { registers.set_flags(zero: registers.a == registers.b, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.b), carry: registers.a < registers.b); 4 } # CP A,B
+    table[0xB9] = -> { registers.set_flags(zero: registers.a == registers.c, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.c), carry: registers.a < registers.c); 4 } # CP A,C
+    table[0xBA] = -> { registers.set_flags(zero: registers.a == registers.d, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.d), carry: registers.a < registers.d); 4 } # CP A,D
+    table[0xBB] = -> { registers.set_flags(zero: registers.a == registers.e, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.e), carry: registers.a < registers.e); 4 } # CP A,E
+    table[0xBC] = -> { registers.set_flags(zero: registers.a == registers.h, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.h), carry: registers.a < registers.h); 4 } # CP A,H
+    table[0xBD] = -> { registers.set_flags(zero: registers.a == registers.l, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(registers.l), carry: registers.a < registers.l); 4 } # CP A,L
+    table[0xBE] = -> { byte = read_at_hl; registers.set_flags(zero: registers.a == byte, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(byte), carry: registers.a < byte); 8 } # CP A,(HL)
+    table[0xBF] = -> { registers.set_flags(zero: true, negative: true, half_carry: false, carry: false); 4 } # CP A,A
+    table[0xFE] = -> { byte = fetch_u8; registers.set_flags(zero: registers.a == byte, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(byte), carry: registers.a < byte); 8 } # CP A,u8: Compare(比較)
 
     # ============================================================
     # ローテート (Aレジスタ用1バイト命令)
     # ============================================================
-    # table[0x07] = -> { 4 }  # RLCA
-    # table[0x0F] = -> { 4 }  # RRCA
-    # table[0x17] = -> { 4 }  # RLA
-    # table[0x1F] = -> { 4 }  # RRA
+    # table[0x07] = -> { 4 } # RLCA
+    # table[0x0F] = -> { 4 } # RRCA
+    # table[0x17] = -> { 4 } # RLA
+    # table[0x1F] = -> { 4 } # RRA
 
     # ============================================================
     # その他演算 (DAA / CPL / SCF / CCF)
     # ============================================================
-    # table[0x27] = -> { 4 }  # DAA
-    # table[0x2F] = -> { 4 }  # CPL
-    # table[0x37] = -> { 4 }  # SCF
-    # table[0x3F] = -> { 4 }  # CCF
+    # table[0x27] = -> { 4 } # DAA
+    # table[0x2F] = -> { 4 } # CPL
+    # table[0x37] = -> { 4 } # SCF
+    # table[0x3F] = -> { 4 } # CCF
 
     # ============================================================
     # ジャンプ - JP (絶対ジャンプ)
