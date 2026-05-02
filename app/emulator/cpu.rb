@@ -276,6 +276,14 @@ class CPU
     table[0x3C] = -> { half_carry_result = Bit.low_4bits(registers.a) + 1 > 0x0F; registers.a = Bit.wrap_u8(registers.a + 1); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
 
     # ============================================================
+    # 16bit 算術 - INC rr (フラグ全保持)
+    # ============================================================
+    table[0x03] = -> { registers.bc = Bit.wrap_u16(registers.bc + 1); 8 } # INC BC
+    table[0x13] = -> { registers.de = Bit.wrap_u16(registers.de + 1); 8 } # INC DE
+    table[0x23] = -> { registers.hl = Bit.wrap_u16(registers.hl + 1); 8 } # INC HL
+    table[0x33] = -> { registers.sp = Bit.wrap_u16(registers.sp + 1); 8 } # INC SP
+
+    # ============================================================
     # 8bit 算術 - DEC
     # ============================================================
     table[0x05] = -> { half_carry_result = Bit.low_4bits(registers.b) == 0; registers.b = Bit.wrap_u8(registers.b - 1); registers.set_flags(zero: registers.b == 0, negative: true, half_carry: half_carry_result); 4 } # DEC B
@@ -286,6 +294,14 @@ class CPU
     table[0x2D] = -> { half_carry_result = Bit.low_4bits(registers.l) == 0; registers.l = Bit.wrap_u8(registers.l - 1); registers.set_flags(zero: registers.l == 0, negative: true, half_carry: half_carry_result); 4 } # DEC L
     # table[0x35] = -> { 12 } # DEC (HL)
     table[0x3D] = -> { half_carry_result = Bit.low_4bits(registers.a) == 0; registers.a = Bit.wrap_u8(registers.a - 1); registers.set_flags(zero: registers.a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
+
+    # ============================================================
+    # 16bit 算術 - DEC rr (フラグ全保持)
+    # ============================================================
+    table[0x0B] = -> { registers.bc = Bit.wrap_u16(registers.bc - 1); 8 } # DEC BC
+    table[0x1B] = -> { registers.de = Bit.wrap_u16(registers.de - 1); 8 } # DEC DE
+    table[0x2B] = -> { registers.hl = Bit.wrap_u16(registers.hl - 1); 8 } # DEC HL
+    table[0x3B] = -> { registers.sp = Bit.wrap_u16(registers.sp - 1); 8 } # DEC SP
 
     # ============================================================
     # 8bit 算術 - ADD A
@@ -299,6 +315,19 @@ class CPU
     # table[0x86] = -> { 8 }  # ADD A,(HL)
     # table[0x87] = -> { 4 }  # ADD A,A
     # table[0xC6] = -> { 8 }  # ADD A,u8
+
+    # ============================================================
+    # 16bit 算術 - ADD HL,rr (HL に rr を加算、Z は保持、N=0、H/C 計算)
+    # ============================================================
+    # table[0x09] = -> { 8 }  # ADD HL,BC
+    # table[0x19] = -> { 8 }  # ADD HL,DE
+    # table[0x29] = -> { 8 }  # ADD HL,HL
+    # table[0x39] = -> { 8 }  # ADD HL,SP
+
+    # ============================================================
+    # 16bit 算術 - ADD SP,i8 (符号付き 8bit を SP に加算、Z=N=0、H/C は下位 8bit 計算)
+    # ============================================================
+    # table[0xE8] = -> { 16 } # ADD SP,i8
 
     # ============================================================
     # 8bit 算術 - ADC A (キャリー込み加算)
@@ -390,35 +419,6 @@ class CPU
     table[0xBE] = -> { byte = read_at_hl; registers.set_flags(zero: registers.a == byte, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(byte), carry: registers.a < byte); 8 }  # CP A,(HL)
     table[0xBF] = -> { registers.set_flags(zero: true, negative: true, half_carry: false, carry: false); 4 }  # CP A,A
     table[0xFE] = -> { byte = fetch_u8; registers.set_flags(zero: registers.a == byte, negative: true, half_carry: Bit.low_4bits(registers.a) < Bit.low_4bits(byte), carry: registers.a < byte); 8 } # CP A,u8: Compare(比較)
-
-    # ============================================================
-    # 16bit 算術 - ADD HL,rr (HL に rr を加算、Z は保持、N=0、H/C 計算)
-    # ============================================================
-    # table[0x09] = -> { 8 }  # ADD HL,BC
-    # table[0x19] = -> { 8 }  # ADD HL,DE
-    # table[0x29] = -> { 8 }  # ADD HL,HL
-    # table[0x39] = -> { 8 }  # ADD HL,SP
-
-    # ============================================================
-    # 16bit 算術 - INC rr (フラグ全保持)
-    # ============================================================
-    table[0x03] = -> { registers.bc = Bit.wrap_u16(registers.bc + 1); 8 } # INC BC
-    table[0x13] = -> { registers.de = Bit.wrap_u16(registers.de + 1); 8 } # INC DE
-    table[0x23] = -> { registers.hl = Bit.wrap_u16(registers.hl + 1); 8 } # INC HL
-    table[0x33] = -> { registers.sp = Bit.wrap_u16(registers.sp + 1); 8 } # INC SP
-
-    # ============================================================
-    # 16bit 算術 - DEC rr (フラグ全保持)
-    # ============================================================
-    table[0x0B] = -> { registers.bc = Bit.wrap_u16(registers.bc - 1); 8 } # DEC BC
-    table[0x1B] = -> { registers.de = Bit.wrap_u16(registers.de - 1); 8 } # DEC DE
-    table[0x2B] = -> { registers.hl = Bit.wrap_u16(registers.hl - 1); 8 } # DEC HL
-    table[0x3B] = -> { registers.sp = Bit.wrap_u16(registers.sp - 1); 8 } # DEC SP
-
-    # ============================================================
-    # 16bit 算術 - ADD SP,i8 (符号付き 8bit を SP に加算、Z=N=0、H/C は下位 8bit 計算)
-    # ============================================================
-    # table[0xE8] = -> { 16 } # ADD SP,i8
 
     # ============================================================
     # ローテート (Aレジスタ用1バイト命令)
