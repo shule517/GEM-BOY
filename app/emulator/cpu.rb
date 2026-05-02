@@ -669,12 +669,12 @@ class CPU
     # cb_table[0x64] = -> { 8 }  # BIT 4,H
     # cb_table[0x65] = -> { 8 }  # BIT 4,L
     # cb_table[0x66] = -> { 12 } # BIT 4,(HL)
-    # cb_table[0x67] = -> { 8 }  # BIT 4,A
-    # cb_table[0x68] = -> { 8 }  # BIT 5,B
-    # cb_table[0x69] = -> { 8 }  # BIT 5,C
-    # cb_table[0x6A] = -> { 8 }  # BIT 5,D
-    # cb_table[0x6B] = -> { 8 }  # BIT 5,E
-    cb_table[0x6C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,H: bit5 が 0 なら Z=1。N=0、H=1、C=保持
+    cb_table[0x67] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 4) == 0, negative: false, half_carry: true); 8 } # BIT 4,A
+    cb_table[0x68] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,B: bit5 が 0 なら Z=1。N=0、H=1、C=保持
+    cb_table[0x69] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,C
+    cb_table[0x6A] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,D
+    cb_table[0x6B] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,E
+    cb_table[0x6C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,H
     # cb_table[0x6D] = -> { 8 }  # BIT 5,L
     # cb_table[0x6E] = -> { 12 } # BIT 5,(HL)
     # cb_table[0x6F] = -> { 8 }  # BIT 5,A
