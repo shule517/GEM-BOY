@@ -41,7 +41,7 @@ class CpuRegisters
               :pc # プログラムカウンタ 今メモリのどこを読んでいるか
 
   def a=(value); @a = Bit.wrap_u8(value); end
-  def f=(value); @f = Bit.wrap_u8(value); end
+  def f=(value); @f = value & 0b11110000; end # Flagは上位4bitしか更新しない
   def b=(value); @b = Bit.wrap_u8(value); end
   def c=(value); @c = Bit.wrap_u8(value); end
   def d=(value); @d = Bit.wrap_u8(value); end

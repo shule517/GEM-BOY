@@ -269,13 +269,13 @@ class CPU
     # ============================================================
     # スタック - PUSH / POP
     # ============================================================
-    # table[0xC1] = -> { 12 } # POP BC
-    # table[0xD1] = -> { 12 } # POP DE
-    # table[0xE1] = -> { 12 } # POP HL
+    table[0xC1] = -> { registers.c = read_at_sp; registers.sp_increment; registers.b = read_at_sp; registers.sp_increment; 12 } # POP BC
+    table[0xD1] = -> { registers.e = read_at_sp; registers.sp_increment; registers.d = read_at_sp; registers.sp_increment; 12 } # POP DE
+    table[0xE1] = -> { registers.l = read_at_sp; registers.sp_increment; registers.h = read_at_sp; registers.sp_increment; 12 } # POP HL
     table[0xF1] = -> { registers.f = read_at_sp; registers.sp_increment; registers.a = read_at_sp; registers.sp_increment; 12 } # POP AF
-    # table[0xC5] = -> { 16 } # PUSH BC
-    # table[0xD5] = -> { 16 } # PUSH DE
-    # table[0xE5] = -> { 16 } # PUSH HL
+    table[0xC5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.b); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.c); 16 } # PUSH BC
+    table[0xD5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.d); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.e); 16 } # PUSH DE
+    table[0xE5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.h); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.l); 16 } # PUSH HL
     table[0xF5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.a); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.f); 16 } # PUSH AF
 
     # ============================================================
@@ -638,206 +638,206 @@ class CPU
     # CB-prefix - BIT n,r (r の bit n を Z にコピー、N=0、H=1、C は保持)
     # (HL) 版だけ 12 サイクル (RES/SET の (HL) 16 と違うので注意)
     # ============================================================
-    cb_table[0x40] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 0) == 0, negative: false, half_carry: true); 8 }  # BIT 0,B
-    cb_table[0x41] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 0) == 0, negative: false, half_carry: true); 8 }  # BIT 0,C
-    cb_table[0x42] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 0) == 0, negative: false, half_carry: true); 8 }  # BIT 0,D
-    cb_table[0x43] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 0) == 0, negative: false, half_carry: true); 8 }  # BIT 0,E
-    cb_table[0x44] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 0) == 0, negative: false, half_carry: true); 8 }  # BIT 0,H
-    cb_table[0x45] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 0) == 0, negative: false, half_carry: true); 8 }  # BIT 0,L
-    # cb_table[0x46] = -> { 12 } # BIT 0,(HL)
-    cb_table[0x47] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 0) == 0, negative: false, half_carry: true); 8 }  # BIT 0,A
-    cb_table[0x48] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 1) == 0, negative: false, half_carry: true); 8 }  # BIT 1,B
-    cb_table[0x49] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 1) == 0, negative: false, half_carry: true); 8 }  # BIT 1,C
-    cb_table[0x4A] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 1) == 0, negative: false, half_carry: true); 8 }  # BIT 1,D
-    cb_table[0x4B] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 1) == 0, negative: false, half_carry: true); 8 }  # BIT 1,E
-    cb_table[0x4C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 1) == 0, negative: false, half_carry: true); 8 }  # BIT 1,H
-    cb_table[0x4D] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 1) == 0, negative: false, half_carry: true); 8 }  # BIT 1,L
-    # cb_table[0x4E] = -> { 12 } # BIT 1,(HL)
-    cb_table[0x4F] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 1) == 0, negative: false, half_carry: true); 8 }  # BIT 1,A
-    cb_table[0x50] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 2) == 0, negative: false, half_carry: true); 8 }  # BIT 2,B
-    cb_table[0x51] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 2) == 0, negative: false, half_carry: true); 8 }  # BIT 2,C
-    cb_table[0x52] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 2) == 0, negative: false, half_carry: true); 8 }  # BIT 2,D
-    cb_table[0x53] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 2) == 0, negative: false, half_carry: true); 8 }  # BIT 2,E
-    cb_table[0x54] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 2) == 0, negative: false, half_carry: true); 8 }  # BIT 2,H
-    cb_table[0x55] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 2) == 0, negative: false, half_carry: true); 8 }  # BIT 2,L
-    # cb_table[0x56] = -> { 12 } # BIT 2,(HL)
-    cb_table[0x57] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 2) == 0, negative: false, half_carry: true); 8 }  # BIT 2,A
-    cb_table[0x58] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 3) == 0, negative: false, half_carry: true); 8 }  # BIT 3,B
-    cb_table[0x59] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 3) == 0, negative: false, half_carry: true); 8 }  # BIT 3,C
-    cb_table[0x5A] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 3) == 0, negative: false, half_carry: true); 8 }  # BIT 3,D
-    cb_table[0x5B] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 3) == 0, negative: false, half_carry: true); 8 }  # BIT 3,E
-    cb_table[0x5C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 3) == 0, negative: false, half_carry: true); 8 }  # BIT 3,H
-    cb_table[0x5D] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 3) == 0, negative: false, half_carry: true); 8 }  # BIT 3,L
-    # cb_table[0x5E] = -> { 12 } # BIT 3,(HL)
-    cb_table[0x5F] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 3) == 0, negative: false, half_carry: true); 8 }  # BIT 3,A
-    cb_table[0x60] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 4) == 0, negative: false, half_carry: true); 8 }  # BIT 4,B
-    cb_table[0x61] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 4) == 0, negative: false, half_carry: true); 8 }  # BIT 4,C
-    cb_table[0x62] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 4) == 0, negative: false, half_carry: true); 8 }  # BIT 4,D
-    cb_table[0x63] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 4) == 0, negative: false, half_carry: true); 8 }  # BIT 4,E
-    cb_table[0x64] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 4) == 0, negative: false, half_carry: true); 8 }  # BIT 4,H
-    cb_table[0x65] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 4) == 0, negative: false, half_carry: true); 8 }  # BIT 4,L
-    # cb_table[0x66] = -> { 12 } # BIT 4,(HL)
+    cb_table[0x40] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 0) == 0, negative: false, half_carry: true); 8 } # BIT 0,B
+    cb_table[0x41] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 0) == 0, negative: false, half_carry: true); 8 } # BIT 0,C
+    cb_table[0x42] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 0) == 0, negative: false, half_carry: true); 8 } # BIT 0,D
+    cb_table[0x43] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 0) == 0, negative: false, half_carry: true); 8 } # BIT 0,E
+    cb_table[0x44] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 0) == 0, negative: false, half_carry: true); 8 } # BIT 0,H
+    cb_table[0x45] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 0) == 0, negative: false, half_carry: true); 8 } # BIT 0,L
+    cb_table[0x46] = -> { registers.set_flags(zero: Bit.bit_at(read_at_hl, 0) == 0, negative: false, half_carry: true); 12 } # BIT 0,(HL)
+    cb_table[0x47] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 0) == 0, negative: false, half_carry: true); 8 } # BIT 0,A
+    cb_table[0x48] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 1) == 0, negative: false, half_carry: true); 8 } # BIT 1,B
+    cb_table[0x49] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 1) == 0, negative: false, half_carry: true); 8 } # BIT 1,C
+    cb_table[0x4A] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 1) == 0, negative: false, half_carry: true); 8 } # BIT 1,D
+    cb_table[0x4B] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 1) == 0, negative: false, half_carry: true); 8 } # BIT 1,E
+    cb_table[0x4C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 1) == 0, negative: false, half_carry: true); 8 } # BIT 1,H
+    cb_table[0x4D] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 1) == 0, negative: false, half_carry: true); 8 } # BIT 1,L
+    cb_table[0x4E] = -> { registers.set_flags(zero: Bit.bit_at(read_at_hl, 1) == 0, negative: false, half_carry: true); 12 } # BIT 1,(HL)
+    cb_table[0x4F] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 1) == 0, negative: false, half_carry: true); 8 } # BIT 1,A
+    cb_table[0x50] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 2) == 0, negative: false, half_carry: true); 8 } # BIT 2,B
+    cb_table[0x51] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 2) == 0, negative: false, half_carry: true); 8 } # BIT 2,C
+    cb_table[0x52] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 2) == 0, negative: false, half_carry: true); 8 } # BIT 2,D
+    cb_table[0x53] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 2) == 0, negative: false, half_carry: true); 8 } # BIT 2,E
+    cb_table[0x54] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 2) == 0, negative: false, half_carry: true); 8 } # BIT 2,H
+    cb_table[0x55] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 2) == 0, negative: false, half_carry: true); 8 } # BIT 2,L
+    cb_table[0x56] = -> { registers.set_flags(zero: Bit.bit_at(read_at_hl, 2) == 0, negative: false, half_carry: true); 12 } # BIT 2,(HL)
+    cb_table[0x57] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 2) == 0, negative: false, half_carry: true); 8 } # BIT 2,A
+    cb_table[0x58] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 3) == 0, negative: false, half_carry: true); 8 } # BIT 3,B
+    cb_table[0x59] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 3) == 0, negative: false, half_carry: true); 8 } # BIT 3,C
+    cb_table[0x5A] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 3) == 0, negative: false, half_carry: true); 8 } # BIT 3,D
+    cb_table[0x5B] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 3) == 0, negative: false, half_carry: true); 8 } # BIT 3,E
+    cb_table[0x5C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 3) == 0, negative: false, half_carry: true); 8 } # BIT 3,H
+    cb_table[0x5D] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 3) == 0, negative: false, half_carry: true); 8 } # BIT 3,L
+    cb_table[0x5E] = -> { registers.set_flags(zero: Bit.bit_at(read_at_hl, 3) == 0, negative: false, half_carry: true); 12 } # BIT 3,(HL)
+    cb_table[0x5F] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 3) == 0, negative: false, half_carry: true); 8 } # BIT 3,A
+    cb_table[0x60] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 4) == 0, negative: false, half_carry: true); 8 } # BIT 4,B
+    cb_table[0x61] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 4) == 0, negative: false, half_carry: true); 8 } # BIT 4,C
+    cb_table[0x62] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 4) == 0, negative: false, half_carry: true); 8 } # BIT 4,D
+    cb_table[0x63] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 4) == 0, negative: false, half_carry: true); 8 } # BIT 4,E
+    cb_table[0x64] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 4) == 0, negative: false, half_carry: true); 8 } # BIT 4,H
+    cb_table[0x65] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 4) == 0, negative: false, half_carry: true); 8 } # BIT 4,L
+    cb_table[0x66] = -> { registers.set_flags(zero: Bit.bit_at(read_at_hl, 4) == 0, negative: false, half_carry: true); 12 } # BIT 4,(HL)
     cb_table[0x67] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 4) == 0, negative: false, half_carry: true); 8 } # BIT 4,A
     cb_table[0x68] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,B: bit5 が 0 なら Z=1。N=0、H=1、C=保持
     cb_table[0x69] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,C
     cb_table[0x6A] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,D
     cb_table[0x6B] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,E
     cb_table[0x6C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,H
-    cb_table[0x6D] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 5) == 0, negative: false, half_carry: true); 8 }  # BIT 5,L
-    # cb_table[0x6E] = -> { 12 } # BIT 5,(HL)
-    cb_table[0x6F] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 5) == 0, negative: false, half_carry: true); 8 }  # BIT 5,A
-    cb_table[0x70] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 6) == 0, negative: false, half_carry: true); 8 }  # BIT 6,B
-    cb_table[0x71] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 6) == 0, negative: false, half_carry: true); 8 }  # BIT 6,C
-    cb_table[0x72] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 6) == 0, negative: false, half_carry: true); 8 }  # BIT 6,D
-    cb_table[0x73] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 6) == 0, negative: false, half_carry: true); 8 }  # BIT 6,E
-    cb_table[0x74] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 6) == 0, negative: false, half_carry: true); 8 }  # BIT 6,H
-    cb_table[0x75] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 6) == 0, negative: false, half_carry: true); 8 }  # BIT 6,L
-    # cb_table[0x76] = -> { 12 } # BIT 6,(HL)
-    cb_table[0x77] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 6) == 0, negative: false, half_carry: true); 8 }  # BIT 6,A
-    cb_table[0x78] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 7) == 0, negative: false, half_carry: true); 8 }  # BIT 7,B
-    cb_table[0x79] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 7) == 0, negative: false, half_carry: true); 8 }  # BIT 7,C
-    cb_table[0x7A] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 7) == 0, negative: false, half_carry: true); 8 }  # BIT 7,D
-    cb_table[0x7B] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 7) == 0, negative: false, half_carry: true); 8 }  # BIT 7,E
-    cb_table[0x7C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 7) == 0, negative: false, half_carry: true); 8 }  # BIT 7,H
-    cb_table[0x7D] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 7) == 0, negative: false, half_carry: true); 8 }  # BIT 7,L
-    # cb_table[0x7E] = -> { 12 } # BIT 7,(HL)
-    cb_table[0x7F] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 7) == 0, negative: false, half_carry: true); 8 }  # BIT 7,A
+    cb_table[0x6D] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,L
+    cb_table[0x6E] = -> { registers.set_flags(zero: Bit.bit_at(read_at_hl, 5) == 0, negative: false, half_carry: true); 12 } # BIT 5,(HL)
+    cb_table[0x6F] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 5) == 0, negative: false, half_carry: true); 8 } # BIT 5,A
+    cb_table[0x70] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 6) == 0, negative: false, half_carry: true); 8 } # BIT 6,B
+    cb_table[0x71] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 6) == 0, negative: false, half_carry: true); 8 } # BIT 6,C
+    cb_table[0x72] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 6) == 0, negative: false, half_carry: true); 8 } # BIT 6,D
+    cb_table[0x73] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 6) == 0, negative: false, half_carry: true); 8 } # BIT 6,E
+    cb_table[0x74] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 6) == 0, negative: false, half_carry: true); 8 } # BIT 6,H
+    cb_table[0x75] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 6) == 0, negative: false, half_carry: true); 8 } # BIT 6,L
+    cb_table[0x76] = -> { registers.set_flags(zero: Bit.bit_at(read_at_hl, 6) == 0, negative: false, half_carry: true); 12 } # BIT 6,(HL)
+    cb_table[0x77] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 6) == 0, negative: false, half_carry: true); 8 } # BIT 6,A
+    cb_table[0x78] = -> { registers.set_flags(zero: Bit.bit_at(registers.b, 7) == 0, negative: false, half_carry: true); 8 } # BIT 7,B
+    cb_table[0x79] = -> { registers.set_flags(zero: Bit.bit_at(registers.c, 7) == 0, negative: false, half_carry: true); 8 } # BIT 7,C
+    cb_table[0x7A] = -> { registers.set_flags(zero: Bit.bit_at(registers.d, 7) == 0, negative: false, half_carry: true); 8 } # BIT 7,D
+    cb_table[0x7B] = -> { registers.set_flags(zero: Bit.bit_at(registers.e, 7) == 0, negative: false, half_carry: true); 8 } # BIT 7,E
+    cb_table[0x7C] = -> { registers.set_flags(zero: Bit.bit_at(registers.h, 7) == 0, negative: false, half_carry: true); 8 } # BIT 7,H
+    cb_table[0x7D] = -> { registers.set_flags(zero: Bit.bit_at(registers.l, 7) == 0, negative: false, half_carry: true); 8 } # BIT 7,L
+    cb_table[0x7E] = -> { registers.set_flags(zero: Bit.bit_at(read_at_hl, 7) == 0, negative: false, half_carry: true); 12 } # BIT 7,(HL)
+    cb_table[0x7F] = -> { registers.set_flags(zero: Bit.bit_at(registers.a, 7) == 0, negative: false, half_carry: true); 8 } # BIT 7,A
 
     # ============================================================
     # CB-prefix - RES n,r (r の bit n を 0 にクリア、フラグ変化なし)
     # ============================================================
-    cb_table[0x80] = -> { registers.b = Bit.set_bit(registers.b, 0, 0); 8 }  # RES 0,B
-    cb_table[0x81] = -> { registers.c = Bit.set_bit(registers.c, 0, 0); 8 }  # RES 0,C
-    cb_table[0x82] = -> { registers.d = Bit.set_bit(registers.d, 0, 0); 8 }  # RES 0,D
-    cb_table[0x83] = -> { registers.e = Bit.set_bit(registers.e, 0, 0); 8 }  # RES 0,E
-    cb_table[0x84] = -> { registers.h = Bit.set_bit(registers.h, 0, 0); 8 }  # RES 0,H
-    cb_table[0x85] = -> { registers.l = Bit.set_bit(registers.l, 0, 0); 8 }  # RES 0,L
-    # cb_table[0x86] = -> { 16 } # RES 0,(HL)
-    cb_table[0x87] = -> { registers.a = Bit.set_bit(registers.a, 0, 0); 8 }  # RES 0,A
-    cb_table[0x88] = -> { registers.b = Bit.set_bit(registers.b, 1, 0); 8 }  # RES 1,B
-    cb_table[0x89] = -> { registers.c = Bit.set_bit(registers.c, 1, 0); 8 }  # RES 1,C
-    cb_table[0x8A] = -> { registers.d = Bit.set_bit(registers.d, 1, 0); 8 }  # RES 1,D
-    cb_table[0x8B] = -> { registers.e = Bit.set_bit(registers.e, 1, 0); 8 }  # RES 1,E
-    cb_table[0x8C] = -> { registers.h = Bit.set_bit(registers.h, 1, 0); 8 }  # RES 1,H
-    cb_table[0x8D] = -> { registers.l = Bit.set_bit(registers.l, 1, 0); 8 }  # RES 1,L
-    # cb_table[0x8E] = -> { 16 } # RES 1,(HL)
-    cb_table[0x8F] = -> { registers.a = Bit.set_bit(registers.a, 1, 0); 8 }  # RES 1,A
-    cb_table[0x90] = -> { registers.b = Bit.set_bit(registers.b, 2, 0); 8 }  # RES 2,B
-    cb_table[0x91] = -> { registers.c = Bit.set_bit(registers.c, 2, 0); 8 }  # RES 2,C
-    cb_table[0x92] = -> { registers.d = Bit.set_bit(registers.d, 2, 0); 8 }  # RES 2,D
-    cb_table[0x93] = -> { registers.e = Bit.set_bit(registers.e, 2, 0); 8 }  # RES 2,E
-    cb_table[0x94] = -> { registers.h = Bit.set_bit(registers.h, 2, 0); 8 }  # RES 2,H
-    cb_table[0x95] = -> { registers.l = Bit.set_bit(registers.l, 2, 0); 8 }  # RES 2,L
-    # cb_table[0x96] = -> { 16 } # RES 2,(HL)
-    cb_table[0x97] = -> { registers.a = Bit.set_bit(registers.a, 2, 0); 8 }  # RES 2,A
-    cb_table[0x98] = -> { registers.b = Bit.set_bit(registers.b, 3, 0); 8 }  # RES 3,B
-    cb_table[0x99] = -> { registers.c = Bit.set_bit(registers.c, 3, 0); 8 }  # RES 3,C
-    cb_table[0x9A] = -> { registers.d = Bit.set_bit(registers.d, 3, 0); 8 }  # RES 3,D
-    cb_table[0x9B] = -> { registers.e = Bit.set_bit(registers.e, 3, 0); 8 }  # RES 3,E
-    cb_table[0x9C] = -> { registers.h = Bit.set_bit(registers.h, 3, 0); 8 }  # RES 3,H
-    cb_table[0x9D] = -> { registers.l = Bit.set_bit(registers.l, 3, 0); 8 }  # RES 3,L
-    # cb_table[0x9E] = -> { 16 } # RES 3,(HL)
-    cb_table[0x9F] = -> { registers.a = Bit.set_bit(registers.a, 3, 0); 8 }  # RES 3,A
-    cb_table[0xA0] = -> { registers.b = Bit.set_bit(registers.b, 4, 0); 8 }  # RES 4,B
-    cb_table[0xA1] = -> { registers.c = Bit.set_bit(registers.c, 4, 0); 8 }  # RES 4,C
-    cb_table[0xA2] = -> { registers.d = Bit.set_bit(registers.d, 4, 0); 8 }  # RES 4,D
-    cb_table[0xA3] = -> { registers.e = Bit.set_bit(registers.e, 4, 0); 8 }  # RES 4,E
-    cb_table[0xA4] = -> { registers.h = Bit.set_bit(registers.h, 4, 0); 8 }  # RES 4,H
-    cb_table[0xA5] = -> { registers.l = Bit.set_bit(registers.l, 4, 0); 8 }  # RES 4,L
-    # cb_table[0xA6] = -> { 16 } # RES 4,(HL)
-    cb_table[0xA7] = -> { registers.a = Bit.set_bit(registers.a, 4, 0); 8 }  # RES 4,A
-    cb_table[0xA8] = -> { registers.b = Bit.set_bit(registers.b, 5, 0); 8 }  # RES 5,B
-    cb_table[0xA9] = -> { registers.c = Bit.set_bit(registers.c, 5, 0); 8 }  # RES 5,C
-    cb_table[0xAA] = -> { registers.d = Bit.set_bit(registers.d, 5, 0); 8 }  # RES 5,D
-    cb_table[0xAB] = -> { registers.e = Bit.set_bit(registers.e, 5, 0); 8 }  # RES 5,E
-    cb_table[0xAC] = -> { registers.h = Bit.set_bit(registers.h, 5, 0); 8 }  # RES 5,H
-    cb_table[0xAD] = -> { registers.l = Bit.set_bit(registers.l, 5, 0); 8 }  # RES 5,L
-    # cb_table[0xAE] = -> { 16 } # RES 5,(HL)
-    cb_table[0xAF] = -> { registers.a = Bit.set_bit(registers.a, 5, 0); 8 }  # RES 5,A
-    cb_table[0xB0] = -> { registers.b = Bit.set_bit(registers.b, 6, 0); 8 }  # RES 6,B
-    cb_table[0xB1] = -> { registers.c = Bit.set_bit(registers.c, 6, 0); 8 }  # RES 6,C
-    cb_table[0xB2] = -> { registers.d = Bit.set_bit(registers.d, 6, 0); 8 }  # RES 6,D
-    cb_table[0xB3] = -> { registers.e = Bit.set_bit(registers.e, 6, 0); 8 }  # RES 6,E
-    cb_table[0xB4] = -> { registers.h = Bit.set_bit(registers.h, 6, 0); 8 }  # RES 6,H
-    cb_table[0xB5] = -> { registers.l = Bit.set_bit(registers.l, 6, 0); 8 }  # RES 6,L
-    # cb_table[0xB6] = -> { 16 } # RES 6,(HL)
-    cb_table[0xB7] = -> { registers.a = Bit.set_bit(registers.a, 6, 0); 8 }  # RES 6,A
-    cb_table[0xB8] = -> { registers.b = Bit.set_bit(registers.b, 7, 0); 8 }  # RES 7,B
-    cb_table[0xB9] = -> { registers.c = Bit.set_bit(registers.c, 7, 0); 8 }  # RES 7,C
-    cb_table[0xBA] = -> { registers.d = Bit.set_bit(registers.d, 7, 0); 8 }  # RES 7,D
-    cb_table[0xBB] = -> { registers.e = Bit.set_bit(registers.e, 7, 0); 8 }  # RES 7,E
-    cb_table[0xBC] = -> { registers.h = Bit.set_bit(registers.h, 7, 0); 8 }  # RES 7,H
-    cb_table[0xBD] = -> { registers.l = Bit.set_bit(registers.l, 7, 0); 8 }  # RES 7,L
-    # cb_table[0xBE] = -> { 16 } # RES 7,(HL)
-    cb_table[0xBF] = -> { registers.a = Bit.set_bit(registers.a, 7, 0); 8 }  # RES 7,A
+    cb_table[0x80] = -> { registers.b = Bit.set_bit(registers.b, 0, 0); 8 } # RES 0,B
+    cb_table[0x81] = -> { registers.c = Bit.set_bit(registers.c, 0, 0); 8 } # RES 0,C
+    cb_table[0x82] = -> { registers.d = Bit.set_bit(registers.d, 0, 0); 8 } # RES 0,D
+    cb_table[0x83] = -> { registers.e = Bit.set_bit(registers.e, 0, 0); 8 } # RES 0,E
+    cb_table[0x84] = -> { registers.h = Bit.set_bit(registers.h, 0, 0); 8 } # RES 0,H
+    cb_table[0x85] = -> { registers.l = Bit.set_bit(registers.l, 0, 0); 8 } # RES 0,L
+    cb_table[0x86] = -> { write_at_hl(Bit.set_bit(read_at_hl, 0, 0)); 16 } # RES 0,(HL)
+    cb_table[0x87] = -> { registers.a = Bit.set_bit(registers.a, 0, 0); 8 } # RES 0,A
+    cb_table[0x88] = -> { registers.b = Bit.set_bit(registers.b, 1, 0); 8 } # RES 1,B
+    cb_table[0x89] = -> { registers.c = Bit.set_bit(registers.c, 1, 0); 8 } # RES 1,C
+    cb_table[0x8A] = -> { registers.d = Bit.set_bit(registers.d, 1, 0); 8 } # RES 1,D
+    cb_table[0x8B] = -> { registers.e = Bit.set_bit(registers.e, 1, 0); 8 } # RES 1,E
+    cb_table[0x8C] = -> { registers.h = Bit.set_bit(registers.h, 1, 0); 8 } # RES 1,H
+    cb_table[0x8D] = -> { registers.l = Bit.set_bit(registers.l, 1, 0); 8 } # RES 1,L
+    cb_table[0x8E] = -> { write_at_hl(Bit.set_bit(read_at_hl, 1, 0)); 16 } # RES 1,(HL)
+    cb_table[0x8F] = -> { registers.a = Bit.set_bit(registers.a, 1, 0); 8 } # RES 1,A
+    cb_table[0x90] = -> { registers.b = Bit.set_bit(registers.b, 2, 0); 8 } # RES 2,B
+    cb_table[0x91] = -> { registers.c = Bit.set_bit(registers.c, 2, 0); 8 } # RES 2,C
+    cb_table[0x92] = -> { registers.d = Bit.set_bit(registers.d, 2, 0); 8 } # RES 2,D
+    cb_table[0x93] = -> { registers.e = Bit.set_bit(registers.e, 2, 0); 8 } # RES 2,E
+    cb_table[0x94] = -> { registers.h = Bit.set_bit(registers.h, 2, 0); 8 } # RES 2,H
+    cb_table[0x95] = -> { registers.l = Bit.set_bit(registers.l, 2, 0); 8 } # RES 2,L
+    cb_table[0x96] = -> { write_at_hl(Bit.set_bit(read_at_hl, 2, 0)); 16 } # RES 2,(HL)
+    cb_table[0x97] = -> { registers.a = Bit.set_bit(registers.a, 2, 0); 8 } # RES 2,A
+    cb_table[0x98] = -> { registers.b = Bit.set_bit(registers.b, 3, 0); 8 } # RES 3,B
+    cb_table[0x99] = -> { registers.c = Bit.set_bit(registers.c, 3, 0); 8 } # RES 3,C
+    cb_table[0x9A] = -> { registers.d = Bit.set_bit(registers.d, 3, 0); 8 } # RES 3,D
+    cb_table[0x9B] = -> { registers.e = Bit.set_bit(registers.e, 3, 0); 8 } # RES 3,E
+    cb_table[0x9C] = -> { registers.h = Bit.set_bit(registers.h, 3, 0); 8 } # RES 3,H
+    cb_table[0x9D] = -> { registers.l = Bit.set_bit(registers.l, 3, 0); 8 } # RES 3,L
+    cb_table[0x9E] = -> { write_at_hl(Bit.set_bit(read_at_hl, 3, 0)); 16 } # RES 3,(HL)
+    cb_table[0x9F] = -> { registers.a = Bit.set_bit(registers.a, 3, 0); 8 } # RES 3,A
+    cb_table[0xA0] = -> { registers.b = Bit.set_bit(registers.b, 4, 0); 8 } # RES 4,B
+    cb_table[0xA1] = -> { registers.c = Bit.set_bit(registers.c, 4, 0); 8 } # RES 4,C
+    cb_table[0xA2] = -> { registers.d = Bit.set_bit(registers.d, 4, 0); 8 } # RES 4,D
+    cb_table[0xA3] = -> { registers.e = Bit.set_bit(registers.e, 4, 0); 8 } # RES 4,E
+    cb_table[0xA4] = -> { registers.h = Bit.set_bit(registers.h, 4, 0); 8 } # RES 4,H
+    cb_table[0xA5] = -> { registers.l = Bit.set_bit(registers.l, 4, 0); 8 } # RES 4,L
+    cb_table[0xA6] = -> { write_at_hl(Bit.set_bit(read_at_hl, 4, 0)); 16 } # RES 4,(HL)
+    cb_table[0xA7] = -> { registers.a = Bit.set_bit(registers.a, 4, 0); 8 } # RES 4,A
+    cb_table[0xA8] = -> { registers.b = Bit.set_bit(registers.b, 5, 0); 8 } # RES 5,B
+    cb_table[0xA9] = -> { registers.c = Bit.set_bit(registers.c, 5, 0); 8 } # RES 5,C
+    cb_table[0xAA] = -> { registers.d = Bit.set_bit(registers.d, 5, 0); 8 } # RES 5,D
+    cb_table[0xAB] = -> { registers.e = Bit.set_bit(registers.e, 5, 0); 8 } # RES 5,E
+    cb_table[0xAC] = -> { registers.h = Bit.set_bit(registers.h, 5, 0); 8 } # RES 5,H
+    cb_table[0xAD] = -> { registers.l = Bit.set_bit(registers.l, 5, 0); 8 } # RES 5,L
+    cb_table[0xAE] = -> { write_at_hl(Bit.set_bit(read_at_hl, 5, 0)); 16 } # RES 5,(HL)
+    cb_table[0xAF] = -> { registers.a = Bit.set_bit(registers.a, 5, 0); 8 } # RES 5,A
+    cb_table[0xB0] = -> { registers.b = Bit.set_bit(registers.b, 6, 0); 8 } # RES 6,B
+    cb_table[0xB1] = -> { registers.c = Bit.set_bit(registers.c, 6, 0); 8 } # RES 6,C
+    cb_table[0xB2] = -> { registers.d = Bit.set_bit(registers.d, 6, 0); 8 } # RES 6,D
+    cb_table[0xB3] = -> { registers.e = Bit.set_bit(registers.e, 6, 0); 8 } # RES 6,E
+    cb_table[0xB4] = -> { registers.h = Bit.set_bit(registers.h, 6, 0); 8 } # RES 6,H
+    cb_table[0xB5] = -> { registers.l = Bit.set_bit(registers.l, 6, 0); 8 } # RES 6,L
+    cb_table[0xB6] = -> { write_at_hl(Bit.set_bit(read_at_hl, 6, 0)); 16 } # RES 6,(HL)
+    cb_table[0xB7] = -> { registers.a = Bit.set_bit(registers.a, 6, 0); 8 } # RES 6,A
+    cb_table[0xB8] = -> { registers.b = Bit.set_bit(registers.b, 7, 0); 8 } # RES 7,B
+    cb_table[0xB9] = -> { registers.c = Bit.set_bit(registers.c, 7, 0); 8 } # RES 7,C
+    cb_table[0xBA] = -> { registers.d = Bit.set_bit(registers.d, 7, 0); 8 } # RES 7,D
+    cb_table[0xBB] = -> { registers.e = Bit.set_bit(registers.e, 7, 0); 8 } # RES 7,E
+    cb_table[0xBC] = -> { registers.h = Bit.set_bit(registers.h, 7, 0); 8 } # RES 7,H
+    cb_table[0xBD] = -> { registers.l = Bit.set_bit(registers.l, 7, 0); 8 } # RES 7,L
+    cb_table[0xBE] = -> { write_at_hl(Bit.set_bit(read_at_hl, 7, 0)); 16 } # RES 7,(HL)
+    cb_table[0xBF] = -> { registers.a = Bit.set_bit(registers.a, 7, 0); 8 } # RES 7,A
 
     # ============================================================
     # CB-prefix - SET n,r (r の bit n を 1 にセット、フラグ変化なし)
     # ============================================================
-    cb_table[0xC0] = -> { registers.b = Bit.set_bit(registers.b, 0, 1); 8 }  # SET 0,B
-    cb_table[0xC1] = -> { registers.c = Bit.set_bit(registers.c, 0, 1); 8 }  # SET 0,C
-    cb_table[0xC2] = -> { registers.d = Bit.set_bit(registers.d, 0, 1); 8 }  # SET 0,D
-    cb_table[0xC3] = -> { registers.e = Bit.set_bit(registers.e, 0, 1); 8 }  # SET 0,E
-    cb_table[0xC4] = -> { registers.h = Bit.set_bit(registers.h, 0, 1); 8 }  # SET 0,H
-    cb_table[0xC5] = -> { registers.l = Bit.set_bit(registers.l, 0, 1); 8 }  # SET 0,L
+    cb_table[0xC0] = -> { registers.b = Bit.set_bit(registers.b, 0, 1); 8 } # SET 0,B
+    cb_table[0xC1] = -> { registers.c = Bit.set_bit(registers.c, 0, 1); 8 } # SET 0,C
+    cb_table[0xC2] = -> { registers.d = Bit.set_bit(registers.d, 0, 1); 8 } # SET 0,D
+    cb_table[0xC3] = -> { registers.e = Bit.set_bit(registers.e, 0, 1); 8 } # SET 0,E
+    cb_table[0xC4] = -> { registers.h = Bit.set_bit(registers.h, 0, 1); 8 } # SET 0,H
+    cb_table[0xC5] = -> { registers.l = Bit.set_bit(registers.l, 0, 1); 8 } # SET 0,L
     # cb_table[0xC6] = -> { 16 } # SET 0,(HL)
-    cb_table[0xC7] = -> { registers.a = Bit.set_bit(registers.a, 0, 1); 8 }  # SET 0,A
-    cb_table[0xC8] = -> { registers.b = Bit.set_bit(registers.b, 1, 1); 8 }  # SET 1,B
-    cb_table[0xC9] = -> { registers.c = Bit.set_bit(registers.c, 1, 1); 8 }  # SET 1,C
-    cb_table[0xCA] = -> { registers.d = Bit.set_bit(registers.d, 1, 1); 8 }  # SET 1,D
-    cb_table[0xCB] = -> { registers.e = Bit.set_bit(registers.e, 1, 1); 8 }  # SET 1,E
-    cb_table[0xCC] = -> { registers.h = Bit.set_bit(registers.h, 1, 1); 8 }  # SET 1,H
-    cb_table[0xCD] = -> { registers.l = Bit.set_bit(registers.l, 1, 1); 8 }  # SET 1,L
+    cb_table[0xC7] = -> { registers.a = Bit.set_bit(registers.a, 0, 1); 8 } # SET 0,A
+    cb_table[0xC8] = -> { registers.b = Bit.set_bit(registers.b, 1, 1); 8 } # SET 1,B
+    cb_table[0xC9] = -> { registers.c = Bit.set_bit(registers.c, 1, 1); 8 } # SET 1,C
+    cb_table[0xCA] = -> { registers.d = Bit.set_bit(registers.d, 1, 1); 8 } # SET 1,D
+    cb_table[0xCB] = -> { registers.e = Bit.set_bit(registers.e, 1, 1); 8 } # SET 1,E
+    cb_table[0xCC] = -> { registers.h = Bit.set_bit(registers.h, 1, 1); 8 } # SET 1,H
+    cb_table[0xCD] = -> { registers.l = Bit.set_bit(registers.l, 1, 1); 8 } # SET 1,L
     # cb_table[0xCE] = -> { 16 } # SET 1,(HL)
-    cb_table[0xCF] = -> { registers.a = Bit.set_bit(registers.a, 1, 1); 8 }  # SET 1,A
-    cb_table[0xD0] = -> { registers.b = Bit.set_bit(registers.b, 2, 1); 8 }  # SET 2,B
-    cb_table[0xD1] = -> { registers.c = Bit.set_bit(registers.c, 2, 1); 8 }  # SET 2,C
-    cb_table[0xD2] = -> { registers.d = Bit.set_bit(registers.d, 2, 1); 8 }  # SET 2,D
-    cb_table[0xD3] = -> { registers.e = Bit.set_bit(registers.e, 2, 1); 8 }  # SET 2,E
-    cb_table[0xD4] = -> { registers.h = Bit.set_bit(registers.h, 2, 1); 8 }  # SET 2,H
-    cb_table[0xD5] = -> { registers.l = Bit.set_bit(registers.l, 2, 1); 8 }  # SET 2,L
+    cb_table[0xCF] = -> { registers.a = Bit.set_bit(registers.a, 1, 1); 8 } # SET 1,A
+    cb_table[0xD0] = -> { registers.b = Bit.set_bit(registers.b, 2, 1); 8 } # SET 2,B
+    cb_table[0xD1] = -> { registers.c = Bit.set_bit(registers.c, 2, 1); 8 } # SET 2,C
+    cb_table[0xD2] = -> { registers.d = Bit.set_bit(registers.d, 2, 1); 8 } # SET 2,D
+    cb_table[0xD3] = -> { registers.e = Bit.set_bit(registers.e, 2, 1); 8 } # SET 2,E
+    cb_table[0xD4] = -> { registers.h = Bit.set_bit(registers.h, 2, 1); 8 } # SET 2,H
+    cb_table[0xD5] = -> { registers.l = Bit.set_bit(registers.l, 2, 1); 8 } # SET 2,L
     # cb_table[0xD6] = -> { 16 } # SET 2,(HL)
-    cb_table[0xD7] = -> { registers.a = Bit.set_bit(registers.a, 2, 1); 8 }  # SET 2,A
-    cb_table[0xD8] = -> { registers.b = Bit.set_bit(registers.b, 3, 1); 8 }  # SET 3,B
-    cb_table[0xD9] = -> { registers.c = Bit.set_bit(registers.c, 3, 1); 8 }  # SET 3,C
-    cb_table[0xDA] = -> { registers.d = Bit.set_bit(registers.d, 3, 1); 8 }  # SET 3,D
-    cb_table[0xDB] = -> { registers.e = Bit.set_bit(registers.e, 3, 1); 8 }  # SET 3,E
-    cb_table[0xDC] = -> { registers.h = Bit.set_bit(registers.h, 3, 1); 8 }  # SET 3,H
-    cb_table[0xDD] = -> { registers.l = Bit.set_bit(registers.l, 3, 1); 8 }  # SET 3,L
+    cb_table[0xD7] = -> { registers.a = Bit.set_bit(registers.a, 2, 1); 8 } # SET 2,A
+    cb_table[0xD8] = -> { registers.b = Bit.set_bit(registers.b, 3, 1); 8 } # SET 3,B
+    cb_table[0xD9] = -> { registers.c = Bit.set_bit(registers.c, 3, 1); 8 } # SET 3,C
+    cb_table[0xDA] = -> { registers.d = Bit.set_bit(registers.d, 3, 1); 8 } # SET 3,D
+    cb_table[0xDB] = -> { registers.e = Bit.set_bit(registers.e, 3, 1); 8 } # SET 3,E
+    cb_table[0xDC] = -> { registers.h = Bit.set_bit(registers.h, 3, 1); 8 } # SET 3,H
+    cb_table[0xDD] = -> { registers.l = Bit.set_bit(registers.l, 3, 1); 8 } # SET 3,L
     # cb_table[0xDE] = -> { 16 } # SET 3,(HL)
-    cb_table[0xDF] = -> { registers.a = Bit.set_bit(registers.a, 3, 1); 8 }  # SET 3,A
-    cb_table[0xE0] = -> { registers.b = Bit.set_bit(registers.b, 4, 1); 8 }  # SET 4,B
-    cb_table[0xE1] = -> { registers.c = Bit.set_bit(registers.c, 4, 1); 8 }  # SET 4,C
-    cb_table[0xE2] = -> { registers.d = Bit.set_bit(registers.d, 4, 1); 8 }  # SET 4,D
-    cb_table[0xE3] = -> { registers.e = Bit.set_bit(registers.e, 4, 1); 8 }  # SET 4,E
-    cb_table[0xE4] = -> { registers.h = Bit.set_bit(registers.h, 4, 1); 8 }  # SET 4,H
-    cb_table[0xE5] = -> { registers.l = Bit.set_bit(registers.l, 4, 1); 8 }  # SET 4,L
+    cb_table[0xDF] = -> { registers.a = Bit.set_bit(registers.a, 3, 1); 8 } # SET 3,A
+    cb_table[0xE0] = -> { registers.b = Bit.set_bit(registers.b, 4, 1); 8 } # SET 4,B
+    cb_table[0xE1] = -> { registers.c = Bit.set_bit(registers.c, 4, 1); 8 } # SET 4,C
+    cb_table[0xE2] = -> { registers.d = Bit.set_bit(registers.d, 4, 1); 8 } # SET 4,D
+    cb_table[0xE3] = -> { registers.e = Bit.set_bit(registers.e, 4, 1); 8 } # SET 4,E
+    cb_table[0xE4] = -> { registers.h = Bit.set_bit(registers.h, 4, 1); 8 } # SET 4,H
+    cb_table[0xE5] = -> { registers.l = Bit.set_bit(registers.l, 4, 1); 8 } # SET 4,L
     # cb_table[0xE6] = -> { 16 } # SET 4,(HL)
-    cb_table[0xE7] = -> { registers.a = Bit.set_bit(registers.a, 4, 1); 8 }  # SET 4,A
-    cb_table[0xE8] = -> { registers.b = Bit.set_bit(registers.b, 5, 1); 8 }  # SET 5,B
-    cb_table[0xE9] = -> { registers.c = Bit.set_bit(registers.c, 5, 1); 8 }  # SET 5,C
-    cb_table[0xEA] = -> { registers.d = Bit.set_bit(registers.d, 5, 1); 8 }  # SET 5,D
-    cb_table[0xEB] = -> { registers.e = Bit.set_bit(registers.e, 5, 1); 8 }  # SET 5,E
-    cb_table[0xEC] = -> { registers.h = Bit.set_bit(registers.h, 5, 1); 8 }  # SET 5,H
-    cb_table[0xED] = -> { registers.l = Bit.set_bit(registers.l, 5, 1); 8 }  # SET 5,L
+    cb_table[0xE7] = -> { registers.a = Bit.set_bit(registers.a, 4, 1); 8 } # SET 4,A
+    cb_table[0xE8] = -> { registers.b = Bit.set_bit(registers.b, 5, 1); 8 } # SET 5,B
+    cb_table[0xE9] = -> { registers.c = Bit.set_bit(registers.c, 5, 1); 8 } # SET 5,C
+    cb_table[0xEA] = -> { registers.d = Bit.set_bit(registers.d, 5, 1); 8 } # SET 5,D
+    cb_table[0xEB] = -> { registers.e = Bit.set_bit(registers.e, 5, 1); 8 } # SET 5,E
+    cb_table[0xEC] = -> { registers.h = Bit.set_bit(registers.h, 5, 1); 8 } # SET 5,H
+    cb_table[0xED] = -> { registers.l = Bit.set_bit(registers.l, 5, 1); 8 } # SET 5,L
     # cb_table[0xEE] = -> { 16 } # SET 5,(HL)
-    cb_table[0xEF] = -> { registers.a = Bit.set_bit(registers.a, 5, 1); 8 }  # SET 5,A
-    cb_table[0xF0] = -> { registers.b = Bit.set_bit(registers.b, 6, 1); 8 }  # SET 6,B
-    cb_table[0xF1] = -> { registers.c = Bit.set_bit(registers.c, 6, 1); 8 }  # SET 6,C
-    cb_table[0xF2] = -> { registers.d = Bit.set_bit(registers.d, 6, 1); 8 }  # SET 6,D
-    cb_table[0xF3] = -> { registers.e = Bit.set_bit(registers.e, 6, 1); 8 }  # SET 6,E
-    cb_table[0xF4] = -> { registers.h = Bit.set_bit(registers.h, 6, 1); 8 }  # SET 6,H
-    cb_table[0xF5] = -> { registers.l = Bit.set_bit(registers.l, 6, 1); 8 }  # SET 6,L
+    cb_table[0xEF] = -> { registers.a = Bit.set_bit(registers.a, 5, 1); 8 } # SET 5,A
+    cb_table[0xF0] = -> { registers.b = Bit.set_bit(registers.b, 6, 1); 8 } # SET 6,B
+    cb_table[0xF1] = -> { registers.c = Bit.set_bit(registers.c, 6, 1); 8 } # SET 6,C
+    cb_table[0xF2] = -> { registers.d = Bit.set_bit(registers.d, 6, 1); 8 } # SET 6,D
+    cb_table[0xF3] = -> { registers.e = Bit.set_bit(registers.e, 6, 1); 8 } # SET 6,E
+    cb_table[0xF4] = -> { registers.h = Bit.set_bit(registers.h, 6, 1); 8 } # SET 6,H
+    cb_table[0xF5] = -> { registers.l = Bit.set_bit(registers.l, 6, 1); 8 } # SET 6,L
     # cb_table[0xF6] = -> { 16 } # SET 6,(HL)
-    cb_table[0xF7] = -> { registers.a = Bit.set_bit(registers.a, 6, 1); 8 }  # SET 6,A
-    cb_table[0xF8] = -> { registers.b = Bit.set_bit(registers.b, 7, 1); 8 }  # SET 7,B
-    cb_table[0xF9] = -> { registers.c = Bit.set_bit(registers.c, 7, 1); 8 }  # SET 7,C
-    cb_table[0xFA] = -> { registers.d = Bit.set_bit(registers.d, 7, 1); 8 }  # SET 7,D
-    cb_table[0xFB] = -> { registers.e = Bit.set_bit(registers.e, 7, 1); 8 }  # SET 7,E
-    cb_table[0xFC] = -> { registers.h = Bit.set_bit(registers.h, 7, 1); 8 }  # SET 7,H
-    cb_table[0xFD] = -> { registers.l = Bit.set_bit(registers.l, 7, 1); 8 }  # SET 7,L
+    cb_table[0xF7] = -> { registers.a = Bit.set_bit(registers.a, 6, 1); 8 } # SET 6,A
+    cb_table[0xF8] = -> { registers.b = Bit.set_bit(registers.b, 7, 1); 8 } # SET 7,B
+    cb_table[0xF9] = -> { registers.c = Bit.set_bit(registers.c, 7, 1); 8 } # SET 7,C
+    cb_table[0xFA] = -> { registers.d = Bit.set_bit(registers.d, 7, 1); 8 } # SET 7,D
+    cb_table[0xFB] = -> { registers.e = Bit.set_bit(registers.e, 7, 1); 8 } # SET 7,E
+    cb_table[0xFC] = -> { registers.h = Bit.set_bit(registers.h, 7, 1); 8 } # SET 7,H
+    cb_table[0xFD] = -> { registers.l = Bit.set_bit(registers.l, 7, 1); 8 } # SET 7,L
     # cb_table[0xFE] = -> { 16 } # SET 7,(HL)
-    cb_table[0xFF] = -> { registers.a = Bit.set_bit(registers.a, 7, 1); 8 }  # SET 7,A
+    cb_table[0xFF] = -> { registers.a = Bit.set_bit(registers.a, 7, 1); 8 } # SET 7,A
 
     cb_table
   end
