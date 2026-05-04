@@ -5,8 +5,8 @@ require 'app/emulator/mmu.rb'
 require 'app/emulator/cpu.rb'
 require 'app/emulator/ppu.rb'
 
-ROM_PATH = 'data/hello.gb'
-SKIP_BOOT = true # ブートROMをスキップして直接 PC=0x0100 から起動(D-1)
+ROM_PATH = 'data/cpu_instrs/03-op sp,hl.gb'
+SKIP_BOOT = false # ブートROMをスキップして直接 PC=0x0100 から起動(D-1)
 
 # 1フレームのT-cycle数(154スキャンライン × 456 cycle = 70224)
 CYCLES_PER_FRAME = 154 * 456
