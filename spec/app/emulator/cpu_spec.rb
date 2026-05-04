@@ -331,7 +331,7 @@ RSpec.describe CPU do
   end
 
   describe 'ブートROM 完走 (PC が 0x0100 に到達するまで)' do
-    # CPU 単体ではなく CPU + MMU + Cartridge + ブートROM の統合シナリオ。
+    # CPU + MMU + Cartridge + PPU + ブートROM の統合シナリオ。
     # 「ブートROM を実行して PC が 0x0100 に到達する」という振る舞いの検証なので
     # 特定のメソッド describe ではなくシナリオ名で切る。
 
@@ -340,17 +340,28 @@ RSpec.describe CPU do
     # ジャンプしないため、tobu.gb の正規ロゴを 0x0104-0x0133 に置く必要がある。
     # E-4 で MMU 側にブートROM 重畳の正規実装が入るが、B-2/E-1/E-2 の進捗確認用にここでは
     # Cartridge 配列の先頭を直接書き換える簡易セットアップを使う。
+    #
+    # PPU を並走させるのは、ブートROM が LCD 有効化後に LY(0xFF44)を見てロゴを
+    # スクロールさせるため。PPU が止まっていると VBlank 待ちループで永遠に詰まる
+    # (HELLO WORLD 完走テストと同じ理由)。
     let(:cpu) { described_class.new(mmu) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
+    let(:ppu) { PPU.new(mmu) }
     let(:boot_rom) { File.binread(File.expand_path('../../../../data/dmg_boot.bin', __FILE__)).bytes }
     let(:tobu)     { File.binread(File.expand_path('../../../../data/tobu.gb', __FILE__)).bytes }
     let(:rom_data) { boot_rom + tobu[boot_rom.size..] }
 
     it 'tobu.gb のロゴ照合を通って PC=0x0100 に到達する' do
-      # ブートROM は実機で約 70,000 T-cycle 程度で完走する。
-      # 上限 200,000 T-cycle まで run を繰り返し、PC が 0x0100 (カートリッジ先頭) に到達するか確認する。
+      # SameBoy 同梱の dmg_boot.bin は VRAM クリアだけで 8192 iter × 28 cycle = 229,376 cycle 必要
+      # ロゴ展開 + スクロールイン + チャイム待機まで含めると実機で数百万 T-cycle 程度
+      # 現状は途中の未実装命令で例外停止する想定で、上限 400,000 T-cycle で次に詰まる
+      # 命令を観測する probe として使う。命令が揃ってきたら上限を増やしていく。
       elapsed = 0
-      elapsed += cpu.run(1000) while cpu.registers.pc < 0x0100 && elapsed < 200_000
+      while cpu.registers.pc < 0x0100 && elapsed < 400_000
+        cycles = cpu.run(1000)
+        ppu.step(cycles)
+        elapsed += cycles
+      end
 
       expect(cpu.registers.pc).to eq 0x0100
     end
