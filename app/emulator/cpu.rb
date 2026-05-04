@@ -27,11 +27,14 @@ class CPU
                 :mmu
   attr_reader :registers # 8bit レジスタ (A/F/B/C/D/E/H/L) と SP / PC、フラグ操作
 
-  def initialize(mmu, skip_boot: false)
+  # trace: true で1命令ごとに disasm 行を puts する。RSpec では大量の puts でテストが詰まるので
+  # デフォルト OFF。app/main.rb から呼ぶときだけ ON にして命令実行を逐次目で追えるようにする
+  def initialize(mmu, skip_boot: false, trace: false)
     @mmu = mmu
     @registers = CpuRegisters.new(skip_boot: skip_boot)
     @ime = false   # 割り込み許可フラグ(Interrupt Master Enable)
     @halted = false # CPUの一時停止中フラグ
+    @trace = trace # disasm ログ出力の有無
 
     @opcodes = build_opcode_table
     @cb_opcodes = build_cb_opcode_table
@@ -46,11 +49,11 @@ class CPU
     opcode = fetch_u8
     handler = opcodes[opcode]
     if handler.nil?
-      puts "未実装の opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})"
+      puts context[:line].rstrip if @trace # 未実装でも trace 有効時は disasm 行を出してから raise
       raise "未実装の opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})"
     end
     cycles = handler.call
-    puts @disassembler.after_step(context, opcode, cycles) # 命令後の差分とまとめて整形済みの行を出力
+    puts @disassembler.after_step(context, opcode, cycles) if @trace # trace 有効時のみ命令後の差分を出力
     cycles
   end
 
