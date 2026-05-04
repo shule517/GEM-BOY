@@ -7,7 +7,7 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 「Blargg を全 Pass させてから先に進む」旧戦略も「Nintendo ロゴ一発狙い」中継戦略もやめ、**3 つの視覚的マイルストーンを近い順に並べて段階的に達成する**ルートに改める。
 
 1. **HELLO WORLD 表示**(`hello.gb` を skip_boot 起動)★ 第一マイルストーン
-2. **Nintendo ロゴ表示**(ブートROM 経由 + スクロールイン + チャイム)★ 第二マイルストーン
+2. **Nintendo ロゴ表示**(ブートROM 経由 + スクロールイン)★ 第二マイルストーン
 3. **tobu.gb タイトル画面**(MBC1 + スプライト + 入力)★ 第三マイルストーン
 
 利点:
@@ -24,10 +24,10 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 | B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 2/2 [完了](INC/DEC・AND・CALL/RET・JR Z/JR 無条件まで追加され、HELLO WORLD 統合シナリオが HALT 到達)|
 | C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 2/2 [完了](C-1: LY ティック / C-2: BG タイル描画。framebuffer に画素が乗るようになった)|
 | D. HELLO WORLD 表示 | skip_boot 起動 + 画面確認 | 1h | **画面に "Hello World!" 表示** ★第一 | 2/2 [完了] ★ **第一マイルストーン達成**(`hello.gb` の `Hello 8-bit world!` が DragonRuby で描画された)|
-| E. Nintendo ロゴ表示 | ブートROM 用追加命令 + CB-prefix + ブートROM mapping + スクロール + チャイム | 3〜7h | **正しい Nintendo ロゴ + ブートチャイム** ★第二 | 0.5/8(E-2 CB-prefix の BIT/RES/SET 計 168 命令を実装済み。**残りは ROTATE 系 + ADD/SUB/ADC/SBC/PUSH/POP/RST など**)|
+| E. Nintendo ロゴ表示 | ブートROM 用追加命令 + CB-prefix + ブートROM mapping + スクロール | 2.5〜6.5h | **正しい Nintendo ロゴ** ★第二 | 0.5/7(E-2 CB-prefix の BIT/RES/SET 計 168 命令を実装済み。**残りは ROTATE 系 + ADD/SUB/ADC/SBC/PUSH/POP/RST など**)|
 | F. tobu.gb タイトル | MBC1 + スプライト + 入力 + タイマー | 6.5〜10h | **tobu.gb タイトル表示** ★第三 | 0/5 |
 
-合計 22 ステップ、想定 17.5〜27h。**現在 10 ステップ完了(フェーズ A + B-1, B-2 + C-1, C-2 + D-1, D-2 完了、E-2 部分着手)**。★ **第一マイルストーン(HELLO WORLD 表示)達成**。
+合計 21 ステップ、想定 17〜26.5h。**現在 10 ステップ完了(フェーズ A + B-1, B-2 + C-1, C-2 + D-1, D-2 完了、E-2 部分着手)**。★ **第一マイルストーン(HELLO WORLD 表示)達成**。
 
 ### 進行中の発見(2026-05-02 時点)
 
@@ -97,7 +97,6 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
   - [ ] E-6c: `04-op r,imm.gb` で即値 ALU 検証
   - [ ] E-6d: `11-op a,(hl).gb` でメモリ間接 ALU 検証
 - [ ] E-7: 修正済み Nintendo ロゴ表示 ★第二マイルストーン
-- [ ] E-8: ブートチャイム再生(NR14 trigger フック)
 
 ### フェーズ F: tobu.gb タイトル
 - [ ] F-1: MBC1 実装
@@ -109,7 +108,7 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 ## 三段マイルストーン
 
 1. **HELLO WORLD 表示**(D-2 完了時, 約 5〜6h):画面に文字が出た瞬間。CPU 基本命令と PPU が連動して動いた証拠。「自分で書ける範囲のコードが正しく解釈・描画される」最小ループの完成
-2. **Nintendo ロゴ表示**(E-7 完了時, 約 8〜13h):スクロールインのロゴ。**ブートROM 完走** = CPU + MMU + PPU + フラグ計算 + CB-prefix が全部揃った証拠。E-8 でブートチャイム
+2. **Nintendo ロゴ表示**(E-7 完了時, 約 8〜13h):スクロールインのロゴ。**ブートROM 完走** = CPU + MMU + PPU + フラグ計算 + CB-prefix が全部揃った証拠
 3. **tobu.gb タイトル**(F-5 完了時, 約 14.5〜23h):実ゲームが起動。MBC1 + スプライト + 入力 + タイマー が揃った証拠
 
 ## 前提
@@ -121,9 +120,8 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 - ROM 素材の入手と配置(取得済み):
   - `data/hello.gb`(gitendo/helloworld) ← フェーズ D で使用
   - `data/dmg_boot.bin`(SameBoy 同梱の SameBoot 実装、256B) ← フェーズ E で使用
-  - `data/cpu_instrs/` の Blargg 個別 ROM(retrio/gb-test-roms 由来) ← E-6 診断時に使用
+  - `data/gb-test-roms/cpu_instrs/` の Blargg 個別 ROM(retrio/gb-test-roms 由来) ← E-6 診断時に使用
   - `data/tobu.gb` ← フェーズ F で使用
-  - `data/game-boy-startup.wav` ← E-8 で使用
 
 ## ディレクトリ構造(最終形)
 
@@ -598,7 +596,7 @@ HELLO WORLD で PPU が動いている前提なので、**「画面に何か出�
 
 ```ruby
 # app/main.rb
-ROM_PATH = 'data/cpu_instrs/06-ld r,r.gb'   # 切り替えてテスト
+ROM_PATH = 'data/gb-test-roms/cpu_instrs/06-ld r,r.gb'   # 切り替えてテスト
 ```
 
 ### 症状から推測する実行順序
@@ -644,68 +642,10 @@ SKIP_BOOT = false
 
 1. グレー → 黒の画面遷移
 2. **Nintendo ロゴが画面中央に上から下へスクロールイン**
-3. 「ピーン」音(E-8 で実装、本ステップでは無音)
-4. 約 1 秒静止
-5. PC=0x0100 へジャンプ → カートリッジ本体へ
+3. 約 1 秒静止
+4. PC=0x0100 へジャンプ → カートリッジ本体へ
 
 これで **第二マイルストーン達成**。
-
----
-
-## ステップ E-8: ブートチャイム再生(NR14 trigger フック) (30分)
-
-**目標**: ブートROM が APU の Channel 1 を trigger した瞬間を MMU で検知し、`data/game-boy-startup.wav` を再生する。APU 本体は実装せず、**WAV 再生で代替**するライト実装。
-
-### MMU にチャイムフック追加
-
-```ruby
-# app/emulator/mmu.rb
-class MMU
-  attr_accessor :on_chime_trigger
-
-  # APU レジスタ Channel 1 周波数上位
-  # Pan Docs: https://gbdev.io/pandocs/Audio_Registers.html#ff14--nr14-channel-1-period-high--control
-  NR14 = 0xFF14
-  NR14_TRIGGER_BIT = 0x80
-
-  def write(addr, value)
-    # ... 既存の処理
-
-    # ブートチャイム検知(初回 trigger のみ)
-    if addr == NR14 && (value & NR14_TRIGGER_BIT) != 0 && !@chime_triggered
-      @chime_triggered = true
-      @on_chime_trigger&.call
-    end
-  end
-end
-```
-
-### main.rb 側でコールバック登録
-
-```ruby
-# app/main.rb
-def setup(args)
-  args.state.cartridge = Cartridge.new(args.gtk.read_file(ROM_PATH).bytes)
-  args.state.mmu = MMU.new(args.state.cartridge)
-  args.state.mmu.on_chime_trigger = -> {
-    args.outputs.sounds << 'data/game-boy-startup.wav'
-  }
-end
-```
-
-### 一発フラグの理由
-
-ブートROM は **チャイムを 2 回 trigger する**(低音 → 待ちループ → 高音)。今回の WAV は既に「ポイーン」2 音入りの録音なので、**毎回鳴らすと 4 音重なって崩れる**。`@chime_triggered` で初回だけ拾い、以降は無視する。
-
-### 受け入れ条件
-
-- ブートROM が完走する瞬間に「ポイーン」が 1 回だけ鳴る
-- ロゴのスクロールインと音のタイミングが大きくズレない(数フレームの遅延は許容)
-- 2 回目の起動でも正常に鳴る(`@chime_triggered` が setup でリセットされること)
-
-### 補足
-
-将来 APU 本体を実装するときは、この WAV 再生フックを外して、Channel 1 の矩形波生成 + envelope に置き換える。今はあくまで**演出としての音**であり、実機の APU レジスタ値からの音色生成ではない。
 
 ---
 
