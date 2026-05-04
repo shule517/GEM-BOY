@@ -100,6 +100,12 @@ class CpuRegisters
     self.f = Bit.set_bit(f, FLAG_C_BIT, value) # bit4 Carry
   end
 
+  # condition
+  def nz? = zero_flag == 0 # NZ: Execute if Z is not set.
+  def z? = zero_flag == 1 # Z: Execute if Z is set.
+  def nc? = carry_flag == 0 # NC: Execute if C is not set.
+  def c? = carry_flag == 1 # C: Execute if C is set.
+
   def bc = Bit.make_u16(high: b, low: c)
   def de = Bit.make_u16(high: d, low: e)
   def hl = Bit.make_u16(high: h, low: l)

@@ -492,10 +492,10 @@ class CPU
     # ============================================================
     table[0xC3] = -> { jp(cc: true) } # JP u16
     table[0xE9] = -> { registers.pc = registers.hl; 4 } # JP HL
-    table[0xC2] = -> { jp(cc: registers.zero_flag == 0) } # JP NZ,u16 (taken: 16 / not taken: 12) NZ: Execute if Z is not set.
-    table[0xCA] = -> { jp(cc: registers.zero_flag == 1) } # JP Z,u16 (taken: 16 / not taken: 12) Z: Execute if Z is set.
-    table[0xD2] = -> { jp(cc: registers.carry_flag == 0) } # JP NC,u16 (taken: 16 / not taken: 12) NC: Execute if C is not set.
-    table[0xDA] = -> { jp(cc: registers.carry_flag == 1) } # JP C,u16 (taken: 16 / not taken: 12) C: Execute if C is set.
+    table[0xC2] = -> { jp(cc: registers.nz?) } # JP NZ,u16 (taken: 16 / not taken: 12) NZ: Execute if Z is not set.
+    table[0xCA] = -> { jp(cc: registers.z?) } # JP Z,u16 (taken: 16 / not taken: 12) Z: Execute if Z is set.
+    table[0xD2] = -> { jp(cc: registers.nc?) } # JP NC,u16 (taken: 16 / not taken: 12) NC: Execute if C is not set.
+    table[0xDA] = -> { jp(cc: registers.c?) } # JP C,u16 (taken: 16 / not taken: 12) C: Execute if C is set.
 
     # ============================================================
     # ジャンプ - JR (相対ジャンプ)
@@ -503,7 +503,7 @@ class CPU
     table[0x18] = -> { offset_i8 = fetch_i8; registers.pc = registers.pc + offset_i8; 12 } # JR i8: 無条件相対ジャンプ。fetch_i8 後のPC(=次の命令の先頭)を起点にオフセット加算
     table[0x20] = -> do # JR NZ,i8
       offset_i8 = fetch_i8
-      if registers.zero_flag == 0 # NZ: Execute if Z is not set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#NZ
+      if registers.nz? # NZ: Execute if Z is not set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#NZ
         registers.pc = registers.pc + offset_i8
         12
       else
@@ -512,7 +512,7 @@ class CPU
     end
     table[0x28] = -> do # JR Z,i8  (taken: 12 / not taken: 8)
       offset_i8 = fetch_i8
-      if registers.zero_flag == 1 # Z: Execute if Z is set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#Z
+      if registers.z? # Z: Execute if Z is set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#Z
         registers.pc = registers.pc + offset_i8
         12
       else
@@ -528,7 +528,7 @@ class CPU
     table[0xCD] = -> { address = fetch_u16; registers.sp = registers.sp - 2; mmu.write_u16(address: registers.sp, value: registers.pc); registers.pc = address; 24 } # CALL u16: 戻りアドレス(=次の命令のPC)をstackに積んでから呼び出し先にjump
     # table[0xC4] = -> do # CALL NZ,u16 (taken: 24 / not taken: 12)
     #   address = fetch_u16 # u16のアドレスにジャンプする
-    #   if registers.zero_flag == 0 # NZ: Execute if Z is not set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#NZ
+    #   if registers.nz? # NZ: Execute if Z is not set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#NZ
     #     registers.pc = address
     #     24
     #   else
