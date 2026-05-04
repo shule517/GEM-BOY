@@ -112,11 +112,18 @@ class CPU
   # (HL) で指す番地に 1 バイト書く。LD (HL+),A / LD (HL-),A などで使う
   def write_at_hl(value) = mmu.write_u8(address: registers.hl, value: value)
 
+  # スタックに2バイトのデータを追加する
+  def push_u16(u16)
+    # SPの書き込み位置を2バイトずらす
+    registers.sp_decrement_u16
+    mmu.write_u16(address: registers.sp, value: u16)
+  end
+
+  # スタックから2バイトのデータを取り出す
   def pop_u16
     u16 = read_at_sp_u16
-    # 2バイト分ずらす
-    registers.sp_increment
-    registers.sp_increment
+    # SPの参照位置を2バイトずらす
+    registers.sp_increment_u16
     u16
   end
 
@@ -292,10 +299,10 @@ class CPU
     table[0xD1] = -> { registers.de = pop_u16; 12 } # POP DE
     table[0xE1] = -> { registers.hl = pop_u16; 12 } # POP HL
     table[0xF1] = -> { registers.af = pop_u16; 12 } # POP AF
-    table[0xC5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.b); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.c); 16 } # PUSH BC
-    table[0xD5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.d); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.e); 16 } # PUSH DE
-    table[0xE5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.h); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.l); 16 } # PUSH HL
-    table[0xF5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.a); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.f); 16 } # PUSH AF
+    table[0xC5] = -> { push_u16(registers.bc); 16 } # PUSH BC
+    table[0xD5] = -> { push_u16(registers.de); 16 } # PUSH DE
+    table[0xE5] = -> { push_u16(registers.hl); 16 } # PUSH HL
+    table[0xF5] = -> { push_u16(registers.af); 16 } # PUSH AF
 
     # ============================================================
     # 8bit 算術 - INC

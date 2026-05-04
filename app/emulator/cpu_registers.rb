@@ -103,6 +103,7 @@ class CpuRegisters
   def bc = Bit.make_u16(high: b, low: c)
   def de = Bit.make_u16(high: d, low: e)
   def hl = Bit.make_u16(high: h, low: l)
+  def af = Bit.make_u16(high: a, low: f)
 
   def bc=(value)
     self.b = Bit.high_byte(value)
@@ -131,12 +132,14 @@ class CpuRegisters
   def de_increment = self.de = de + 1
   def hl_increment = self.hl = hl + 1
   def sp_increment = self.sp = sp + 1
+  def sp_increment_u16 = self.sp = sp + 2
   def pc_increment = self.pc = pc + 1
 
   def bc_decrement = self.bc = bc - 1
   def de_decrement = self.de = de - 1
   def hl_decrement = self.hl = hl - 1
   def sp_decrement = self.sp = sp - 1
+  def sp_decrement_u16 = self.sp = sp - 2
   def pc_decrement = self.pc = pc - 1
 
   # 命令実行前のレジスタ値を保存して、後で差分を取るためのスナップショット
