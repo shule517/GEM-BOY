@@ -300,6 +300,151 @@ RSpec.describe CPU do
         expect(cpu.registers.pc).to eq 0x0000
       end
     end
+
+    context 'table[0xC1] (POP BC) を呼び出したとき' do
+      # スタックから 2 バイトを取り出して BC に入れる。リトルエンディアンなので
+      # SP 番地から下位バイト (C)、SP+1 から上位バイト (B) を読む
+      # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#POP_r16
+      before do
+        cpu.registers.sp = 0xFFFC
+        mmu.write_u8(address: 0xFFFC, value: 0x34) # 下位 → C
+        mmu.write_u8(address: 0xFFFD, value: 0x12) # 上位 → B
+      end
+
+      it '12 サイクルを返し、B=0x12, C=0x34, SP=0xFFFE になる' do
+        expect(subject[0xC1].call).to eq 12
+        expect(cpu.registers.b).to eq 0x12
+        expect(cpu.registers.c).to eq 0x34
+        expect(cpu.registers.sp).to eq 0xFFFE
+      end
+    end
+
+    context 'table[0xD1] (POP DE) を呼び出したとき' do
+      before do
+        cpu.registers.sp = 0xFFFC
+        mmu.write_u8(address: 0xFFFC, value: 0x78) # 下位 → E
+        mmu.write_u8(address: 0xFFFD, value: 0x56) # 上位 → D
+      end
+
+      it '12 サイクルを返し、D=0x56, E=0x78, SP=0xFFFE になる' do
+        expect(subject[0xD1].call).to eq 12
+        expect(cpu.registers.d).to eq 0x56
+        expect(cpu.registers.e).to eq 0x78
+        expect(cpu.registers.sp).to eq 0xFFFE
+      end
+    end
+
+    context 'table[0xE1] (POP HL) を呼び出したとき' do
+      before do
+        cpu.registers.sp = 0xFFFC
+        mmu.write_u8(address: 0xFFFC, value: 0xCD) # 下位 → L
+        mmu.write_u8(address: 0xFFFD, value: 0xAB) # 上位 → H
+      end
+
+      it '12 サイクルを返し、H=0xAB, L=0xCD, SP=0xFFFE になる' do
+        expect(subject[0xE1].call).to eq 12
+        expect(cpu.registers.h).to eq 0xAB
+        expect(cpu.registers.l).to eq 0xCD
+        expect(cpu.registers.sp).to eq 0xFFFE
+      end
+    end
+
+    context 'table[0xF1] (POP AF) を呼び出したとき' do
+      # F レジスタの下位 4bit は物理的に常に 0(Z/N/H/C は上位 4bit のみ)
+      # f= setter の & 0xF0 マスクで自動的にクリアされる
+      # Pan Docs: https://gbdev.io/pandocs/CPU_Registers_and_Flags.html
+      context 'スタックから上位 4bit のみが立った値を pop したとき' do
+        before do
+          cpu.registers.sp = 0xFFFC
+          mmu.write_u8(address: 0xFFFC, value: 0xF0) # 下位 → F (Z=1 N=1 H=1 C=1)
+          mmu.write_u8(address: 0xFFFD, value: 0x12) # 上位 → A
+        end
+
+        it '12 サイクルを返し、A=0x12, F=0xF0, SP=0xFFFE になる' do
+          expect(subject[0xF1].call).to eq 12
+          expect(cpu.registers.a).to eq 0x12
+          expect(cpu.registers.f).to eq 0xF0
+          expect(cpu.registers.sp).to eq 0xFFFE
+        end
+      end
+
+      context 'スタックの値の下位 4bit が立っていたとき' do
+        # 不正な F 値が pop されても f= が 0xF0 マスクで自動的に下位 4bit をクリアする
+        before do
+          cpu.registers.sp = 0xFFFC
+          mmu.write_u8(address: 0xFFFC, value: 0xFF) # 下位 → F (下位 4bit が立つ)
+          mmu.write_u8(address: 0xFFFD, value: 0x12) # 上位 → A
+        end
+
+        it 'F の下位 4bit がマスクされて 0 になる(F=0xF0)' do
+          subject[0xF1].call
+          expect(cpu.registers.f).to eq 0xF0
+        end
+      end
+    end
+
+    context 'table[0xC5] (PUSH BC) を呼び出したとき' do
+      # BC をスタックに積む。SP を 2 減らしてから、SP+1 に B (上位)、SP に C (下位) を書く
+      # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#PUSH_r16
+      before do
+        cpu.registers.sp = 0xFFFE
+        cpu.registers.b = 0x12
+        cpu.registers.c = 0x34
+      end
+
+      it '16 サイクルを返し、SP=0xFFFC, (0xFFFD)=0x12, (0xFFFC)=0x34 になる' do
+        expect(subject[0xC5].call).to eq 16
+        expect(cpu.registers.sp).to eq 0xFFFC
+        expect(mmu.read_u8(address: 0xFFFD)).to eq 0x12
+        expect(mmu.read_u8(address: 0xFFFC)).to eq 0x34
+      end
+    end
+
+    context 'table[0xD5] (PUSH DE) を呼び出したとき' do
+      before do
+        cpu.registers.sp = 0xFFFE
+        cpu.registers.d = 0x56
+        cpu.registers.e = 0x78
+      end
+
+      it '16 サイクルを返し、SP=0xFFFC, (0xFFFD)=0x56, (0xFFFC)=0x78 になる' do
+        expect(subject[0xD5].call).to eq 16
+        expect(cpu.registers.sp).to eq 0xFFFC
+        expect(mmu.read_u8(address: 0xFFFD)).to eq 0x56
+        expect(mmu.read_u8(address: 0xFFFC)).to eq 0x78
+      end
+    end
+
+    context 'table[0xE5] (PUSH HL) を呼び出したとき' do
+      before do
+        cpu.registers.sp = 0xFFFE
+        cpu.registers.h = 0xAB
+        cpu.registers.l = 0xCD
+      end
+
+      it '16 サイクルを返し、SP=0xFFFC, (0xFFFD)=0xAB, (0xFFFC)=0xCD になる' do
+        expect(subject[0xE5].call).to eq 16
+        expect(cpu.registers.sp).to eq 0xFFFC
+        expect(mmu.read_u8(address: 0xFFFD)).to eq 0xAB
+        expect(mmu.read_u8(address: 0xFFFC)).to eq 0xCD
+      end
+    end
+
+    context 'table[0xF5] (PUSH AF) を呼び出したとき' do
+      # F の下位 4bit は f= setter で常に 0 にマスクされているので、push されるバイトも下位 4bit=0
+      before do
+        cpu.registers.sp = 0xFFFE
+        cpu.registers.a = 0x12
+        cpu.registers.f = 0xF0 # Z=1 N=1 H=1 C=1
+      end
+
+      it '16 サイクルを返し、SP=0xFFFC, (0xFFFD)=0x12, (0xFFFC)=0xF0 になる' do
+        expect(subject[0xF5].call).to eq 16
+        expect(cpu.registers.sp).to eq 0xFFFC
+        expect(mmu.read_u8(address: 0xFFFD)).to eq 0x12
+        expect(mmu.read_u8(address: 0xFFFC)).to eq 0xF0
+      end
+    end
   end
 
   describe 'HELLO WORLD 完走 (hello.gb が HALT に到達するまで)' do

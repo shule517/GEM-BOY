@@ -100,9 +100,16 @@ class CpuRegisters
     self.f = Bit.set_bit(f, FLAG_C_BIT, value) # bit4 Carry
   end
 
+  # condition
+  def nz? = zero_flag == 0 # NZ: Execute if Z is not set.
+  def z? = zero_flag == 1 # Z: Execute if Z is set.
+  def nc? = carry_flag == 0 # NC: Execute if C is not set.
+  def c? = carry_flag == 1 # C: Execute if C is set.
+
   def bc = Bit.make_u16(high: b, low: c)
   def de = Bit.make_u16(high: d, low: e)
   def hl = Bit.make_u16(high: h, low: l)
+  def af = Bit.make_u16(high: a, low: f)
 
   def bc=(value)
     self.b = Bit.high_byte(value)
@@ -119,6 +126,11 @@ class CpuRegisters
     self.l = Bit.low_byte(value)
   end
 
+  def af=(value)
+    self.a = Bit.high_byte(value)
+    self.f = Bit.low_byte(value)
+  end
+
   # 16bit レジスタペアの +1 / -1(u16 ラップは setter 側で吸収)
   # INC rr / DEC rr(0x03/0x0B/0x13/0x1B/0x23/0x2B/0x33/0x3B)で使う。フラグは変化しない
   # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#INC_r16
@@ -126,12 +138,14 @@ class CpuRegisters
   def de_increment = self.de = de + 1
   def hl_increment = self.hl = hl + 1
   def sp_increment = self.sp = sp + 1
+  def sp_increment_u16 = self.sp = sp + 2
   def pc_increment = self.pc = pc + 1
 
   def bc_decrement = self.bc = bc - 1
   def de_decrement = self.de = de - 1
   def hl_decrement = self.hl = hl - 1
   def sp_decrement = self.sp = sp - 1
+  def sp_decrement_u16 = self.sp = sp - 2
   def pc_decrement = self.pc = pc - 1
 
   # 命令実行前のレジスタ値を保存して、後で差分を取るためのスナップショット
