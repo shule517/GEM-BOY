@@ -107,8 +107,18 @@ class CPU
 
   def read_at_sp = mmu.read_u8(address: registers.sp)
 
+  def read_at_sp_u16 = mmu.read_u16(address: registers.sp)
+
   # (HL) で指す番地に 1 バイト書く。LD (HL+),A / LD (HL-),A などで使う
   def write_at_hl(value) = mmu.write_u8(address: registers.hl, value: value)
+
+  def pop_u16
+    u16 = read_at_sp_u16
+    # 2バイト分ずらす
+    registers.sp_increment
+    registers.sp_increment
+    u16
+  end
 
   # 論理演算 (OR / XOR) 後のフラグを更新する
   # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#OR_A,r8
@@ -278,10 +288,10 @@ class CPU
     # ============================================================
     # スタック - PUSH / POP
     # ============================================================
-    table[0xC1] = -> { registers.c = read_at_sp; registers.sp_increment; registers.b = read_at_sp; registers.sp_increment; 12 } # POP BC
-    table[0xD1] = -> { registers.e = read_at_sp; registers.sp_increment; registers.d = read_at_sp; registers.sp_increment; 12 } # POP DE
-    table[0xE1] = -> { registers.l = read_at_sp; registers.sp_increment; registers.h = read_at_sp; registers.sp_increment; 12 } # POP HL
-    table[0xF1] = -> { registers.f = read_at_sp; registers.sp_increment; registers.a = read_at_sp; registers.sp_increment; 12 } # POP AF
+    table[0xC1] = -> { registers.bc = pop_u16; 12 } # POP BC
+    table[0xD1] = -> { registers.de = pop_u16; 12 } # POP DE
+    table[0xE1] = -> { registers.hl = pop_u16; 12 } # POP HL
+    table[0xF1] = -> { registers.af = pop_u16; 12 } # POP AF
     table[0xC5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.b); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.c); 16 } # PUSH BC
     table[0xD5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.d); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.e); 16 } # PUSH DE
     table[0xE5] = -> { registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.h); registers.sp_decrement; mmu.write_u8(address: registers.sp, value: registers.l); 16 } # PUSH HL
@@ -499,7 +509,15 @@ class CPU
     # コール / リターン
     # ============================================================
     table[0xCD] = -> { address = fetch_u16; registers.sp = registers.sp - 2; mmu.write_u16(address: registers.sp, value: registers.pc); registers.pc = address; 24 } # CALL u16: 戻りアドレス(=次の命令のPC)をstackに積んでから呼び出し先にjump
-    # table[0xC4] = -> { 24 } # CALL NZ,u16 (taken: 24 / not taken: 12)
+    # table[0xC4] = -> do # CALL NZ,u16 (taken: 24 / not taken: 12)
+    #   address = fetch_u16 # u16のアドレスにジャンプする
+    #   if registers.zero_flag == 0 # NZ: Execute if Z is not set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#NZ
+    #     registers.pc = address
+    #     24
+    #   else
+    #     12
+    #   end
+    # end
     # table[0xCC] = -> { 24 } # CALL Z,u16  (taken: 24 / not taken: 12)
     # table[0xD4] = -> { 24 } # CALL NC,u16 (taken: 24 / not taken: 12)
     # table[0xDC] = -> { 24 } # CALL C,u16  (taken: 24 / not taken: 12)

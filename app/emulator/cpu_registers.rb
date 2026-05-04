@@ -119,6 +119,11 @@ class CpuRegisters
     self.l = Bit.low_byte(value)
   end
 
+  def af=(value)
+    self.a = Bit.high_byte(value)
+    self.f = Bit.low_byte(value)
+  end
+
   # 16bit レジスタペアの +1 / -1(u16 ラップは setter 側で吸収)
   # INC rr / DEC rr(0x03/0x0B/0x13/0x1B/0x23/0x2B/0x33/0x3B)で使う。フラグは変化しない
   # Pan Docs: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#INC_r16
