@@ -160,6 +160,16 @@ class CPU
     cb_handler.call
   end
 
+  def jp(cc:) # JP cc,u16 (taken: 16 / not taken: 12)
+    address = fetch_u16
+    if cc
+      registers.pc = address
+      16
+    else
+      12
+    end
+  end
+
   # opcodeテーブル
   # CPUの命令一覧 https://izik1.github.io/gbops/
   # GB CPU 命令リファレンス(RGBDS 公式マニュアル) https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
@@ -480,44 +490,12 @@ class CPU
     # ============================================================
     # ジャンプ - JP (絶対ジャンプ)
     # ============================================================
-    table[0xC3] = -> { registers.pc = fetch_u16; 16 } # JP u16
+    table[0xC3] = -> { jp(cc: true) } # JP u16
     table[0xE9] = -> { registers.pc = registers.hl; 4 } # JP HL
-    table[0xC2] = -> do # JP NZ,u16 (taken: 16 / not taken: 12) NZ: Execute if Z is not set.
-      address = fetch_u16
-      if registers.zero_flag == 0
-        registers.pc = address
-        16
-      else
-        12
-      end
-    end
-    table[0xCA] = -> do # JP Z,u16  (taken: 16 / not taken: 12) Z: Execute if Z is set.
-      address = fetch_u16
-      if registers.zero_flag == 1
-        registers.pc = address
-        16
-      else
-        12
-      end
-    end
-    table[0xD2] = -> do # JP NC,u16 (taken: 16 / not taken: 12) NC: Execute if C is not set.
-      address = fetch_u16
-      if registers.carry_flag == 0
-        registers.pc = address
-        16
-      else
-        12
-      end
-    end
-    table[0xDA] = -> do # JP C,u16  (taken: 16 / not taken: 12) C: Execute if C is set.
-      address = fetch_u16
-      if registers.carry_flag == 1
-        registers.pc = address
-        16
-      else
-        12
-      end
-    end
+    table[0xC2] = -> { jp(cc: registers.zero_flag == 0) } # JP NZ,u16 (taken: 16 / not taken: 12) NZ: Execute if Z is not set.
+    table[0xCA] = -> { jp(cc: registers.zero_flag == 1) } # JP Z,u16 (taken: 16 / not taken: 12) Z: Execute if Z is set.
+    table[0xD2] = -> { jp(cc: registers.carry_flag == 0) } # JP NC,u16 (taken: 16 / not taken: 12) NC: Execute if C is not set.
+    table[0xDA] = -> { jp(cc: registers.carry_flag == 1) } # JP C,u16 (taken: 16 / not taken: 12) C: Execute if C is set.
 
     # ============================================================
     # ジャンプ - JR (相対ジャンプ)
