@@ -133,4 +133,10 @@ class CpuRegisters
   def hl_decrement = self.hl = hl - 1
   def sp_decrement = self.sp = sp - 1
   def pc_decrement = self.pc = pc - 1
+
+  # 命令実行前のレジスタ値を保存して、後で差分を取るためのスナップショット
+  # F は flag_changes_str 側で別管理、PC は毎命令で必ず変わるので除外する
+  def snapshot
+    { a: a, b: b, c: c, d: d, e: e, h: h, l: l, sp: sp }
+  end
 end

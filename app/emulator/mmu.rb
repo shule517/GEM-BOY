@@ -65,7 +65,8 @@ require 'app/emulator/bit'
 #     +2  タイル番号
 #     +3  属性 (パレット / 反転 / 優先度)
 class MMU
-  attr_reader :serial_buffer
+  attr_reader :serial_buffer,
+              :write_log # 1命令分の書き込み履歴 [[address, value], ...]。CPU が step ごとに reset_write_log で初期化
 
   # I/O レジスタアドレス(Pan Docs の慣用名と同じ)
   SB = 0xFF01  # Serial Buffer: 送信したい 1 バイト
@@ -87,7 +88,14 @@ class MMU
     # Blargg のテスト結果("Passed" / "Failed XX") はこの経路でしか届かない。
     @serial_buffer = ''
 
+    @write_log = [] # ログ用書き込み履歴。step 開始時に reset_write_log で初期化
+
     setup_post_boot_io if skip_boot
+  end
+
+  # 1命令分の書き込み履歴をクリアする。CPU#step の冒頭で呼ぶ
+  def reset_write_log
+    @write_log.clear
   end
 
   # アドレスに対応する領域から 1バイト読み込む
@@ -110,6 +118,7 @@ class MMU
   # (MBC 対応後はここでバンク切り替えレジスタの判定が入る)
   def write_u8(address:, value:)
     value = Bit.wrap_u8(value) # 1バイトにする
+      @write_log << [address, read_u8(address: address), value] # before/after を disassembler のログ用に記録
 
     case address
     when 0x8000..0x9FFF then @vram[address - 0x8000] = value

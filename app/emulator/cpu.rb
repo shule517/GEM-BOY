@@ -1,5 +1,6 @@
 require 'app/emulator/bit'
 require 'app/emulator/cpu_registers'
+require 'app/emulator/disassembler'
 
 # CPU (Sharp LR35902)
 #
@@ -34,17 +35,23 @@ class CPU
 
     @opcodes = build_opcode_table
     @cb_opcodes = build_cb_opcode_table
+    @disassembler = Disassembler.new(mmu, @registers)
   end
 
   # １つ命令を実行する
   def step
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
 
+    context = @disassembler.before_step(registers.pc) # 命令前の状態を取って disasm 行を作る
     opcode = fetch_u8
-    puts "opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})"
     handler = opcodes[opcode]
-    raise "未実装の opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})" if handler.nil?
-    handler.call
+    if handler.nil?
+      puts "未実装の opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})"
+      raise "未実装の opcode 0x#{opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})"
+    end
+    cycles = handler.call
+    puts @disassembler.after_step(context, opcode, cycles) # 命令後の差分とまとめて整形済みの行を出力
+    cycles
   end
 
   # cycles_targetサイクル分だけ実行する
@@ -129,7 +136,6 @@ class CPU
   def dispatch_cb
     cb_opcode = fetch_u8
     cb_handler = cb_opcodes[cb_opcode]
-    puts "CB opcode 0x#{cb_opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})"
     raise "未実装の CB opcode 0x#{cb_opcode.to_s(16).rjust(2, '0').upcase} (PC=0x#{Bit.wrap_u16(registers.pc - 1).to_s(16).rjust(4, '0').upcase})" if cb_handler.nil?
     cb_handler.call
   end
