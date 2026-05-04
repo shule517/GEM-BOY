@@ -48,7 +48,7 @@ end
 def setup(args)
   args.state.cartridge = Cartridge.new(args.gtk.read_file(ROM_PATH).bytes)
   args.state.mmu = MMU.new(args.state.cartridge, skip_boot: SKIP_BOOT)
-  args.state.cpu = CPU.new(args.state.mmu, skip_boot: SKIP_BOOT)
+  args.state.cpu = CPU.new(args.state.mmu, skip_boot: SKIP_BOOT, trace: true)
   args.state.ppu = PPU.new(args.state.mmu)
   args.state.crashed = false
   args.state.crash_message = nil

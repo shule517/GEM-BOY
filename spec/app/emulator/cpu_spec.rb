@@ -353,7 +353,7 @@ RSpec.describe CPU do
 
     it 'tobu.gb のロゴ照合を通って PC=0x0100 に到達する' do
       # SameBoy 同梱の dmg_boot.bin は VRAM クリアだけで 8192 iter × 28 cycle = 229,376 cycle 必要
-      # ロゴ展開 + スクロールイン + チャイム待機まで含めると実機で数百万 T-cycle 程度
+      # ロゴ展開 + スクロールイン + 静止待機まで含めると実機で数百万 T-cycle 程度
       # 現状は途中の未実装命令で例外停止する想定で、上限 400,000 T-cycle で次に詰まる
       # 命令を観測する probe として使う。命令が揃ってきたら上限を増やしていく。
       elapsed = 0
