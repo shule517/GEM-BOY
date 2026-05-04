@@ -482,10 +482,42 @@ class CPU
     # ============================================================
     table[0xC3] = -> { registers.pc = fetch_u16; 16 } # JP u16
     table[0xE9] = -> { registers.pc = registers.hl; 4 } # JP HL
-    # table[0xC2] = -> { 16 } # JP NZ,u16 (taken: 16 / not taken: 12)
-    # table[0xCA] = -> { 16 } # JP Z,u16  (taken: 16 / not taken: 12)
-    # table[0xD2] = -> { 16 } # JP NC,u16 (taken: 16 / not taken: 12)
-    # table[0xDA] = -> { 16 } # JP C,u16  (taken: 16 / not taken: 12)
+    table[0xC2] = -> do # JP NZ,u16 (taken: 16 / not taken: 12) NZ: Execute if Z is not set.
+      address = fetch_u16
+      if registers.zero_flag == 0
+        registers.pc = address
+        16
+      else
+        12
+      end
+    end
+    table[0xCA] = -> do # JP Z,u16  (taken: 16 / not taken: 12) Z: Execute if Z is set.
+      address = fetch_u16
+      if registers.zero_flag == 1
+        registers.pc = address
+        16
+      else
+        12
+      end
+    end
+    table[0xD2] = -> do # JP NC,u16 (taken: 16 / not taken: 12) NC: Execute if C is not set.
+      address = fetch_u16
+      if registers.carry_flag == 0
+        registers.pc = address
+        16
+      else
+        12
+      end
+    end
+    table[0xDA] = -> do # JP C,u16  (taken: 16 / not taken: 12) C: Execute if C is set.
+      address = fetch_u16
+      if registers.carry_flag == 1
+        registers.pc = address
+        16
+      else
+        12
+      end
+    end
 
     # ============================================================
     # ジャンプ - JR (相対ジャンプ)
@@ -528,7 +560,7 @@ class CPU
     # table[0xCC] = -> { 24 } # CALL Z,u16  (taken: 24 / not taken: 12)
     # table[0xD4] = -> { 24 } # CALL NC,u16 (taken: 24 / not taken: 12)
     # table[0xDC] = -> { 24 } # CALL C,u16  (taken: 24 / not taken: 12)
-    table[0xC9] = -> { registers.pc = mmu.read_u16(address: registers.sp); registers.sp = registers.sp + 2; 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
+    table[0xC9] = -> { registers.pc = pop_u16; 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
     # table[0xD9] = -> { 16 } # RETI
     # table[0xC0] = -> { 20 } # RET NZ (taken: 20 / not taken: 8)
     # table[0xC8] = -> { 20 } # RET Z  (taken: 20 / not taken: 8)
