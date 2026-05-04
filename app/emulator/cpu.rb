@@ -376,7 +376,7 @@ class CPU
     table[0x1C] = -> { half_carry_result = Bit.low_4bits(registers.e) + 1 > 0x0F; registers.e = registers.e + 1; registers.set_flags(zero: registers.e == 0, negative: false, half_carry: half_carry_result); 4 } # INC E
     table[0x24] = -> { half_carry_result = Bit.low_4bits(registers.h) + 1 > 0x0F; registers.h = registers.h + 1; registers.set_flags(zero: registers.h == 0, negative: false, half_carry: half_carry_result); 4 } # INC H
     table[0x2C] = -> { half_carry_result = Bit.low_4bits(registers.l) + 1 > 0x0F; registers.l = registers.l + 1; registers.set_flags(zero: registers.l == 0, negative: false, half_carry: half_carry_result); 4 } # INC L
-    # table[0x34] = -> { 12 } # INC (HL)
+    table[0x34] = -> { half_carry_result = Bit.low_4bits(read_at_hl) + 1 > 0x0F; write_at_hl(read_at_hl + 1); registers.set_flags(zero: read_at_hl == 0, negative: false, half_carry: half_carry_result); 12 } # INC (HL)
     table[0x3C] = -> { half_carry_result = Bit.low_4bits(registers.a) + 1 > 0x0F; registers.a = registers.a + 1; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
 
     # ============================================================
@@ -668,7 +668,7 @@ class CPU
     cb_table[0x23] = -> { carry = registers.e[7]; registers.e = registers.e << 1; registers.set_flags(zero: registers.e == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA E
     cb_table[0x24] = -> { carry = registers.h[7]; registers.h = registers.h << 1; registers.set_flags(zero: registers.h == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA H
     cb_table[0x25] = -> { carry = registers.l[7]; registers.l = registers.l << 1; registers.set_flags(zero: registers.l == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA L
-    # cb_table[0x26] = -> { 16 } # SLA (HL)
+    cb_table[0x26] = -> { carry = read_at_hl[7]; write_at_hl(read_at_hl << 1); registers.set_flags(zero: read_at_hl == 0, negative: false, half_carry: false, carry: carry); 16 } # SLA (HL)
     cb_table[0x27] = -> { carry = registers.a[7]; registers.a = registers.a << 1; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA A
 
     # ============================================================

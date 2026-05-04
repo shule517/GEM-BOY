@@ -24,10 +24,10 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 | B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 2/2 [完了](INC/DEC・AND・CALL/RET・JR Z/JR 無条件まで追加され、HELLO WORLD 統合シナリオが HALT 到達)|
 | C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 2/2 [完了](C-1: LY ティック / C-2: BG タイル描画。framebuffer に画素が乗るようになった)|
 | D. HELLO WORLD 表示 | skip_boot 起動 + 画面確認 | 1h | **画面に "Hello World!" 表示** ★第一 | 2/2 [完了] ★ **第一マイルストーン達成**(`hello.gb` の `Hello 8-bit world!` が DragonRuby で描画された)|
-| E. Nintendo ロゴ表示 | ブートROM 用追加命令 + CB-prefix + ブートROM mapping + スクロール | 2.5〜6.5h | **正しい Nintendo ロゴ** ★第二 | 1.5/7(E-1 で PUSH/POP/JP cc/JR cc/CALL cc 完成、E-2 で CB-prefix BIT/RES/SET 系をほぼ実装。**残りは ALU 系(ADD/SUB/ADC/SBC)+ CB ROTATE 系 + RST/RETI/EI/RET cc など**)|
+| E. Nintendo ロゴ表示 | ブートROM 用追加命令 + CB-prefix + ブートROM mapping + スクロール | 2.5〜6.5h | **正しい Nintendo ロゴ** ★第二 | 3/7(E-1 で PUSH/POP/JP cc/JR cc/CALL cc/ADD/SUB/ADD HL/RLCA/RRCA/RLA/RRA/DEC (HL) など主要命令完成、E-2 で BIT/RES/SET 系 + RR/RL/SRL ファミリー完成。**残りは ADC/SBC/RLC/RRC/SRA/SWAP の量産 + RST/RETI/EI/RET cc/DAA/CPL/SCF/CCF + INC (HL) + ADD SP,e8 など**)|
 | F. tobu.gb タイトル | MBC1 + スプライト + 入力 + タイマー | 6.5〜10h | **tobu.gb タイトル表示** ★第三 | 0/5 |
 
-合計 21 ステップ、想定 17〜26.5h。**現在 11 ステップ完了(フェーズ A + B-1, B-2 + C-1, C-2 + D-1, D-2 完了、E-1 / E-2 部分着手)**。★ **第一マイルストーン(HELLO WORLD 表示)達成**。
+合計 21 ステップ、想定 17〜26.5h。**現在 11 ステップ完了(フェーズ A + B-1, B-2 + C-1, C-2 + D-1, D-2 完了、E-1 / E-2 ほぼ完成)**。★ **第一マイルストーン(HELLO WORLD 表示)達成**。
 
 ### 進行中の発見(2026-05-04 時点)
 
@@ -35,21 +35,33 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 `./dragonruby .` で `data/hello.gb` を skip_boot 起動 → 左ペインに `Hello 8-bit world!` が DMG パレットで表示。右ペインには PC=0x01B9 / LY=74 が表示され、CPU が HALT 後も PPU が回り続けていることが目視できる。**フェーズ D 完了**。
 
-#### 2. CPU は 181 通常 opcode + 200 CB opcode 実装(計 381 / 501 = 約 76%)
+#### 2. CPU は 207 通常 opcode + 223 CB opcode 実装(計 430 / 501 = 約 86%)
 
 **実装済みカテゴリ(主要)**:
 - **8bit ロード**: `LD r, u8` × 8、`LD r, r'` × 64、`LD A, (rr)` × 8、`LD A, (u16)` / `LD (u16), A`、I/O ポート系 (`LD (FF00+u8/C), A` 等)
 - **16bit ロード**: `LD rr, u16` × 4、`LD (u16), SP`、`LD SP, HL`
 - **PUSH / POP**: BC/DE/HL/AF 全 8 個(`push_u16` / `pop_u16` ヘルパで対称配置、`af` getter/setter も追加)
 - **8bit 論理演算**: `AND/XOR/OR/CP r` × 32 + 即値 4 個 = 36 個
-- **INC / DEC**: 8bit レジスタ系 14 個 + 16bit ペア 8 個(`(HL)` 版以外完了)
+- **8bit 算術**: `ADD A, r/u8` × 9、`SUB A, r/u8` × 9(`add_a` / `sub_a` ヘルパでフラグ計算を集約)
+- **16bit 算術**: `ADD HL, rr` × 4(下位 12bit ハーフキャリー判定対応、Z 保持)
+- **INC / DEC**: 8bit レジスタ系 14 個 + 16bit ペア 8 個 + `DEC (HL)` 1 個
 - **条件分岐**: JR cc × 5、JP cc × 6、CALL cc × 5(`jp(cc:)` / `jr(cc:)` / `call(cc:)` ヘルパで対称配置、`registers.nz?` / `z?` / `nc?` / `c?` 述語も追加)
 - **RET**: 無条件 RET のみ(`pop_u16` ヘルパ経由)
-- **CB-prefix**: BIT n,r / RES n,r / SET n,r 計 192 個(レジスタ版 + (HL) 版を含む)+ 一部 ROTATE 系
+- **A 専用ローテート**: `RLCA` / `RRCA` / `RLA` / `RRA`(Z=0 固定の高速版、CB 経由の汎用版とは独立)
+- **CB-prefix**: BIT/RES/SET 計 192 個(レジスタ版 + (HL) 版を含む) + RR ファミリー 8 個 + RL ファミリー 8 個 + SRL ファミリー 8 個 + SLA レジスタ版 7 個
 
 **PPU(C-1, C-2)** 完了済み(LY ティック + BG タイル描画)。**HELLO WORLD** は HALT(PC=0x01B8)到達で halted=true、実機でも文字描画確認済み(2026-05-02)。
 
-**Blargg 進捗**: cpu_instrs 個別 ROM 11 個 + instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound 個別 ROM 計 41 件のシナリオテストが `spec/app/emulator/gb-test-roms/` 配下に整備されており、現状は全 ROM が **`0xC6 (ADD A, u8)` 未実装**で停止する所まで進んでいる(以前は `0xC4 (CALL NZ)` で全停止していたが、`call(cc:)` 実装で次のフェーズに進んだ)。
+**Blargg 進捗**: cpu_instrs 個別 ROM 11 個 + instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound 個別 ROM 計 41 件のシナリオテストが `spec/app/emulator/gb-test-roms/` 配下に整備されており、停止点が **`0xC4 (CALL NZ)` → `0xC6 (ADD A, u8)` → `0xD6 (SUB A, u8)` → CB `0x38` (SRL B)** と着実に前進中。現状は ROM ごとに異なる未実装命令(`ADC` / `SBC` / `CB SRA` / `CB RLC` 等)で停止する段階。
+
+**残る未実装命令**(主要なもの):
+- ALU 系: `ADC A, r/u8` × 9、`SBC A, r/u8` × 9
+- CB-prefix: `RLC r` × 8、`RRC r` × 8、`SRA r` × 8、`SWAP r` × 8、`SLA (HL)` × 1
+- 制御系: `RST 00H〜38H` × 8、`RETI`、`EI`、`RET cc` × 4
+- 演算: `DAA` / `CPL` / `SCF` / `CCF`
+- メモリ: `INC (HL)` × 1
+- SP系: `ADD SP, e8` × 1、`LD HL, SP+e8` のフラグ計算修正
+- その他: `STOP`
 
 #### 3. ブートROM: VRAM クリアループ(`LD (HL+),A` / `BIT 5,H` / `JR Z,-5`)で 200,000 サイクル枠を超過して停止
 
@@ -84,15 +96,15 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 ★第一マイルストーン達成済み。次は **★第二マイルストーン(Nintendo ロゴ表示)** に向かう。優先順位:
 
-1. **8bit ALU 系を実装(`ADD/ADC/SUB/SBC` × レジスタ8 + 即値1 = 36 命令)** — **Blargg 41 件全てが現在 `0xC6 (ADD A, u8)` で停止しているので最優先**。`add_a(value)` / `sub_a(value)` ヘルパでフラグ計算を集約すれば、論理演算と同じパターンで量産可能
-2. **CB-prefix ROTATE 系(RLC / RRC / RL / RR / SLA / SRA / SWAP / SRL の残り)を実装** — `RL r` がブートROM のロゴ展開で頻発する。BIT/RES/SET と同じ書き方で量産可能
-3. **`RST 00H〜38H`(8 個)+ `RETI` + `EI` + `RET cc`(4 個)** — ブートROM 後半 + tobu.gb の割り込みで必要。`call(cc:)` / `pop_u16` ヘルパが流用できる
-4. **16bit 算術(`ADD HL, rr` × 4 + `ADD SP, i8` + `LD HL, SP+i8`)** — フラグ計算は専用テンプレ
-5. **ローテート(非 CB)`RLCA / RLA / RRCA / RRA` + `DAA / CPL / SCF / CCF`** — 数命令で済む。`RLA` と `CB RL A` のフラグ仕様が違う(Z 扱い)点に注意
-6. **`INC (HL)` / `DEC (HL)`** — 残り 2 命令、(HL) 経由のメモリインクリメント
+1. **CB ROTATE 系の残り(`RLC / RRC / SRA / SWAP` × 8 + `SLA (HL)` = 33 個)** — `RLC r` がブートROM 起動直後のロゴ展開で頻発するので最優先。RL/RR/SRL/BIT/RES/SET の量産パターンに乗せて 1 行ずつで書ける
+2. **ALU 系の残り(`ADC A, r/u8` × 9 + `SBC A, r/u8` × 9 = 18 個)** — Blargg cpu_instrs の各 ROM が ALU 系で停止しているので、ここを埋めると一気に進む。`add_a` / `sub_a` ヘルパに `+ carry_flag` / `- carry_flag` を加えるだけで派生可能
+3. **割り込み関連(`EI` + `RETI` + `RET cc` × 4 + VBlank IF 立ち上げ)** — ブートROM の VBlank 待ちで詰まっている本質的問題。PPU の `LY=144 → IF |= 0x01` を実装すると一気に抜ける
+4. **`RST 00H〜38H` × 8** — `call(cc:)` ヘルパに固定アドレス引数を渡す形で書ける。割り込みベクタ(`RST 38H` 等)で必要
+5. **`DAA / CPL / SCF / CCF` × 4** — Blargg `08-misc instrs.gb` が検証する。DAA は BCD 補正で複雑、他の 3 つは単純
+6. **`INC (HL)` × 1**(`DEC (HL)` のペア)、**`ADD SP, e8`**、**`LD HL, SP+e8` のフラグ修正** — 残るアウトライアー
 7. **E-3 PPU SCY スクロール対応 / E-4 ブートROM mapping** — Nintendo ロゴのスクロールイン演出に必要
-8. **`0xF8 LD HL, SP+i8` のフラグ計算修正**(現在 H=1, C=1 のハードコード、TODO 残り)
-9. **VBlank 割り込み要求の実装(IF レジスタ 0xFF0F の bit 0)** — ブートROM が VBlank 待ちで詰まる問題の本質的修正
+
+ここまで実装すれば、CPU 命令カバレッジ 86% → 99%+ に達し、ブートROM が完走する条件がほぼ揃う。あとは **PPU のスクロールイン演出**(E-3)と **ブートROM mapping**(E-4)で第二マイルストーン達成。
 
 ## 進捗チェックリスト
 
@@ -103,7 +115,7 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 ### フェーズ B: CPU 基本命令(hello.gb 用)
 - [x] B-1: CPU 骨組み(NOP + ヘルパ群)
-- [x] B-2: hello.gb が使う命令一式(~161 オペコード、HELLO WORLD 完走シナリオが HALT 到達。INC/DEC・AND・JR 無条件・JR Z・CALL u16・RET まで実装済み)
+- [x] B-2: hello.gb が使う命令一式(B-2 完了時 ~161 オペコード、現在は E-1/E-2 で拡張され 207 通常 + 223 CB = 計 430 命令。HELLO WORLD 完走シナリオが HALT 到達)
 
 ### フェーズ C: PPU 最小実装
 - [x] C-1: PPU 骨組み(LCDC, LY, モード) — LY ティック動作、HELLO WORLD は VBlank ループを抜けて CALL で停止
@@ -114,12 +126,12 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 - [x] D-2: hello.gb 起動 → "Hello World!" 表示 ★第一マイルストーン達成 — `./dragonruby .` で `Hello 8-bit world!` が DMG パレットで描画されることを目視確認(2026-05-02)。統合テスト `HELLO WORLD 完走` も HALT 到達で pass
 
 ### フェーズ E: Nintendo ロゴ表示
-- [~] E-1: ブートROM 用 CPU 命令追加 — **PUSH/POP × 8、JP cc × 4、JR cc × 5、CALL cc × 5(ヘルパ `jp(cc:)` / `jr(cc:)` / `call(cc:)` で対称配置)、`registers.nz?/z?/nc?/c?` 述語を実装済み**。**残: ADD/SUB/ADC/SBC(8bit + 即値、計 36 個)、ローテート(非CB)4 個、INC (HL) / DEC (HL)、RST × 8、RETI、EI、RET cc × 4、DAA/CPL/SCF/CCF、ADD HL,rr × 4、ADD SP,i8、LD HL,SP+i8 のフラグ計算修正**
-- [~] E-2: CB-prefix 実装 — **BIT/RES/SET の (HL) 版含む 192 命令を実装済み**。**残: ROTATE 系(RLC / RRC / RL / RR / SLA / SRA / SWAP / SRL の (HL) 版を含む 64 個のうち、SLA レジスタ版のみ実装済み = 残り約 56 個)**
+- [~] E-1: ブートROM 用 CPU 命令追加 — **PUSH/POP × 8、JP cc × 4、JR cc × 5、CALL/CALL cc × 5、ADD/SUB × 18(`add_a`/`sub_a` ヘルパ)、ADD HL × 4、A 専用ローテート 4 個(RLCA/RRCA/RLA/RRA)、DEC (HL)、`registers.nz?/z?/nc?/c?` 述語、`push_u16`/`pop_u16` ヘルパなど主要命令完成**。**残:ADC/SBC(計 18 個)、RST × 8、RETI、EI、RET cc × 4、DAA/CPL/SCF/CCF、INC (HL)、ADD SP, e8、LD HL, SP+e8 のフラグ計算修正**
+- [~] E-2: CB-prefix 実装 — **BIT/RES/SET の (HL) 版含む 192 命令 + RR/RL/SRL ファミリー(8 個 × 3 = 24 命令) + SLA レジスタ版 7 個 = 計 223 命令実装済み**。**残:RLC × 8 + RRC × 8 + SRA × 8 + SWAP × 8 + SLA (HL) × 1 = 33 命令**
 - [ ] E-3: PPU SCY スクロール対応
 - [ ] E-4: MMU にブートROM mapping 追加 + VBlank IF (0xFF0F bit 0) 立ち上げ
 - [ ] E-5: ブートROM 起動 → 崩れたロゴ観察
-- [ ] E-6: Blargg 診断ループ — **`spec/app/emulator/gb-test-roms/` に 41 件のシナリオテスト整備済み**(cpu_instrs / instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound)。停止位置が opcode 単位で見えるので診断ツールとして機能中
+- [ ] E-6: Blargg 診断ループ — **`spec/app/emulator/gb-test-roms/` に 41 件のシナリオテスト整備済み**(cpu_instrs / instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound)。停止位置が opcode 単位で見え、`0xC4 → 0xC6 → 0xD6 → CB 0x38` と着実に前進
 - [ ] E-7: 修正済み Nintendo ロゴ表示 ★第二マイルストーン
 
 ### フェーズ F: tobu.gb タイトル
@@ -221,7 +233,7 @@ CPU リファレンス:
 
 ### 現状(2026-05-02 時点)
 
-**実装済み命令カテゴリ(計 ~161 通常 opcode + 168 CB opcode):**
+**実装済み命令カテゴリ(B-2 完了時の計 ~161 通常 opcode + 168 CB opcode、現在は E-1/E-2 で拡張され 207 + 223 = 430 命令):**
 
 | カテゴリ | 範囲 | 状態 |
 |---|---|---|
