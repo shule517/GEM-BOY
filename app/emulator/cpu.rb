@@ -194,6 +194,16 @@ class CPU
     end
   end
 
+  # ADD A,B
+  def add_a(b)
+    result = registers.a + b
+    carry = result > 0xFF # When the result of an 8-bit addition is higher than $FF. https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#the-carry-flag-c-or-cy
+    half_carry = Bit.low_4bits(registers.a) + Bit.low_4bits(b) > 0xF
+    registers.a = result
+    registers.set_flags(zero: registers.a == 0, negative: 0, carry: carry, half_carry: half_carry)
+    4
+  end
+
   # opcodeテーブル
   # CPUの命令一覧 https://izik1.github.io/gbops/
   # GB CPU 命令リファレンス(RGBDS 公式マニュアル) https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
@@ -381,15 +391,15 @@ class CPU
     # ============================================================
     # 8bit 算術 - ADD A
     # ============================================================
-    # TODO: 未実装 table[0x80] = -> { registers.a = Bit.wrap_u8(registers.a + registers.b); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: false); 4 } # ADD A,B
-    # table[0x81] = -> { 4 } # ADD A,C
-    # table[0x82] = -> { 4 } # ADD A,D
-    # table[0x83] = -> { 4 } # ADD A,E
-    # table[0x84] = -> { 4 } # ADD A,H
-    # table[0x85] = -> { 4 } # ADD A,L
-    # table[0x86] = -> { 8 } # ADD A,(HL)
-    # table[0x87] = -> { 4 } # ADD A,A
-    # table[0xC6] = -> { 8 } # ADD A,u8
+    table[0x80] = -> { add_a(registers.b) } # ADD A,B
+    table[0x81] = -> { add_a(registers.c) } # ADD A,C
+    table[0x82] = -> { add_a(registers.d) } # ADD A,D
+    table[0x83] = -> { add_a(registers.e) } # ADD A,E
+    table[0x84] = -> { add_a(registers.h) } # ADD A,H
+    table[0x85] = -> { add_a(registers.l) } # ADD A,L
+    table[0x86] = -> { add_a(read_at_hl) + 4 } # ADD A,(HL)
+    table[0x87] = -> { add_a(registers.a) } # ADD A,A
+    table[0xC6] = -> { add_a(fetch_u8) + 4 } # ADD A,u8
 
     # ============================================================
     # 16bit 算術 - ADD HL,rr (HL に rr を加算、Z は保持、N=0、H/C 計算)
