@@ -160,11 +160,35 @@ class CPU
     cb_handler.call
   end
 
-  def jp(cc:) # JP cc,u16 (taken: 16 / not taken: 12)
+  # 指定したアドレスにジャンプする
+  def jp(condition:) # JP cc,u16 (taken: 16 / not taken: 12)
     address = fetch_u16
-    if cc
+    if condition
       registers.pc = address
       16
+    else
+      12
+    end
+  end
+
+  # 相対ジャンプ
+  def jr(condition:) # JR cc,i8 (taken: 12 / not taken: 8)
+    offset_i8 = fetch_i8
+    if condition
+      registers.pc = registers.pc + offset_i8
+      12
+    else
+      8
+    end
+  end
+
+  # CALL cc,n16
+  def call(condition:)
+    address = fetch_u16
+    if condition
+      push_u16(registers.pc) # RETで戻ってこれるように、次の命令の位置をpushしておく
+      registers.pc = address # 読み込んだアドレスにジャンプする
+      24
     else
       12
     end
@@ -490,54 +514,30 @@ class CPU
     # ============================================================
     # ジャンプ - JP (絶対ジャンプ)
     # ============================================================
-    table[0xC3] = -> { jp(cc: true) } # JP u16
+    table[0xC3] = -> { jp(condition: true) } # JP u16
     table[0xE9] = -> { registers.pc = registers.hl; 4 } # JP HL
-    table[0xC2] = -> { jp(cc: registers.nz?) } # JP NZ,u16 (taken: 16 / not taken: 12) NZ: Execute if Z is not set.
-    table[0xCA] = -> { jp(cc: registers.z?) } # JP Z,u16 (taken: 16 / not taken: 12) Z: Execute if Z is set.
-    table[0xD2] = -> { jp(cc: registers.nc?) } # JP NC,u16 (taken: 16 / not taken: 12) NC: Execute if C is not set.
-    table[0xDA] = -> { jp(cc: registers.c?) } # JP C,u16 (taken: 16 / not taken: 12) C: Execute if C is set.
+    table[0xC2] = -> { jp(condition: registers.nz?) } # JP NZ,u16
+    table[0xCA] = -> { jp(condition: registers.z?) } # JP Z,u16
+    table[0xD2] = -> { jp(condition: registers.nc?) } # JP NC,u16
+    table[0xDA] = -> { jp(condition: registers.c?) } # JP C,u16
 
     # ============================================================
     # ジャンプ - JR (相対ジャンプ)
     # ============================================================
-    table[0x18] = -> { offset_i8 = fetch_i8; registers.pc = registers.pc + offset_i8; 12 } # JR i8: 無条件相対ジャンプ。fetch_i8 後のPC(=次の命令の先頭)を起点にオフセット加算
-    table[0x20] = -> do # JR NZ,i8
-      offset_i8 = fetch_i8
-      if registers.nz? # NZ: Execute if Z is not set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#NZ
-        registers.pc = registers.pc + offset_i8
-        12
-      else
-        8
-      end
-    end
-    table[0x28] = -> do # JR Z,i8  (taken: 12 / not taken: 8)
-      offset_i8 = fetch_i8
-      if registers.z? # Z: Execute if Z is set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#Z
-        registers.pc = registers.pc + offset_i8
-        12
-      else
-        8
-      end
-    end
-    # table[0x30] = -> { 12 } # JR NC,i8 (taken: 12 / not taken: 8)
-    # table[0x38] = -> { 12 } # JR C,i8  (taken: 12 / not taken: 8)
+    table[0x18] = -> { jr(condition: true) } # JR i8
+    table[0x20] = -> { jr(condition: registers.nz?) } # JR NZ,i8
+    table[0x28] = -> { jr(condition: registers.z?) } # JR Z,i8
+    table[0x30] = -> { jr(condition: registers.nc?) } # JR NC,i8
+    table[0x38] = -> { jr(condition: registers.c?) } # JR C,i8
 
     # ============================================================
     # コール / リターン
     # ============================================================
-    table[0xCD] = -> { address = fetch_u16; registers.sp = registers.sp - 2; mmu.write_u16(address: registers.sp, value: registers.pc); registers.pc = address; 24 } # CALL u16: 戻りアドレス(=次の命令のPC)をstackに積んでから呼び出し先にjump
-    # table[0xC4] = -> do # CALL NZ,u16 (taken: 24 / not taken: 12)
-    #   address = fetch_u16 # u16のアドレスにジャンプする
-    #   if registers.nz? # NZ: Execute if Z is not set. https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#NZ
-    #     registers.pc = address
-    #     24
-    #   else
-    #     12
-    #   end
-    # end
-    # table[0xCC] = -> { 24 } # CALL Z,u16  (taken: 24 / not taken: 12)
-    # table[0xD4] = -> { 24 } # CALL NC,u16 (taken: 24 / not taken: 12)
-    # table[0xDC] = -> { 24 } # CALL C,u16  (taken: 24 / not taken: 12)
+    table[0xCD] = -> { call(condition: true) } # CALL u16: 戻りアドレス(=次の命令のPC)をstackに積んでから呼び出し先にjump
+    table[0xC4] = -> { call(condition: registers.nz?) } # CALL NZ,u16
+    table[0xCC] = -> { call(condition: registers.z?) } # CALL Z,u16
+    table[0xD4] = -> { call(condition: registers.nc?) } # CALL NC,u16
+    table[0xDC] = -> { call(condition: registers.c?) } # CALL C,u16
     table[0xC9] = -> { registers.pc = pop_u16; 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
     # table[0xD9] = -> { 16 } # RETI
     # table[0xC0] = -> { 20 } # RET NZ (taken: 20 / not taken: 8)
@@ -824,7 +824,7 @@ class CPU
     cb_table[0xC3] = -> { registers.e = Bit.set_bit(registers.e, 0, 1); 8 } # SET 0,E
     cb_table[0xC4] = -> { registers.h = Bit.set_bit(registers.h, 0, 1); 8 } # SET 0,H
     cb_table[0xC5] = -> { registers.l = Bit.set_bit(registers.l, 0, 1); 8 } # SET 0,L
-    # cb_table[0xC6] = -> { 16 } # SET 0,(HL)
+    cb_table[0xC6] = -> { write_at_hl(Bit.set_bit(read_at_hl, 0, 1)); 16 } # SET 0,(HL)
     cb_table[0xC7] = -> { registers.a = Bit.set_bit(registers.a, 0, 1); 8 } # SET 0,A
     cb_table[0xC8] = -> { registers.b = Bit.set_bit(registers.b, 1, 1); 8 } # SET 1,B
     cb_table[0xC9] = -> { registers.c = Bit.set_bit(registers.c, 1, 1); 8 } # SET 1,C
@@ -832,7 +832,7 @@ class CPU
     cb_table[0xCB] = -> { registers.e = Bit.set_bit(registers.e, 1, 1); 8 } # SET 1,E
     cb_table[0xCC] = -> { registers.h = Bit.set_bit(registers.h, 1, 1); 8 } # SET 1,H
     cb_table[0xCD] = -> { registers.l = Bit.set_bit(registers.l, 1, 1); 8 } # SET 1,L
-    # cb_table[0xCE] = -> { 16 } # SET 1,(HL)
+    cb_table[0xCE] = -> { write_at_hl(Bit.set_bit(read_at_hl, 1, 1)); 16 } # SET 1,(HL)
     cb_table[0xCF] = -> { registers.a = Bit.set_bit(registers.a, 1, 1); 8 } # SET 1,A
     cb_table[0xD0] = -> { registers.b = Bit.set_bit(registers.b, 2, 1); 8 } # SET 2,B
     cb_table[0xD1] = -> { registers.c = Bit.set_bit(registers.c, 2, 1); 8 } # SET 2,C
@@ -840,7 +840,7 @@ class CPU
     cb_table[0xD3] = -> { registers.e = Bit.set_bit(registers.e, 2, 1); 8 } # SET 2,E
     cb_table[0xD4] = -> { registers.h = Bit.set_bit(registers.h, 2, 1); 8 } # SET 2,H
     cb_table[0xD5] = -> { registers.l = Bit.set_bit(registers.l, 2, 1); 8 } # SET 2,L
-    # cb_table[0xD6] = -> { 16 } # SET 2,(HL)
+    cb_table[0xD6] = -> { write_at_hl(Bit.set_bit(read_at_hl, 2, 1)); 16 } # SET 2,(HL)
     cb_table[0xD7] = -> { registers.a = Bit.set_bit(registers.a, 2, 1); 8 } # SET 2,A
     cb_table[0xD8] = -> { registers.b = Bit.set_bit(registers.b, 3, 1); 8 } # SET 3,B
     cb_table[0xD9] = -> { registers.c = Bit.set_bit(registers.c, 3, 1); 8 } # SET 3,C
@@ -848,7 +848,7 @@ class CPU
     cb_table[0xDB] = -> { registers.e = Bit.set_bit(registers.e, 3, 1); 8 } # SET 3,E
     cb_table[0xDC] = -> { registers.h = Bit.set_bit(registers.h, 3, 1); 8 } # SET 3,H
     cb_table[0xDD] = -> { registers.l = Bit.set_bit(registers.l, 3, 1); 8 } # SET 3,L
-    # cb_table[0xDE] = -> { 16 } # SET 3,(HL)
+    cb_table[0xDE] = -> { write_at_hl(Bit.set_bit(read_at_hl, 3, 1)); 16 } # SET 3,(HL)
     cb_table[0xDF] = -> { registers.a = Bit.set_bit(registers.a, 3, 1); 8 } # SET 3,A
     cb_table[0xE0] = -> { registers.b = Bit.set_bit(registers.b, 4, 1); 8 } # SET 4,B
     cb_table[0xE1] = -> { registers.c = Bit.set_bit(registers.c, 4, 1); 8 } # SET 4,C
@@ -856,7 +856,7 @@ class CPU
     cb_table[0xE3] = -> { registers.e = Bit.set_bit(registers.e, 4, 1); 8 } # SET 4,E
     cb_table[0xE4] = -> { registers.h = Bit.set_bit(registers.h, 4, 1); 8 } # SET 4,H
     cb_table[0xE5] = -> { registers.l = Bit.set_bit(registers.l, 4, 1); 8 } # SET 4,L
-    # cb_table[0xE6] = -> { 16 } # SET 4,(HL)
+    cb_table[0xE6] = -> { write_at_hl(Bit.set_bit(read_at_hl, 4, 1)); 16 } # SET 4,(HL)
     cb_table[0xE7] = -> { registers.a = Bit.set_bit(registers.a, 4, 1); 8 } # SET 4,A
     cb_table[0xE8] = -> { registers.b = Bit.set_bit(registers.b, 5, 1); 8 } # SET 5,B
     cb_table[0xE9] = -> { registers.c = Bit.set_bit(registers.c, 5, 1); 8 } # SET 5,C
@@ -864,7 +864,7 @@ class CPU
     cb_table[0xEB] = -> { registers.e = Bit.set_bit(registers.e, 5, 1); 8 } # SET 5,E
     cb_table[0xEC] = -> { registers.h = Bit.set_bit(registers.h, 5, 1); 8 } # SET 5,H
     cb_table[0xED] = -> { registers.l = Bit.set_bit(registers.l, 5, 1); 8 } # SET 5,L
-    # cb_table[0xEE] = -> { 16 } # SET 5,(HL)
+    cb_table[0xEE] = -> { write_at_hl(Bit.set_bit(read_at_hl, 5, 1)); 16 } # SET 5,(HL)
     cb_table[0xEF] = -> { registers.a = Bit.set_bit(registers.a, 5, 1); 8 } # SET 5,A
     cb_table[0xF0] = -> { registers.b = Bit.set_bit(registers.b, 6, 1); 8 } # SET 6,B
     cb_table[0xF1] = -> { registers.c = Bit.set_bit(registers.c, 6, 1); 8 } # SET 6,C
@@ -872,7 +872,7 @@ class CPU
     cb_table[0xF3] = -> { registers.e = Bit.set_bit(registers.e, 6, 1); 8 } # SET 6,E
     cb_table[0xF4] = -> { registers.h = Bit.set_bit(registers.h, 6, 1); 8 } # SET 6,H
     cb_table[0xF5] = -> { registers.l = Bit.set_bit(registers.l, 6, 1); 8 } # SET 6,L
-    # cb_table[0xF6] = -> { 16 } # SET 6,(HL)
+    cb_table[0xF6] = -> { write_at_hl(Bit.set_bit(read_at_hl, 6, 1)); 16 } # SET 6,(HL)
     cb_table[0xF7] = -> { registers.a = Bit.set_bit(registers.a, 6, 1); 8 } # SET 6,A
     cb_table[0xF8] = -> { registers.b = Bit.set_bit(registers.b, 7, 1); 8 } # SET 7,B
     cb_table[0xF9] = -> { registers.c = Bit.set_bit(registers.c, 7, 1); 8 } # SET 7,C
@@ -880,7 +880,7 @@ class CPU
     cb_table[0xFB] = -> { registers.e = Bit.set_bit(registers.e, 7, 1); 8 } # SET 7,E
     cb_table[0xFC] = -> { registers.h = Bit.set_bit(registers.h, 7, 1); 8 } # SET 7,H
     cb_table[0xFD] = -> { registers.l = Bit.set_bit(registers.l, 7, 1); 8 } # SET 7,L
-    # cb_table[0xFE] = -> { 16 } # SET 7,(HL)
+    cb_table[0xFE] = -> { write_at_hl(Bit.set_bit(read_at_hl, 7, 1)); 16 } # SET 7,(HL)
     cb_table[0xFF] = -> { registers.a = Bit.set_bit(registers.a, 7, 1); 8 } # SET 7,A
 
     cb_table
