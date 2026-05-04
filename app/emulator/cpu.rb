@@ -45,7 +45,7 @@ class CPU
   def step
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
 
-    context = @disassembler.before_step(registers.pc) # 命令前の状態を取って disasm 行を作る
+    context = @disassembler.before_step(registers.pc) if @trace # trace 有効時のみ命令前の状態を取って disasm 行を作る
     opcode = fetch_u8
     handler = opcodes[opcode]
     if handler.nil?
