@@ -67,30 +67,34 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         expect(cpu.ime).to eq true
       end
 
-      # 注: 本来は 1 命令遅延仕様だが、現状の実装は即時 EI なので
-      # 「EI 直後に IME=true」を確認するに留める
-      it 'EI の 1 命令遅延仕様は未対応(現状は即時 IME=1)' do
-        skip 'EI の 1 命令遅延仕様(ime_pending → 次命令後に反映)が未実装'
+      it 'EI の 1 命令遅延仕様: EI 直後の 1 命令を実行した後に IME=1 になる(現状は即時 EI のため失敗想定)' do
+        # 配置: 0xC000 = EI, 0xC001 = NOP
+        mmu.write_u8(address: 0xC001, value: 0x00) # NOP
+        cpu.ime = false
+        cpu.step # EI を実行 → 仕様上はまだ IME=0(次命令後に IME=1)
+        expect(cpu.ime).to eq false # ← 現状は即時 EI なので失敗(true になる)
+        cpu.step # NOP を実行 → ここで IME=1 になるべき
+        expect(cpu.ime).to eq true
       end
     end
 
     context 'IF & IE & 0x1F が真かつ IME=1 のとき割り込み dispatch される(Test 2)' do
       it 'IE=0x04 (Timer)、IF=0x04 をセットして次の step で 0x50 にジャンプし、IF bit 2 がクリアされる' do
-        skip '割り込みベクタへの自動 dispatch が未実装(IF/IE → push PC → vector jump → IME=0)'
+        mmu.write_u8(address: ie_address, value: 0x04)
+        mmu.write_u8(address: if_address, value: 0x04)
+        cpu.ime = true
+        cpu.registers.sp = 0xDFFE
+        cpu.registers.pc = 0xC100
+        mmu.write_u8(address: 0xC100, value: 0x00) # NOP(dispatch されなければこれが実行される)
 
-        # 期待される実装の挙動:
-        # mmu.write_u8(address: ie_address, value: 0x04)
-        # mmu.write_u8(address: if_address, value: 0x04)
-        # cpu.ime = true
-        # cpu.registers.sp = 0xDFFE
-        # cpu.registers.pc = 0xC100
-        # cpu.step
-        # expect(cpu.registers.pc).to eq timer_vector
-        # expect(cpu.ime).to eq false
-        # expect(mmu.read_u8(address: if_address) & 0x04).to eq 0
-        # expect(cpu.registers.sp).to eq 0xDFFC
-        # expect(mmu.read_u8(address: 0xDFFD)).to eq 0xC1 # 戻り先 high
-        # expect(mmu.read_u8(address: 0xDFFC)).to eq 0x00 # 戻り先 low
+        cpu.step
+
+        expect(cpu.registers.pc).to eq timer_vector # 0x50 へ jump
+        expect(cpu.ime).to eq false                  # IME クリア
+        expect(mmu.read_u8(address: if_address) & 0x04).to eq 0 # IF bit 2 クリア
+        expect(cpu.registers.sp).to eq 0xDFFC        # 2 バイト push
+        expect(mmu.read_u8(address: 0xDFFD)).to eq 0xC1 # 戻り先 high
+        expect(mmu.read_u8(address: 0xDFFC)).to eq 0x00 # 戻り先 low
       end
     end
 
@@ -153,15 +157,18 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
     context 'Timer 割り込み(Test 4)' do
       it 'TAC=0x05、TIMA=0xFF を超えると IF bit 2 (Timer) が立つ' do
-        skip 'Timer (DIV / TIMA / TMA / TAC) と IF bit 2 の自動セットが未実装'
+        mmu.write_u8(address: 0xFF07, value: 0x05) # TAC: enable + 262144 Hz
+        mmu.write_u8(address: 0xFF05, value: 0xFF) # TIMA: 次の tick でオーバーフロー
+        mmu.write_u8(address: 0xFF06, value: 0x42) # TMA: オーバーフロー時の再ロード値
+        mmu.write_u8(address: if_address, value: 0x00)
+        cpu.registers.pc = 0xC100
+        # NOP を 64 個並べて 256 cycles 進める(262144 Hz / 4 = 65536 Hz、4 cycles ごとに TIMA tick)
+        64.times { |i| mmu.write_u8(address: 0xC100 + i, value: 0x00) }
 
-        # 期待される実装の挙動:
-        # mmu.write_u8(address: 0xFF07, value: 0x05) # TAC: enable + 262144 Hz
-        # mmu.write_u8(address: 0xFF05, value: 0xFF) # TIMA: 次の tick でオーバーフロー
-        # mmu.write_u8(address: if_address, value: 0x00)
-        # cpu.run(cycles_for_one_tima_tick) # 16 cycles 程度
-        # expect(mmu.read_u8(address: if_address) & 0x04).to eq 0x04
-        # expect(mmu.read_u8(address: 0xFF05)).to eq mmu.read_u8(address: 0xFF06) # TMA が再ロードされる
+        cpu.run(256)
+
+        expect(mmu.read_u8(address: if_address) & 0x04).to eq 0x04 # Timer 割り込み立つ
+        expect(mmu.read_u8(address: 0xFF05)).to eq 0x42            # TMA が再ロード
       end
     end
 
@@ -195,26 +202,35 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       end
     end
 
-    context 'HALT 中に IF & IE が真になったとき(Test 5)' do
-      it 'halted=false に戻り、IME=1 ならベクタへ dispatch、IME=0 なら次の命令から再開' do
-        skip 'HALT 解除条件(IF & IE != 0)と dispatch / 非 dispatch の分岐が未実装'
+    context 'HALT 中に IF & IE が真になったとき(Test 5、IME=1)' do
+      it 'halted=false に戻り、ベクタ 0x50 へ dispatch される' do
+        cpu.ime = true
+        cpu.halted = true
+        cpu.registers.pc = 0xC100
+        cpu.registers.sp = 0xDFFE
+        mmu.write_u8(address: ie_address, value: 0x04)
+        mmu.write_u8(address: if_address, value: 0x04)
 
-        # 期待される実装の挙動:
-        # IME=1 のケース:
-        #   cpu.ime = true; cpu.halted = true
-        #   mmu.write_u8(address: ie_address, value: 0x04)
-        #   mmu.write_u8(address: if_address, value: 0x04)
-        #   cpu.step
-        #   expect(cpu.halted).to eq false
-        #   expect(cpu.registers.pc).to eq timer_vector
-        #
-        # IME=0 のケース(HALT bug を避けて):
-        #   cpu.ime = false; cpu.halted = true
-        #   mmu.write_u8(address: ie_address, value: 0x04)
-        #   mmu.write_u8(address: if_address, value: 0x04)
-        #   cpu.step
-        #   expect(cpu.halted).to eq false
-        #   expect(cpu.registers.pc).to eq pc_before + 1 # HALT の次から再開
+        cpu.step
+
+        expect(cpu.halted).to eq false
+        expect(cpu.registers.pc).to eq timer_vector
+      end
+    end
+
+    context 'HALT 中に IF & IE が真になったとき(Test 5、IME=0)' do
+      it 'halted=false に戻り、HALT の次の命令から再開する(dispatch されない)' do
+        cpu.ime = false
+        cpu.halted = true
+        cpu.registers.pc = 0xC100
+        mmu.write_u8(address: 0xC100, value: 0x00) # NOP
+        mmu.write_u8(address: ie_address, value: 0x04)
+        mmu.write_u8(address: if_address, value: 0x04)
+
+        cpu.step
+
+        expect(cpu.halted).to eq false
+        expect(cpu.registers.pc).to eq 0xC101 # NOP を踏んだ後
       end
     end
 
