@@ -266,6 +266,7 @@ class CPU
     carry = (registers.a + byte + registers.carry_flag) > 0xFF
     registers.a += byte + registers.carry_flag
     registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: half_carry, carry: carry)
+    4
   end
 
   # opcodeテーブル
@@ -481,15 +482,15 @@ class CPU
     # ============================================================
     # 8bit 算術 - ADC A (キャリー込み加算)
     # ============================================================
-    table[0x88] = -> { adc_a(registers.b); 4 } # ADC A,B
-    table[0x89] = -> { adc_a(registers.c); 4 } # ADC A,C
-    table[0x8A] = -> { adc_a(registers.d); 4 } # ADC A,D
-    table[0x8B] = -> { adc_a(registers.e); 4 } # ADC A,E
-    table[0x8C] = -> { adc_a(registers.h); 4 } # ADC A,H
-    table[0x8D] = -> { adc_a(registers.l); 4 } # ADC A,L
-    table[0x8E] = -> { adc_a(read_at_hl); 8 } # ADC A,(HL)
-    table[0x8F] = -> { adc_a(registers.a); 4 } # ADC A,A
-    table[0xCE] = -> { adc_a(fetch_u8); 8 } # ADC A,u8
+    table[0x88] = -> { adc_a(registers.b) } # ADC A,B
+    table[0x89] = -> { adc_a(registers.c) } # ADC A,C
+    table[0x8A] = -> { adc_a(registers.d) } # ADC A,D
+    table[0x8B] = -> { adc_a(registers.e) } # ADC A,E
+    table[0x8C] = -> { adc_a(registers.h) } # ADC A,H
+    table[0x8D] = -> { adc_a(registers.l) } # ADC A,L
+    table[0x8E] = -> { adc_a(read_at_hl) + 4 } # ADC A,(HL)
+    table[0x8F] = -> { adc_a(registers.a) } # ADC A,A
+    table[0xCE] = -> { adc_a(fetch_u8) + 4 } # ADC A,u8
 
     # ============================================================
     # 8bit 算術 - SUB A
