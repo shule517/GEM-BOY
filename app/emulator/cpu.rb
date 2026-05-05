@@ -205,6 +205,13 @@ class CPU
     end
   end
 
+  # RST vec https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#RST_vec
+  def rst(address:)
+    push_u16(registers.pc) # RETで戻ってこれるように、次の命令の位置をpushしておく
+    registers.pc = address # 読み込んだアドレスにジャンプする
+    16
+  end
+
   # ADD A,B
   def add_a(b)
     result_u8 = registers.a + b
@@ -213,6 +220,16 @@ class CPU
     registers.a = result_u8
     registers.set_flags(zero: registers.a == 0, negative: 0, carry: carry, half_carry: half_carry)
     4
+  end
+
+  # ADD SP,i8 https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#ADD_SP,e8
+  def add_sp(i8)
+    result_u8 = registers.sp + i8
+    carry = Bit.wrap_u8(registers.sp) + Bit.wrap_u8(i8) > 0xFF # Set if overflow from bit 7.
+    half_carry = Bit.low_4bits(registers.sp) + Bit.low_4bits(i8) > 0xF # Set if overflow from bit 3.
+    registers.sp = result_u8
+    registers.set_flags(zero: 0, negative: 0, carry: carry, half_carry: half_carry)
+    16
   end
 
   # ADD HL,B
@@ -230,6 +247,15 @@ class CPU
     carry = registers.a < b # When the result of an 8-bit addition is higher than $FF. https://gbdev.io/pandocs/CPU_Registers_and_Flags.html#the-carry-flag-c-or-cy
     half_carry = Bit.low_4bits(registers.a) < Bit.low_4bits(b)
     registers.a = registers.a - b
+    registers.set_flags(zero: registers.a == 0, negative: 1, carry: carry, half_carry: half_carry)
+    4
+  end
+
+  # SBC A,r8 https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#SBC_A,r8
+  def sbc_a(r8)
+    carry = (r8 + registers.carry_flag) > registers.a # Set if borrow (i.e. if (r8 + carry) > A).
+    half_carry = Bit.low_4bits(r8) + registers.carry_flag > Bit.low_4bits(registers.a) # Set if borrow from bit 4.
+    registers.a = registers.a - r8 - registers.carry_flag
     registers.set_flags(zero: registers.a == 0, negative: 1, carry: carry, half_carry: half_carry)
     4
   end
@@ -254,8 +280,8 @@ class CPU
     table[0x00] = -> { 4 } # NOP: 何もしない。4サイクル進む。
     # table[0x10] = -> { 4 } # STOP
     table[0x76] = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
-    table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグをクリアして割り込みを無効
-    # table[0xFB] = -> { 4 } # EI
+    table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグを無効にして、割り込みを無効
+    table[0xFB] = -> { self.ime = true; 4 } # EI: IMEフラグを有効にして、割り込みを有効
     table[0xCB] = -> { dispatch_cb } # PREFIX CB (次バイトを CB-prefix table で解釈)
 
     # ============================================================
@@ -450,7 +476,7 @@ class CPU
     # ============================================================
     # 16bit 算術 - ADD SP,i8 (符号付き 8bit を SP に加算、Z=N=0、H/C は下位 8bit 計算)
     # ============================================================
-    # table[0xE8] = -> { 16 } # ADD SP,i8
+    table[0xE8] = -> { add_sp(fetch_i8) } # ADD SP,i8
 
     # ============================================================
     # 8bit 算術 - ADC A (キャリー込み加算)
@@ -481,15 +507,15 @@ class CPU
     # ============================================================
     # 8bit 算術 - SBC A (キャリー込み減算)
     # ============================================================
-    # table[0x98] = -> { 4 } # SBC A,B
-    # table[0x99] = -> { 4 } # SBC A,C
-    # table[0x9A] = -> { 4 } # SBC A,D
-    # table[0x9B] = -> { 4 } # SBC A,E
-    # table[0x9C] = -> { 4 } # SBC A,H
-    # table[0x9D] = -> { 4 } # SBC A,L
-    # table[0x9E] = -> { 8 } # SBC A,(HL)
-    # table[0x9F] = -> { 4 } # SBC A,A
-    # table[0xDE] = -> { 8 } # SBC A,u8
+    table[0x98] = -> { sbc_a(registers.b) } # SBC A,B
+    table[0x99] = -> { sbc_a(registers.c) } # SBC A,C
+    table[0x9A] = -> { sbc_a(registers.d) } # SBC A,D
+    table[0x9B] = -> { sbc_a(registers.e) } # SBC A,E
+    table[0x9C] = -> { sbc_a(registers.h) } # SBC A,H
+    table[0x9D] = -> { sbc_a(registers.l) } # SBC A,L
+    table[0x9E] = -> { sbc_a(read_at_hl) + 4 } # SBC A,(HL)
+    table[0x9F] = -> { sbc_a(registers.a) } # SBC A,A
+    table[0xDE] = -> { sbc_a(fetch_u8) + 4 } # SBC A,u8
 
     # ============================================================
     # 8bit 論理 - AND
@@ -555,9 +581,9 @@ class CPU
     # その他演算 (DAA / CPL / SCF / CCF)
     # ============================================================
     # table[0x27] = -> { 4 } # DAA
-    # table[0x2F] = -> { 4 } # CPL
-    # table[0x37] = -> { 4 } # SCF
-    # table[0x3F] = -> { 4 } # CCF
+    table[0x2F] = -> { registers.a ^= 0xFF; registers.set_flags(negative: 1, half_carry: 1); 4 } # CPL Aのbitを反転する
+    table[0x37] = -> { registers.set_flags(negative: 0, half_carry: 0, carry: 1); 4 } # SCF
+    table[0x3F] = -> { registers.set_flags(negative: 0, half_carry: 0, carry: registers.carry_flag == 0 ? 1 : 0); 4 } # CCF https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#CCF
 
     # ============================================================
     # ジャンプ - JP (絶対ジャンプ)
@@ -586,24 +612,24 @@ class CPU
     table[0xCC] = -> { call(condition: registers.z?) } # CALL Z,u16
     table[0xD4] = -> { call(condition: registers.nc?) } # CALL NC,u16
     table[0xDC] = -> { call(condition: registers.c?) } # CALL C,u16
-    table[0xC9] = -> { registers.pc = pop_u16; 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
-    # table[0xD9] = -> { 16 } # RETI
-    table[0xC0] = -> { ret(condition: registers.nz?)} # RET NZ
-    table[0xC8] = -> { ret(condition: registers.z?)} # RET Z
-    table[0xD0] = -> { ret(condition: registers.nc?)} # RET NC
+    table[0xC9] = -> { ret(condition: true) } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
+    table[0xD9] = -> { self.ime = true; ret(condition: true); 16 } # RETI
+    table[0xC0] = -> { ret(condition: registers.nz?) } # RET NZ
+    table[0xC8] = -> { ret(condition: registers.z?) } # RET Z
+    table[0xD0] = -> { ret(condition: registers.nc?) } # RET NC
     table[0xD8] = -> { ret(condition: registers.c?) } # RET C
 
     # ============================================================
     # リセット (RST)
     # ============================================================
-    # table[0xC7] = -> { 16 } # RST 00h
-    # table[0xCF] = -> { 16 } # RST 08h
-    # table[0xD7] = -> { 16 } # RST 10h
-    # table[0xDF] = -> { 16 } # RST 18h
-    # table[0xE7] = -> { 16 } # RST 20h
-    # table[0xEF] = -> { 16 } # RST 28h
-    # table[0xF7] = -> { 16 } # RST 30h
-    # table[0xFF] = -> { 16 } # RST 38h
+    table[0xC7] = -> { rst(address: 0x00) } # RST 00h
+    table[0xCF] = -> { rst(address: 0x08) } # RST 08h
+    table[0xD7] = -> { rst(address: 0x10) } # RST 10h
+    table[0xDF] = -> { rst(address: 0x18) } # RST 18h
+    table[0xE7] = -> { rst(address: 0x20) } # RST 20h
+    table[0xEF] = -> { rst(address: 0x28) } # RST 28h
+    table[0xF7] = -> { rst(address: 0x30) } # RST 30h
+    table[0xFF] = -> { rst(address: 0x38) } # RST 38h
 
     # ============================================================
     # 未使用 (UNUSED) - 実機では実行すると CPU が固まる
@@ -693,26 +719,26 @@ class CPU
     # ============================================================
     # CB-prefix - SRA r (算術右シフト、bit0→C、bit7 維持、Z=結果0、N=H=0)
     # ============================================================
-    # cb_table[0x28] = -> { 8 }  # SRA B
-    # cb_table[0x29] = -> { 8 }  # SRA C
-    # cb_table[0x2A] = -> { 8 }  # SRA D
-    # cb_table[0x2B] = -> { 8 }  # SRA E
-    # cb_table[0x2C] = -> { 8 }  # SRA H
-    # cb_table[0x2D] = -> { 8 }  # SRA L
-    # cb_table[0x2E] = -> { 16 } # SRA (HL)
-    # cb_table[0x2F] = -> { 8 }  # SRA A
+    cb_table[0x28] = -> { registers.carry_flag = Bit.bit_at(registers.b, 0); registers.b = registers.b >> 1 | (registers.b & 1 << 7); registers.set_flags(zero: registers.b == 0, negative: 0, half_carry: 0); 8 } # SRA B: 8bit目は維持する
+    cb_table[0x29] = -> { registers.carry_flag = Bit.bit_at(registers.c, 0); registers.c = registers.c >> 1 | (registers.c & 1 << 7); registers.set_flags(zero: registers.c == 0, negative: 0, half_carry: 0); 8 } # SRA C: 8bit目は維持する
+    cb_table[0x2A] = -> { registers.carry_flag = Bit.bit_at(registers.d, 0); registers.d = registers.d >> 1 | (registers.d & 1 << 7); registers.set_flags(zero: registers.d == 0, negative: 0, half_carry: 0); 8 } # SRA D: 8bit目は維持する
+    cb_table[0x2B] = -> { registers.carry_flag = Bit.bit_at(registers.e, 0); registers.e = registers.e >> 1 | (registers.e & 1 << 7); registers.set_flags(zero: registers.e == 0, negative: 0, half_carry: 0); 8 } # SRA E: 8bit目は維持する
+    cb_table[0x2C] = -> { registers.carry_flag = Bit.bit_at(registers.h, 0); registers.h = registers.h >> 1 | (registers.h & 1 << 7); registers.set_flags(zero: registers.h == 0, negative: 0, half_carry: 0); 8 } # SRA H: 8bit目は維持する
+    cb_table[0x2D] = -> { registers.carry_flag = Bit.bit_at(registers.l, 0); registers.l = registers.l >> 1 | (registers.l & 1 << 7); registers.set_flags(zero: registers.l == 0, negative: 0, half_carry: 0); 8 } # SRA L: 8bit目は維持する
+    cb_table[0x2E] = -> { byte = read_at_hl; registers.carry_flag = Bit.bit_at(byte, 0); result = byte >> 1 | (byte & 1 << 7); write_at_hl(result); registers.set_flags(zero: result == 0, negative: 0, half_carry: 0); 16 } # SRA (HL)
+    cb_table[0x2F] = -> { registers.carry_flag = Bit.bit_at(registers.a, 0); registers.a = registers.a >> 1 | (registers.a & 1 << 7); registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0); 8 } # SRA A: 8bit目は維持する
 
     # ============================================================
     # CB-prefix - SWAP r (上位 4bit と下位 4bit を入れ替え、Z=結果0、N=H=C=0)
     # ============================================================
-    # cb_table[0x30] = -> { 8 }  # SWAP B
-    # cb_table[0x31] = -> { 8 }  # SWAP C
-    # cb_table[0x32] = -> { 8 }  # SWAP D
-    # cb_table[0x33] = -> { 8 }  # SWAP E
-    # cb_table[0x34] = -> { 8 }  # SWAP H
-    # cb_table[0x35] = -> { 8 }  # SWAP L
-    # cb_table[0x36] = -> { 16 } # SWAP (HL)
-    # cb_table[0x37] = -> { 8 }  # SWAP A
+    cb_table[0x30] = -> { registers.b = Bit.swap_u8(registers.b); registers.set_flags(zero: registers.b == 0, negative: 0, half_carry: 0, carry: 0); 8 } # SWAP B
+    cb_table[0x31] = -> { registers.c = Bit.swap_u8(registers.c); registers.set_flags(zero: registers.c == 0, negative: 0, half_carry: 0, carry: 0); 8 } # SWAP C
+    cb_table[0x32] = -> { registers.d = Bit.swap_u8(registers.d); registers.set_flags(zero: registers.d == 0, negative: 0, half_carry: 0, carry: 0); 8 } # SWAP D
+    cb_table[0x33] = -> { registers.e = Bit.swap_u8(registers.e); registers.set_flags(zero: registers.e == 0, negative: 0, half_carry: 0, carry: 0); 8 } # SWAP E
+    cb_table[0x34] = -> { registers.h = Bit.swap_u8(registers.h); registers.set_flags(zero: registers.h == 0, negative: 0, half_carry: 0, carry: 0); 8 } # SWAP H
+    cb_table[0x35] = -> { registers.l = Bit.swap_u8(registers.l); registers.set_flags(zero: registers.l == 0, negative: 0, half_carry: 0, carry: 0); 8 } # SWAP L
+    cb_table[0x36] = -> { byte = Bit.swap_u8(read_at_hl); write_at_hl(byte); registers.set_flags(zero: byte == 0, negative: 0, half_carry: 0, carry: 0); 16 } # SWAP (HL)
+    cb_table[0x37] = -> { registers.a = Bit.swap_u8(registers.a); registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0, carry: 0); 8 } # SWAP A
 
     # ============================================================
     # CB-prefix - SRL r (論理右シフト、bit0→C、bit7=0、Z=結果0、N=H=0)
