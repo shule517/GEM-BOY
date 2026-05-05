@@ -700,14 +700,14 @@ class CPU
     # ============================================================
     # CB-prefix - RL r (Carry 経由の左ローテート、Z=結果0、N=H=0)
     # ============================================================
-    cb_table[0x10] = -> { carry = registers.b[7]; registers.b = Bit.set_bit(registers.b << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.b == 0, negative: false, half_carry: false, carry: carry); 8 } # RL B
-    cb_table[0x11] = -> { carry = registers.c[7]; registers.c = Bit.set_bit(registers.c << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # RL C
-    cb_table[0x12] = -> { carry = registers.d[7]; registers.d = Bit.set_bit(registers.d << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.d == 0, negative: false, half_carry: false, carry: carry); 8 } # RL D
-    cb_table[0x13] = -> { carry = registers.e[7]; registers.e = Bit.set_bit(registers.e << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.e == 0, negative: false, half_carry: false, carry: carry); 8 } # RL E
-    cb_table[0x14] = -> { carry = registers.h[7]; registers.h = Bit.set_bit(registers.h << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.h == 0, negative: false, half_carry: false, carry: carry); 8 } # RL H
-    cb_table[0x15] = -> { carry = registers.l[7]; registers.l = Bit.set_bit(registers.l << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.l == 0, negative: false, half_carry: false, carry: carry); 8 } # RL L
-    cb_table[0x16] = -> { carry = read_at_hl[7]; write_at_hl(Bit.set_bit(read_at_hl << 1, 0, registers.carry_flag)); registers.set_flags(zero: read_at_hl == 0, negative: false, half_carry: false, carry: carry); 16 } # RL (HL)
-    cb_table[0x17] = -> { carry = registers.a[7]; registers.a = Bit.set_bit(registers.a << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: carry); 8 } # RL A
+    cb_table[0x10] = -> { carry = Bit.bit_at(registers.b, 7); registers.b = Bit.set_bit(registers.b << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.b == 0, negative: false, half_carry: false, carry: carry); 8 } # RL B
+    cb_table[0x11] = -> { carry = Bit.bit_at(registers.c, 7); registers.c = Bit.set_bit(registers.c << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # RL C
+    cb_table[0x12] = -> { carry = Bit.bit_at(registers.d, 7); registers.d = Bit.set_bit(registers.d << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.d == 0, negative: false, half_carry: false, carry: carry); 8 } # RL D
+    cb_table[0x13] = -> { carry = Bit.bit_at(registers.e, 7); registers.e = Bit.set_bit(registers.e << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.e == 0, negative: false, half_carry: false, carry: carry); 8 } # RL E
+    cb_table[0x14] = -> { carry = Bit.bit_at(registers.h, 7); registers.h = Bit.set_bit(registers.h << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.h == 0, negative: false, half_carry: false, carry: carry); 8 } # RL H
+    cb_table[0x15] = -> { carry = Bit.bit_at(registers.l, 7); registers.l = Bit.set_bit(registers.l << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.l == 0, negative: false, half_carry: false, carry: carry); 8 } # RL L
+    cb_table[0x16] = -> { carry = Bit.bit_at(read_at_hl, 7); write_at_hl(Bit.set_bit(read_at_hl << 1, 0, registers.carry_flag)); registers.set_flags(zero: read_at_hl == 0, negative: false, half_carry: false, carry: carry); 16 } # RL (HL)
+    cb_table[0x17] = -> { carry = Bit.bit_at(registers.a, 7); registers.a = Bit.set_bit(registers.a << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: carry); 8 } # RL A
 
     # ============================================================
     # CB-prefix - RR r (Carry 経由の右ローテート、Z=結果0、N=H=0)
