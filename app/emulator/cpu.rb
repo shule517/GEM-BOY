@@ -397,7 +397,7 @@ class CPU
     table[0x21] = -> { registers.hl = fetch_u16; 12 } # LD HL,u16
     table[0x31] = -> { registers.sp = fetch_u16; 12 } # LD SP,u16
     table[0x08] = -> { mmu.write_u16(address: fetch_u16, value: registers.sp); 20 } # LD (u16),SP
-    table[0xF8] = -> { registers.hl = registers.sp + fetch_i8; registers.negative_flag = 0; registers.negative_flag = 0; registers.half_carry_flag = 1; registers.carry_flag = 1; 12 } # LD HL,SP+i8 # TODO: FLAGが未実装
+    table[0xF8] = -> { i8 = fetch_i8; registers.hl = registers.sp + i8; registers.set_flags(zero: 0, negative: 0, half_carry: Bit.low_4bits(registers.sp) + Bit.low_4bits(i8) > 0xF, carry: Bit.wrap_u8(registers.sp) + Bit.wrap_u8(i8) > 0xFF); 12 } # LD HL,SP+i8
     table[0xF9] = -> { registers.sp = registers.hl; 8 } # LD SP,HL
 
     # ============================================================
@@ -580,7 +580,24 @@ class CPU
     # ============================================================
     # その他演算 (DAA / CPL / SCF / CCF)
     # ============================================================
-    # table[0x27] = -> { 4 } # DAA
+    table[0x27] = -> {
+      if registers.negative_flag == 1
+        adjustment = 0
+        adjustment += 0x06 if registers.half_carry_flag == 1
+        adjustment += 0x60 if registers.carry_flag == 1
+        registers.a -= adjustment
+      else
+        adjustment = 0
+        adjustment += 0x06 if registers.half_carry_flag == 1 || (registers.a & 0xF) > 0x9
+        if registers.carry_flag == 1 || registers.a > 0x99
+          adjustment += 0x60
+          registers.carry_flag = 1
+        end
+        registers.a += adjustment
+      end
+      registers.set_flags(zero: registers.a == 0, half_carry: 0)
+      4
+    } # DAA https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#DAA
     table[0x2F] = -> { registers.a ^= 0xFF; registers.set_flags(negative: 1, half_carry: 1); 4 } # CPL Aのbitを反転する
     table[0x37] = -> { registers.set_flags(negative: 0, half_carry: 0, carry: 1); 4 } # SCF
     table[0x3F] = -> { registers.set_flags(negative: 0, half_carry: 0, carry: registers.carry_flag == 0 ? 1 : 0); 4 } # CCF https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#CCF
