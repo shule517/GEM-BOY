@@ -182,6 +182,16 @@ class CPU
     end
   end
 
+  # RET cc (taken: 20 / not taken: 8)
+  def ret(condition:)
+    if condition
+      registers.pc = pop_u16
+      20
+    else
+      8
+    end
+  end
+
   # CALL cc,n16
   def call(condition:)
     address = fetch_u16
@@ -221,6 +231,14 @@ class CPU
     registers.a = registers.a - b
     registers.set_flags(zero: registers.a == 0, negative: 1, carry: carry, half_carry: half_carry)
     4
+  end
+
+  # ADC A,r8 https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#ADC_A,r8
+  def adc_a(byte)
+    half_carry = Bit.low_4bits(registers.a) + Bit.low_4bits(byte) + registers.carry_flag > 0xF
+    carry = (registers.a + byte + registers.carry_flag) > 0xFF
+    registers.a += byte + registers.carry_flag
+    registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: half_carry, carry: carry)
   end
 
   # opcodeテーブル
@@ -436,15 +454,15 @@ class CPU
     # ============================================================
     # 8bit 算術 - ADC A (キャリー込み加算)
     # ============================================================
-    # table[0x88] = -> { 4 } # ADC A,B
-    # table[0x89] = -> { 4 } # ADC A,C
-    # table[0x8A] = -> { 4 } # ADC A,D
-    # table[0x8B] = -> { 4 } # ADC A,E
-    # table[0x8C] = -> { 4 } # ADC A,H
-    # table[0x8D] = -> { 4 } # ADC A,L
-    # table[0x8E] = -> { 8 } # ADC A,(HL)
-    # table[0x8F] = -> { 4 } # ADC A,A
-    # table[0xCE] = -> { 8 } # ADC A,u8
+    table[0x88] = -> { adc_a(registers.b); 4 } # ADC A,B
+    table[0x89] = -> { adc_a(registers.c); 4 } # ADC A,C
+    table[0x8A] = -> { adc_a(registers.d); 4 } # ADC A,D
+    table[0x8B] = -> { adc_a(registers.e); 4 } # ADC A,E
+    table[0x8C] = -> { adc_a(registers.h); 4 } # ADC A,H
+    table[0x8D] = -> { adc_a(registers.l); 4 } # ADC A,L
+    table[0x8E] = -> { adc_a(read_at_hl); 8 } # ADC A,(HL)
+    table[0x8F] = -> { adc_a(registers.a); 4 } # ADC A,A
+    table[0xCE] = -> { adc_a(fetch_u8); 8 } # ADC A,u8
 
     # ============================================================
     # 8bit 算術 - SUB A
@@ -569,10 +587,10 @@ class CPU
     table[0xDC] = -> { call(condition: registers.c?) } # CALL C,u16
     table[0xC9] = -> { registers.pc = pop_u16; 16 } # RET: スタックから戻りアドレスをpopしてjump(CALLの逆操作)
     # table[0xD9] = -> { 16 } # RETI
-    # table[0xC0] = -> { 20 } # RET NZ (taken: 20 / not taken: 8)
-    # table[0xC8] = -> { 20 } # RET Z  (taken: 20 / not taken: 8)
-    # table[0xD0] = -> { 20 } # RET NC (taken: 20 / not taken: 8)
-    # table[0xD8] = -> { 20 } # RET C  (taken: 20 / not taken: 8)
+    table[0xC0] = -> { ret(condition: registers.nz?)} # RET NZ
+    table[0xC8] = -> { ret(condition: registers.z?)} # RET Z
+    table[0xD0] = -> { ret(condition: registers.nc?)} # RET NC
+    table[0xD8] = -> { ret(condition: registers.c?) } # RET C
 
     # ============================================================
     # リセット (RST)
