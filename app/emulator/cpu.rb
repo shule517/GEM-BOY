@@ -278,7 +278,7 @@ class CPU
     # 制御 / システム (Control / System)
     # ============================================================
     table[0x00] = -> { 4 } # NOP: 何もしない。4サイクル進む。
-    # table[0x10] = -> { 4 } # STOP
+    table[0x10] = -> { 4 } # STOP: TODO: これで良いのか？
     table[0x76] = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
     table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグを無効にして、割り込みを無効
     table[0xFB] = -> { self.ime = true; 4 } # EI: IMEフラグを有効にして、割り込みを有効
@@ -421,7 +421,7 @@ class CPU
     table[0x1C] = -> { half_carry_result = Bit.low_4bits(registers.e) + 1 > 0x0F; registers.e = registers.e + 1; registers.set_flags(zero: registers.e == 0, negative: false, half_carry: half_carry_result); 4 } # INC E
     table[0x24] = -> { half_carry_result = Bit.low_4bits(registers.h) + 1 > 0x0F; registers.h = registers.h + 1; registers.set_flags(zero: registers.h == 0, negative: false, half_carry: half_carry_result); 4 } # INC H
     table[0x2C] = -> { half_carry_result = Bit.low_4bits(registers.l) + 1 > 0x0F; registers.l = registers.l + 1; registers.set_flags(zero: registers.l == 0, negative: false, half_carry: half_carry_result); 4 } # INC L
-    table[0x34] = -> { half_carry_result = Bit.low_4bits(read_at_hl) + 1 > 0x0F; write_at_hl(read_at_hl + 1); registers.set_flags(zero: read_at_hl == 0, negative: false, half_carry: half_carry_result); 12 } # INC (HL)
+    table[0x34] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) + 1 > 0x0F; write_at_hl(byte + 1); registers.set_flags(zero: byte == 0, negative: false, half_carry: half_carry_result); 12 } # INC (HL)
     table[0x3C] = -> { half_carry_result = Bit.low_4bits(registers.a) + 1 > 0x0F; registers.a = registers.a + 1; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
 
     # ============================================================
@@ -441,7 +441,7 @@ class CPU
     table[0x1D] = -> { half_carry_result = Bit.low_4bits(registers.e) == 0; registers.e = registers.e - 1; registers.set_flags(zero: registers.e == 0, negative: true, half_carry: half_carry_result); 4 } # DEC E
     table[0x25] = -> { half_carry_result = Bit.low_4bits(registers.h) == 0; registers.h = registers.h - 1; registers.set_flags(zero: registers.h == 0, negative: true, half_carry: half_carry_result); 4 } # DEC H
     table[0x2D] = -> { half_carry_result = Bit.low_4bits(registers.l) == 0; registers.l = registers.l - 1; registers.set_flags(zero: registers.l == 0, negative: true, half_carry: half_carry_result); 4 } # DEC L
-    table[0x35] = -> { half_carry_result = Bit.low_4bits(read_at_hl) == 0; write_at_hl(read_at_hl - 1); registers.set_flags(zero: read_at_hl == 0, negative: true, half_carry: half_carry_result); 12 } # DEC (HL)
+    table[0x35] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) == 0; write_at_hl(byte - 1); registers.set_flags(zero: byte == 0, negative: true, half_carry: half_carry_result); 12 } # DEC (HL)
     table[0x3D] = -> { half_carry_result = Bit.low_4bits(registers.a) == 0; registers.a = registers.a - 1; registers.set_flags(zero: registers.a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
 
     # ============================================================
@@ -706,7 +706,7 @@ class CPU
     cb_table[0x13] = -> { carry = Bit.bit_at(registers.e, 7); registers.e = Bit.set_bit(registers.e << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.e == 0, negative: false, half_carry: false, carry: carry); 8 } # RL E
     cb_table[0x14] = -> { carry = Bit.bit_at(registers.h, 7); registers.h = Bit.set_bit(registers.h << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.h == 0, negative: false, half_carry: false, carry: carry); 8 } # RL H
     cb_table[0x15] = -> { carry = Bit.bit_at(registers.l, 7); registers.l = Bit.set_bit(registers.l << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.l == 0, negative: false, half_carry: false, carry: carry); 8 } # RL L
-    cb_table[0x16] = -> { carry = Bit.bit_at(read_at_hl, 7); write_at_hl(Bit.set_bit(read_at_hl << 1, 0, registers.carry_flag)); registers.set_flags(zero: read_at_hl == 0, negative: false, half_carry: false, carry: carry); 16 } # RL (HL)
+    cb_table[0x16] = -> { byte = read_at_hl; carry = Bit.bit_at(byte, 7); result = Bit.set_bit(Bit.wrap_u8(byte << 1), 0, registers.carry_flag); write_at_hl(result); registers.set_flags(zero: result == 0, negative: false, half_carry: false, carry: carry); 16 } # RL (HL)
     cb_table[0x17] = -> { carry = Bit.bit_at(registers.a, 7); registers.a = Bit.set_bit(registers.a << 1, 0, registers.carry_flag); registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: carry); 8 } # RL A
 
     # ============================================================
@@ -718,20 +718,20 @@ class CPU
     cb_table[0x1B] = -> { carry = Bit.bit_at(registers.e, 0); registers.e = Bit.set_bit(registers.e >> 1, 7, registers.carry_flag); registers.set_flags(zero: registers.e == 0, negative: 0, half_carry: 0, carry: carry); 8 } # RR E
     cb_table[0x1C] = -> { carry = Bit.bit_at(registers.h, 0); registers.h = Bit.set_bit(registers.h >> 1, 7, registers.carry_flag); registers.set_flags(zero: registers.h == 0, negative: 0, half_carry: 0, carry: carry); 8 } # RR H
     cb_table[0x1D] = -> { carry = Bit.bit_at(registers.l, 0); registers.l = Bit.set_bit(registers.l >> 1, 7, registers.carry_flag); registers.set_flags(zero: registers.l == 0, negative: 0, half_carry: 0, carry: carry); 8 } # RR L
-    cb_table[0x1E] = -> { carry = Bit.bit_at(read_at_hl, 0); write_at_hl(Bit.set_bit(read_at_hl >> 1, 7, registers.carry_flag)); registers.set_flags(zero: read_at_hl == 0, negative: 0, half_carry: 0, carry: carry); 16 } # RR (HL)
+    cb_table[0x1E] = -> { byte = read_at_hl; carry = Bit.bit_at(byte, 0); result = Bit.set_bit(byte >> 1, 7, registers.carry_flag); write_at_hl(result); registers.set_flags(zero: result == 0, negative: 0, half_carry: 0, carry: carry); 16 } # RR (HL)
     cb_table[0x1F] = -> { carry = Bit.bit_at(registers.a, 0); registers.a = Bit.set_bit(registers.a >> 1, 7, registers.carry_flag); registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0, carry: carry); 8 } # RR A
 
     # ============================================================
     # CB-prefix - SLA r (左シフト、bit7→C、bit0=0、Z=結果0、N=H=0)
     # ============================================================
-    cb_table[0x20] = -> { carry = registers.b[7]; registers.b = registers.b << 1; registers.set_flags(zero: registers.b == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA B
-    cb_table[0x21] = -> { carry = registers.c[7]; registers.c = registers.c << 1; registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA C
-    cb_table[0x22] = -> { carry = registers.d[7]; registers.d = registers.d << 1; registers.set_flags(zero: registers.d == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA D
-    cb_table[0x23] = -> { carry = registers.e[7]; registers.e = registers.e << 1; registers.set_flags(zero: registers.e == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA E
-    cb_table[0x24] = -> { carry = registers.h[7]; registers.h = registers.h << 1; registers.set_flags(zero: registers.h == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA H
-    cb_table[0x25] = -> { carry = registers.l[7]; registers.l = registers.l << 1; registers.set_flags(zero: registers.l == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA L
-    cb_table[0x26] = -> { carry = read_at_hl[7]; write_at_hl(read_at_hl << 1); registers.set_flags(zero: read_at_hl == 0, negative: false, half_carry: false, carry: carry); 16 } # SLA (HL)
-    cb_table[0x27] = -> { carry = registers.a[7]; registers.a = registers.a << 1; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA A
+    cb_table[0x20] = -> { carry = Bit.bit_at(registers.b, 7); registers.b = registers.b << 1; registers.set_flags(zero: registers.b == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA B
+    cb_table[0x21] = -> { carry = Bit.bit_at(registers.c, 7); registers.c = registers.c << 1; registers.set_flags(zero: registers.c == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA C
+    cb_table[0x22] = -> { carry = Bit.bit_at(registers.d, 7); registers.d = registers.d << 1; registers.set_flags(zero: registers.d == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA D
+    cb_table[0x23] = -> { carry = Bit.bit_at(registers.e, 7); registers.e = registers.e << 1; registers.set_flags(zero: registers.e == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA E
+    cb_table[0x24] = -> { carry = Bit.bit_at(registers.h, 7); registers.h = registers.h << 1; registers.set_flags(zero: registers.h == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA H
+    cb_table[0x25] = -> { carry = Bit.bit_at(registers.l, 7); registers.l = registers.l << 1; registers.set_flags(zero: registers.l == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA L
+    cb_table[0x26] = -> { byte = read_at_hl; carry = Bit.bit_at(byte, 7); result = Bit.wrap_u8(byte << 1); write_at_hl(result); registers.set_flags(zero: result == 0, negative: false, half_carry: false, carry: carry); 16 } # SLA (HL)
+    cb_table[0x27] = -> { carry = Bit.bit_at(registers.a, 7); registers.a = registers.a << 1; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: false, carry: carry); 8 } # SLA A
 
     # ============================================================
     # CB-prefix - SRA r (算術右シフト、bit0→C、bit7 維持、Z=結果0、N=H=0)
@@ -766,7 +766,7 @@ class CPU
     cb_table[0x3B] = -> { carry = Bit.bit_at(registers.e, 0); registers.e = registers.e >> 1; registers.set_flags(zero: registers.e == 0, negative: 0, half_carry: 0, carry: carry); 8 } # SRL E
     cb_table[0x3C] = -> { carry = Bit.bit_at(registers.h, 0); registers.h = registers.h >> 1; registers.set_flags(zero: registers.h == 0, negative: 0, half_carry: 0, carry: carry); 8 } # SRL H
     cb_table[0x3D] = -> { carry = Bit.bit_at(registers.l, 0); registers.l = registers.l >> 1; registers.set_flags(zero: registers.l == 0, negative: 0, half_carry: 0, carry: carry); 8 } # SRL L
-    cb_table[0x3E] = -> { carry = Bit.bit_at(read_at_hl, 0); write_at_hl(read_at_hl >> 1); registers.set_flags(zero: read_at_hl == 0, negative: 0, half_carry: 0, carry: carry); 16 } # SRL (HL)
+    cb_table[0x3E] = -> { byte = read_at_hl; carry = Bit.bit_at(byte, 0); result = byte >> 1; write_at_hl(result); registers.set_flags(zero: result == 0, negative: 0, half_carry: 0, carry: carry); 16 } # SRL (HL)
     cb_table[0x3F] = -> { carry = Bit.bit_at(registers.a, 0); registers.a = registers.a >> 1; registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0, carry: carry); 8 } # SRL A
 
     # ============================================================
