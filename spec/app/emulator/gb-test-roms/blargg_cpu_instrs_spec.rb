@@ -15,7 +15,7 @@ require 'app/emulator/ppu'
 # 失敗メッセージから一目で分かる。
 RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" が出るまで)' do
   context '01-special.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/01-special.gb', __FILE__)).bytes }
@@ -33,7 +33,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '02-interrupts.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/02-interrupts.gb', __FILE__)).bytes }
@@ -51,7 +51,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '03-op sp,hl.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/03-op sp,hl.gb', __FILE__)).bytes }
@@ -69,7 +69,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '04-op r,imm.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/04-op r,imm.gb', __FILE__)).bytes }
@@ -87,7 +87,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '05-op rp.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/05-op rp.gb', __FILE__)).bytes }
@@ -105,7 +105,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '06-ld r,r.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/06-ld r,r.gb', __FILE__)).bytes }
@@ -123,7 +123,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '07-jr,jp,call,ret,rst.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/07-jr,jp,call,ret,rst.gb', __FILE__)).bytes }
@@ -141,7 +141,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '08-misc instrs.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/08-misc instrs.gb', __FILE__)).bytes }
@@ -159,7 +159,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '09-op r,r.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/09-op r,r.gb', __FILE__)).bytes }
@@ -177,7 +177,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '10-bit ops.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/10-bit ops.gb', __FILE__)).bytes }
@@ -195,7 +195,7 @@ RSpec.describe 'Blargg cpu_instrs 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '11-op a,(hl).gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/cpu_instrs/11-op a,(hl).gb', __FILE__)).bytes }

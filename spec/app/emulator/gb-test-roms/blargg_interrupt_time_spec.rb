@@ -13,7 +13,7 @@ require 'app/emulator/ppu'
 # IME / EI / RETI / 割り込みベクタジャンプを正しく実装してから初めて意味のある結果が出る。
 RSpec.describe 'Blargg interrupt_time 完走 (シリアルに "Passed" が出るまで)' do
   context 'interrupt_time.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/interrupt_time.gb', __FILE__)).bytes }

@@ -17,7 +17,7 @@ require 'app/emulator/ppu'
 # ことを確認する形に強化できる。
 RSpec.describe 'GB Studio サンプル ROM 起動 (HALT に到達するまで)' do
   context 'gb-studio-sample.gb を skip_boot で起動したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../data/gb-studio-sample.gb', __FILE__)).bytes }

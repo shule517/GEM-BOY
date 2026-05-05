@@ -14,7 +14,7 @@ require 'app/emulator/ppu'
 # このテストが通らない間は、tobu.gb のような実機 ROM で微妙な挙動の差が出る可能性がある。
 RSpec.describe 'Blargg instr_timing 完走 (シリアルに "Passed" が出るまで)' do
   context 'instr_timing.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/instr_timing.gb', __FILE__)).bytes }

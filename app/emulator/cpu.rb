@@ -27,9 +27,10 @@ class CPU
                 :mmu
   attr_reader :registers # 8bit レジスタ (A/F/B/C/D/E/H/L) と SP / PC、フラグ操作
 
-  # trace: true で1命令ごとに disasm 行を puts する。RSpec では大量の puts でテストが詰まるので
-  # デフォルト OFF。app/main.rb から呼ぶときだけ ON にして命令実行を逐次目で追えるようにする
-  def initialize(mmu, skip_boot: false, trace: false)
+  # 全引数を必須キーワード引数にして、呼び出し側が skip_boot / trace を毎回明示するようにする
+  # trace: true で1命令ごとに disasm 行を puts する(app/main.rb / Blargg シナリオで利用)
+  # trace: false で disasm 出力を完全に OFF(通常の単体 spec 用)
+  def initialize(mmu, skip_boot:, trace:)
     @mmu = mmu
     @registers = CpuRegisters.new(skip_boot: skip_boot)
     @ime = false   # 割り込み許可フラグ(Interrupt Master Enable)

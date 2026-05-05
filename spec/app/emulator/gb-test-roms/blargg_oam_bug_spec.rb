@@ -15,7 +15,7 @@ require 'app/emulator/ppu'
 # 実機ゲームの大半は意図的にこの状態を踏まないので、対応の優先度は低い。
 RSpec.describe 'Blargg oam_bug 個別 ROM 完走 (シリアルに "Passed" が出るまで)' do
   context '1-lcd_sync.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/oam_bug/1-lcd_sync.gb', __FILE__)).bytes }
@@ -33,7 +33,7 @@ RSpec.describe 'Blargg oam_bug 個別 ROM 完走 (シリアルに "Passed" が�
   end
 
   context '2-causes.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/oam_bug/2-causes.gb', __FILE__)).bytes }
@@ -51,7 +51,7 @@ RSpec.describe 'Blargg oam_bug 個別 ROM 完走 (シリアルに "Passed" が�
   end
 
   context '3-non_causes.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/oam_bug/3-non_causes.gb', __FILE__)).bytes }
@@ -69,7 +69,7 @@ RSpec.describe 'Blargg oam_bug 個別 ROM 完走 (シリアルに "Passed" が�
   end
 
   context '4-scanline_timing.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/oam_bug/4-scanline_timing.gb', __FILE__)).bytes }
@@ -87,7 +87,7 @@ RSpec.describe 'Blargg oam_bug 個別 ROM 完走 (シリアルに "Passed" が�
   end
 
   context '5-timing_bug.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/oam_bug/5-timing_bug.gb', __FILE__)).bytes }
@@ -105,7 +105,7 @@ RSpec.describe 'Blargg oam_bug 個別 ROM 完走 (シリアルに "Passed" が�
   end
 
   context '6-timing_no_bug.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/oam_bug/6-timing_no_bug.gb', __FILE__)).bytes }
@@ -123,7 +123,7 @@ RSpec.describe 'Blargg oam_bug 個別 ROM 完走 (シリアルに "Passed" が�
   end
 
   context '7-timing_effect.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/oam_bug/7-timing_effect.gb', __FILE__)).bytes }
@@ -141,7 +141,7 @@ RSpec.describe 'Blargg oam_bug 個別 ROM 完走 (シリアルに "Passed" が�
   end
 
   context '8-instr_effect.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/oam_bug/8-instr_effect.gb', __FILE__)).bytes }

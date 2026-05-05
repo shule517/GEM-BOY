@@ -14,7 +14,7 @@ require 'app/emulator/ppu'
 # APU 本体を実装するまではほぼ全部失敗する想定で、APU 実装時のチェックリストとして並べる。
 RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が出るまで)' do
   context '01-registers.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/01-registers.gb', __FILE__)).bytes }
@@ -32,7 +32,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '02-len ctr.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/02-len ctr.gb', __FILE__)).bytes }
@@ -50,7 +50,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '03-trigger.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/03-trigger.gb', __FILE__)).bytes }
@@ -68,7 +68,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '04-sweep.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/04-sweep.gb', __FILE__)).bytes }
@@ -86,7 +86,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '05-sweep details.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/05-sweep details.gb', __FILE__)).bytes }
@@ -104,7 +104,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '06-overflow on trigger.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/06-overflow on trigger.gb', __FILE__)).bytes }
@@ -122,7 +122,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '07-len sweep period sync.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/07-len sweep period sync.gb', __FILE__)).bytes }
@@ -140,7 +140,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '08-len ctr during power.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/08-len ctr during power.gb', __FILE__)).bytes }
@@ -158,7 +158,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '09-wave read while on.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/09-wave read while on.gb', __FILE__)).bytes }
@@ -176,7 +176,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '10-wave trigger while on.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/10-wave trigger while on.gb', __FILE__)).bytes }
@@ -194,7 +194,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '11-regs after power.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/11-regs after power.gb', __FILE__)).bytes }
@@ -212,7 +212,7 @@ RSpec.describe 'Blargg dmg_sound 個別 ROM 完走 (シリアルに "Passed" が
   end
 
   context '12-wave write while on.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/dmg_sound/12-wave write while on.gb', __FILE__)).bytes }
