@@ -652,17 +652,17 @@ class CPU
     # ============================================================
     # 未使用 (UNUSED) - 実機では実行すると CPU が固まる
     # ============================================================
-    # table[0xD3] = nil # UNUSED
-    # table[0xDB] = nil # UNUSED
-    # table[0xDD] = nil # UNUSED
-    # table[0xE3] = nil # UNUSED
-    # table[0xE4] = nil # UNUSED
-    # table[0xEB] = nil # UNUSED
-    # table[0xEC] = nil # UNUSED
-    # table[0xED] = nil # UNUSED
-    # table[0xF4] = nil # UNUSED
-    # table[0xFC] = nil # UNUSED
-    # table[0xFD] = nil # UNUSED
+    table[0xD3] = nil # UNUSED
+    table[0xDB] = nil # UNUSED
+    table[0xDD] = nil # UNUSED
+    table[0xE3] = nil # UNUSED
+    table[0xE4] = nil # UNUSED
+    table[0xEB] = nil # UNUSED
+    table[0xEC] = nil # UNUSED
+    table[0xED] = nil # UNUSED
+    table[0xF4] = nil # UNUSED
+    table[0xFC] = nil # UNUSED
+    table[0xFD] = nil # UNUSED
 
     table
   end
@@ -689,14 +689,14 @@ class CPU
     # ============================================================
     # CB-prefix - RRC r (右ローテート、bit0→C/bit7、Z=結果0、N=H=0)
     # ============================================================
-    # cb_table[0x08] = -> { 8 }  # RRC B
-    # cb_table[0x09] = -> { 8 }  # RRC C
-    # cb_table[0x0A] = -> { 8 }  # RRC D
-    # cb_table[0x0B] = -> { 8 }  # RRC E
-    # cb_table[0x0C] = -> { 8 }  # RRC H
-    # cb_table[0x0D] = -> { 8 }  # RRC L
-    # cb_table[0x0E] = -> { 16 } # RRC (HL)
-    # cb_table[0x0F] = -> { 8 }  # RRC A
+    cb_table[0x08] = -> { bit0 = Bit.bit_at(registers.b, 0); registers.b = Bit.set_bit(registers.b >> 1, 7, bit0); registers.set_flags(zero: registers.b == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC B
+    cb_table[0x09] = -> { bit0 = Bit.bit_at(registers.c, 0); registers.c = Bit.set_bit(registers.c >> 1, 7, bit0); registers.set_flags(zero: registers.c == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC C
+    cb_table[0x0A] = -> { bit0 = Bit.bit_at(registers.d, 0); registers.d = Bit.set_bit(registers.d >> 1, 7, bit0); registers.set_flags(zero: registers.d == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC D
+    cb_table[0x0B] = -> { bit0 = Bit.bit_at(registers.e, 0); registers.e = Bit.set_bit(registers.e >> 1, 7, bit0); registers.set_flags(zero: registers.e == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC E
+    cb_table[0x0C] = -> { bit0 = Bit.bit_at(registers.h, 0); registers.h = Bit.set_bit(registers.h >> 1, 7, bit0); registers.set_flags(zero: registers.h == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC H
+    cb_table[0x0D] = -> { bit0 = Bit.bit_at(registers.l, 0); registers.l = Bit.set_bit(registers.l >> 1, 7, bit0); registers.set_flags(zero: registers.l == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC L
+    cb_table[0x0E] = -> { byte = read_at_hl; bit0 = Bit.bit_at(byte, 0); result = Bit.set_bit(byte >> 1, 7, bit0); write_at_hl(result); registers.set_flags(zero: result == 0, negative: 0, half_carry: 0, carry: bit0); 16 } # RRC (HL)
+    cb_table[0x0F] = -> { bit0 = Bit.bit_at(registers.a, 0); registers.b = Bit.set_bit(registers.a >> 1, 7, bit0); registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC A
 
     # ============================================================
     # CB-prefix - RL r (Carry 経由の左ローテート、Z=結果0、N=H=0)
