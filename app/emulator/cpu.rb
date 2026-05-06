@@ -677,14 +677,14 @@ class CPU
     # ============================================================
     # CB-prefix - RLC r (左ローテート、bit7→C/bit0、Z=結果0、N=H=0)
     # ============================================================
-    # cb_table[0x00] = -> { 8 }  # RLC B
-    # cb_table[0x01] = -> { 8 }  # RLC C
-    # cb_table[0x02] = -> { 8 }  # RLC D
-    # cb_table[0x03] = -> { 8 }  # RLC E
-    # cb_table[0x04] = -> { 8 }  # RLC H
-    # cb_table[0x05] = -> { 8 }  # RLC L
-    # cb_table[0x06] = -> { 16 } # RLC (HL)
-    # cb_table[0x07] = -> { 8 }  # RLC A
+    cb_table[0x00] = -> { bit7 = Bit.bit_at(registers.b, 7); registers.carry_flag = bit7; registers.b = registers.b << 1 | bit7; registers.set_flags(zero: registers.b == 0, negative: 0, half_carry: 0); 8 } # RLC B
+    cb_table[0x01] = -> { bit7 = Bit.bit_at(registers.c, 7); registers.carry_flag = bit7; registers.c = registers.c << 1 | bit7; registers.set_flags(zero: registers.c == 0, negative: 0, half_carry: 0); 8 } # RLC C
+    cb_table[0x02] = -> { bit7 = Bit.bit_at(registers.d, 7); registers.carry_flag = bit7; registers.d = registers.d << 1 | bit7; registers.set_flags(zero: registers.d == 0, negative: 0, half_carry: 0); 8 } # RLC D
+    cb_table[0x03] = -> { bit7 = Bit.bit_at(registers.e, 7); registers.carry_flag = bit7; registers.e = registers.e << 1 | bit7; registers.set_flags(zero: registers.e == 0, negative: 0, half_carry: 0); 8 } # RLC E
+    cb_table[0x04] = -> { bit7 = Bit.bit_at(registers.h, 7); registers.carry_flag = bit7; registers.h = registers.h << 1 | bit7; registers.set_flags(zero: registers.h == 0, negative: 0, half_carry: 0); 8 } # RLC H
+    cb_table[0x05] = -> { bit7 = Bit.bit_at(registers.l, 7); registers.carry_flag = bit7; registers.l = registers.l << 1 | bit7; registers.set_flags(zero: registers.l == 0, negative: 0, half_carry: 0); 8 } # RLC L
+    cb_table[0x06] = -> { byte = read_at_hl; bit7 = Bit.bit_at(byte, 7); registers.carry_flag = bit7; result = Bit.wrap_u8(byte << 1 | bit7); write_at_hl(result); registers.set_flags(zero: result == 0, negative: 0, half_carry: 0); 16 } # RLC (HL)
+    cb_table[0x07] = -> { bit7 = Bit.bit_at(registers.a, 7); registers.carry_flag = bit7; registers.a = registers.a << 1 | bit7; registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0); 8 } # RLC A
 
     # ============================================================
     # CB-prefix - RRC r (右ローテート、bit0→C/bit7、Z=結果0、N=H=0)
