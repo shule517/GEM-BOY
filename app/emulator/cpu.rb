@@ -696,7 +696,7 @@ class CPU
     cb_table[0x0C] = -> { bit0 = Bit.bit_at(registers.h, 0); registers.h = Bit.set_bit(registers.h >> 1, 7, bit0); registers.set_flags(zero: registers.h == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC H
     cb_table[0x0D] = -> { bit0 = Bit.bit_at(registers.l, 0); registers.l = Bit.set_bit(registers.l >> 1, 7, bit0); registers.set_flags(zero: registers.l == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC L
     cb_table[0x0E] = -> { byte = read_at_hl; bit0 = Bit.bit_at(byte, 0); result = Bit.set_bit(byte >> 1, 7, bit0); write_at_hl(result); registers.set_flags(zero: result == 0, negative: 0, half_carry: 0, carry: bit0); 16 } # RRC (HL)
-    cb_table[0x0F] = -> { bit0 = Bit.bit_at(registers.a, 0); registers.b = Bit.set_bit(registers.a >> 1, 7, bit0); registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC A
+    cb_table[0x0F] = -> { bit0 = Bit.bit_at(registers.a, 0); registers.a = Bit.set_bit(registers.a >> 1, 7, bit0); registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC A
 
     # ============================================================
     # CB-prefix - RL r (Carry 経由の左ローテート、Z=結果0、N=H=0)
