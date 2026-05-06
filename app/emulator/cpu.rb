@@ -422,7 +422,7 @@ class CPU
     table[0x1C] = -> { half_carry_result = Bit.low_4bits(registers.e) + 1 > 0x0F; registers.e = registers.e + 1; registers.set_flags(zero: registers.e == 0, negative: false, half_carry: half_carry_result); 4 } # INC E
     table[0x24] = -> { half_carry_result = Bit.low_4bits(registers.h) + 1 > 0x0F; registers.h = registers.h + 1; registers.set_flags(zero: registers.h == 0, negative: false, half_carry: half_carry_result); 4 } # INC H
     table[0x2C] = -> { half_carry_result = Bit.low_4bits(registers.l) + 1 > 0x0F; registers.l = registers.l + 1; registers.set_flags(zero: registers.l == 0, negative: false, half_carry: half_carry_result); 4 } # INC L
-    table[0x34] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) + 1 > 0x0F; write_at_hl(byte + 1); registers.set_flags(zero: byte == 0, negative: false, half_carry: half_carry_result); 12 } # INC (HL)
+    table[0x34] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) + 1 > 0x0F; result = Bit.wrap_u8(byte + 1); write_at_hl(result); registers.set_flags(zero: result == 0, negative: false, half_carry: half_carry_result); 12 } # INC (HL)
     table[0x3C] = -> { half_carry_result = Bit.low_4bits(registers.a) + 1 > 0x0F; registers.a = registers.a + 1; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
 
     # ============================================================
@@ -442,7 +442,7 @@ class CPU
     table[0x1D] = -> { half_carry_result = Bit.low_4bits(registers.e) == 0; registers.e = registers.e - 1; registers.set_flags(zero: registers.e == 0, negative: true, half_carry: half_carry_result); 4 } # DEC E
     table[0x25] = -> { half_carry_result = Bit.low_4bits(registers.h) == 0; registers.h = registers.h - 1; registers.set_flags(zero: registers.h == 0, negative: true, half_carry: half_carry_result); 4 } # DEC H
     table[0x2D] = -> { half_carry_result = Bit.low_4bits(registers.l) == 0; registers.l = registers.l - 1; registers.set_flags(zero: registers.l == 0, negative: true, half_carry: half_carry_result); 4 } # DEC L
-    table[0x35] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) == 0; write_at_hl(byte - 1); registers.set_flags(zero: byte == 0, negative: true, half_carry: half_carry_result); 12 } # DEC (HL)
+    table[0x35] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) == 0; result = byte - 1; write_at_hl(result); registers.set_flags(zero: result == 0, negative: true, half_carry: half_carry_result); 12 } # DEC (HL)
     table[0x3D] = -> { half_carry_result = Bit.low_4bits(registers.a) == 0; registers.a = registers.a - 1; registers.set_flags(zero: registers.a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
 
     # ============================================================
