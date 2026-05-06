@@ -5,8 +5,9 @@ require 'app/emulator/mmu.rb'
 require 'app/emulator/cpu.rb'
 require 'app/emulator/ppu.rb'
 
-ROM_PATH = 'data/tobu.gb'
+ROM_PATH = 'data/gb-studio-sample.gb'
 SKIP_BOOT = true # ブートROMをスキップして直接 PC=0x0100 から起動(D-1)
+TRACE = true
 
 # 1フレームのT-cycle数(154スキャンライン × 456 cycle = 70224)
 CYCLES_PER_FRAME = 154 * 456
@@ -48,7 +49,7 @@ end
 def setup(args)
   args.state.cartridge = Cartridge.new(args.gtk.read_file(ROM_PATH).bytes)
   args.state.mmu = MMU.new(args.state.cartridge, skip_boot: SKIP_BOOT)
-  args.state.cpu = CPU.new(args.state.mmu, skip_boot: SKIP_BOOT, trace: true)
+  args.state.cpu = CPU.new(args.state.mmu, skip_boot: SKIP_BOOT, trace: TRACE)
   args.state.ppu = PPU.new(args.state.mmu)
   args.state.crashed = false
   args.state.crash_message = nil
