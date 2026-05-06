@@ -20,8 +20,8 @@ RSpec.describe 'Blargg cpu_instrs/10-bit ops.gb 相当のシナリオテスト' 
     instr_address = 0xC000
     hl_target = 0xC100
 
-    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
-    let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: false, trace: false) }
+    let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: false) }
     let(:rom_data) { Array.new(0x8000, 0) }
     let(:instr_bytes) { [] }
 

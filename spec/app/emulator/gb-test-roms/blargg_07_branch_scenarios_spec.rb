@@ -24,8 +24,8 @@ RSpec.describe 'Blargg cpu_instrs/07-jr,jp,call,ret,rst.gb 相当のシナリオ
     instr_address  = 0xC000 # 命令バイトを置く WRAM 上のアドレス
     return_address = 0xC003 # 命令の次バイト(test_instr が push する戻り先)
 
-    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
-    let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: false, trace: false) }
+    let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: false) }
     let(:rom_data) { Array.new(0x8000, 0) } # ROM は使わないので 32KB のゼロ配列
     let(:instr_bytes) { [] }
 
