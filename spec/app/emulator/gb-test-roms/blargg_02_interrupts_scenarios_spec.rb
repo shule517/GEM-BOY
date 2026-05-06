@@ -33,8 +33,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     ie_address = 0xFFFF
     timer_vector = 0x0050
 
-    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
-    let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: false, trace: false) }
+    let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: false) }
     let(:rom_data) { Array.new(0x8000, 0) }
     let(:instr_bytes) { [] }
 
