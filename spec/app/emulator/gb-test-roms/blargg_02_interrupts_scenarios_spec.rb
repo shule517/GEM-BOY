@@ -1,6 +1,7 @@
 require 'app/emulator/cartridge'
 require 'app/emulator/mmu'
 require 'app/emulator/cpu'
+require 'app/emulator/ppu'
 
 # Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテスト
 #
@@ -29,7 +30,6 @@ require 'app/emulator/cpu'
 RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテスト' do
   context '02-interrupts.gb を実行したとき' do
     instr_address = 0xC000
-    if_address = 0xFF0F
     ie_address = 0xFFFF
     timer_vector = 0x0050
 
@@ -81,7 +81,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     context 'IF & IE & 0x1F が真かつ IME=1 のとき割り込み dispatch される(Test 2)' do
       it 'IE=0x04 (Timer)、IF=0x04 をセットして次の step で 0x50 にジャンプし、IF bit 2 がクリアされる' do
         mmu.write_u8(address: ie_address, value: 0x04)
-        mmu.write_u8(address: if_address, value: 0x04)
+        mmu.write_u8(address: PPU::IF, value: 0x04)
         cpu.ime = true
         cpu.registers.sp = 0xDFFE
         cpu.registers.pc = 0xC100
@@ -91,7 +91,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
         expect(cpu.registers.pc).to eq timer_vector # 0x50 へ jump
         expect(cpu.ime).to eq false                  # IME クリア
-        expect(mmu.read_u8(address: if_address) & 0x04).to eq 0 # IF bit 2 クリア
+        expect(mmu.read_u8(address: PPU::IF) & 0x04).to eq 0 # IF bit 2 クリア
         expect(cpu.registers.sp).to eq 0xDFFC        # 2 バイト push
         expect(mmu.read_u8(address: 0xDFFD)).to eq 0xC1 # 戻り先 high
         expect(mmu.read_u8(address: 0xDFFC)).to eq 0x00 # 戻り先 low
@@ -123,7 +123,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'IE=0x04, IF=0x04 でも PC は変化せず、IF bit 2 は立ったまま' do
         cpu.ime = false
         mmu.write_u8(address: ie_address, value: 0x04)
-        mmu.write_u8(address: if_address, value: 0x04)
+        mmu.write_u8(address: PPU::IF, value: 0x04)
         cpu.registers.pc = 0xC100
         original_pc = cpu.registers.pc
 
@@ -133,7 +133,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.step
 
         expect(cpu.registers.pc).to eq original_pc + 1 # NOP 1 byte 進むだけ
-        expect(mmu.read_u8(address: if_address) & 0x04).to eq 0x04 # IF bit 2 はクリアされない
+        expect(mmu.read_u8(address: PPU::IF) & 0x04).to eq 0x04 # IF bit 2 はクリアされない
       end
     end
 
@@ -160,14 +160,14 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.write_u8(address: 0xFF07, value: 0x05) # TAC: enable + 262144 Hz
         mmu.write_u8(address: 0xFF05, value: 0xFF) # TIMA: 次の tick でオーバーフロー
         mmu.write_u8(address: 0xFF06, value: 0x42) # TMA: オーバーフロー時の再ロード値
-        mmu.write_u8(address: if_address, value: 0x00)
+        mmu.write_u8(address: PPU::IF, value: 0x00)
         cpu.registers.pc = 0xC100
         # NOP を 64 個並べて 256 cycles 進める(262144 Hz / 4 = 65536 Hz、4 cycles ごとに TIMA tick)
         64.times { |i| mmu.write_u8(address: 0xC100 + i, value: 0x00) }
 
         cpu.run(256)
 
-        expect(mmu.read_u8(address: if_address) & 0x04).to eq 0x04 # Timer 割り込み立つ
+        expect(mmu.read_u8(address: PPU::IF) & 0x04).to eq 0x04 # Timer 割り込み立つ
         expect(mmu.read_u8(address: 0xFF05)).to eq 0x42            # TMA が再ロード
       end
     end
@@ -209,7 +209,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.registers.pc = 0xC100
         cpu.registers.sp = 0xDFFE
         mmu.write_u8(address: ie_address, value: 0x04)
-        mmu.write_u8(address: if_address, value: 0x04)
+        mmu.write_u8(address: PPU::IF, value: 0x04)
 
         cpu.step
 
@@ -225,7 +225,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.registers.pc = 0xC100
         mmu.write_u8(address: 0xC100, value: 0x00) # NOP
         mmu.write_u8(address: ie_address, value: 0x04)
-        mmu.write_u8(address: if_address, value: 0x04)
+        mmu.write_u8(address: PPU::IF, value: 0x04)
 
         cpu.step
 
@@ -240,10 +240,10 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
     context 'IF (0xFF0F) と IE (0xFFFF) を MMU 経由で読み書きしたとき' do
       it '書いた値が読める' do
-        mmu.write_u8(address: if_address, value: 0x1F)
+        mmu.write_u8(address: PPU::IF, value: 0x1F)
         mmu.write_u8(address: ie_address, value: 0x1F)
         # IF の上位 3bit は常に 1 になる仕様だが、現状実装はそのまま保持しているはず
-        expect(mmu.read_u8(address: if_address) & 0x1F).to eq 0x1F
+        expect(mmu.read_u8(address: PPU::IF) & 0x1F).to eq 0x1F
         expect(mmu.read_u8(address: ie_address) & 0x1F).to eq 0x1F
       end
     end
