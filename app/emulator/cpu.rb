@@ -20,7 +20,16 @@ require 'app/emulator/disassembler'
 # `@opcodes` は 256 要素の配列で、各要素が「その命令を実行して消費サイクル数を返す lambda」
 # CB-prefix 命令(0xCB に続く 2 バイト目)は B-3 で別テーブルとして追加する
 class CPU
+  # 制御/システム命令の opcode https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
+  NOP       = 0x00 # 何もしない
+  STOP      = 0x10 # CPU/LCDを停止
+  HALT      = 0x76 # 割り込みが入るまで停止
+  PREFIX_CB = 0xCB # CB-prefix(次バイトを CB-table で解釈)
+  DI        = 0xF3 # Disable Interrupts: IMEを無効化
+  EI        = 0xFB # Enable Interrupts: IMEを有効化(本来は次の命令を実行してから反映)
+
   attr_accessor :ime, # Interrupt Master Enable(割り込みマスタ有効フラグ) 1の時に処理を割り込む https://gbdev.io/pandocs/Interrupts.html
+                :ime_scheduled, # IMEの有効を予約した
                 :halted, # CPUの一時停止中フラグ https://gbdev.io/pandocs/halt.html
                 :opcodes, # CPUの命令一覧 https://izik1.github.io/gbops/
                 :cb_opcodes, # CB-prefix 命令一覧 (0xCB の次のバイトでルックアップ) https://gbdev.io/pandocs/CPU_Instruction_Set.html#cb-prefix-instructions
@@ -44,7 +53,14 @@ class CPU
 
   # １つ命令を実行する
   def step
+    puts "step---------------"
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
+
+    # IMEの有効が予約されてたら、有効にする
+    if ime_scheduled
+      self.ime_scheduled = false
+      self.ime = true
+    end
 
     context = @disassembler.before_step(registers.pc) if @trace # trace 有効時のみ命令前の状態を取って disasm 行を作る
     opcode = fetch_u8
@@ -278,12 +294,12 @@ class CPU
     # ============================================================
     # 制御 / システム (Control / System)
     # ============================================================
-    table[0x00] = -> { 4 } # NOP: 何もしない。4サイクル進む。
-    table[0x10] = -> { 4 } # STOP: TODO: これで良いのか？
-    table[0x76] = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
-    table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグを無効にして、割り込みを無効
-    table[0xFB] = -> { self.ime = true; 4 } # EI: IMEフラグを有効にして、割り込みを有効
-    table[0xCB] = -> { dispatch_cb } # PREFIX CB (次バイトを CB-prefix table で解釈)
+    table[NOP]       = -> { 4 } # NOP: 何もしない。4サイクル進む。
+    table[STOP]      = -> { 4 } # STOP: TODO: これで良いのか？
+    table[HALT]      = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
+    table[DI]        = -> { self.ime = false; 4 } # DI: IMEフラグを無効にして、割り込みを無効
+    table[EI]        = -> { self.ime_scheduled = true; 4 } # EI: IMEフラグの有効を予約する
+    table[PREFIX_CB] = -> { dispatch_cb } # PREFIX CB (次バイトを CB-prefix table で解釈)
 
     # ============================================================
     # 8bit ロード - LD r,u8 (即値ロード)
@@ -422,7 +438,7 @@ class CPU
     table[0x1C] = -> { half_carry_result = Bit.low_4bits(registers.e) + 1 > 0x0F; registers.e = registers.e + 1; registers.set_flags(zero: registers.e == 0, negative: false, half_carry: half_carry_result); 4 } # INC E
     table[0x24] = -> { half_carry_result = Bit.low_4bits(registers.h) + 1 > 0x0F; registers.h = registers.h + 1; registers.set_flags(zero: registers.h == 0, negative: false, half_carry: half_carry_result); 4 } # INC H
     table[0x2C] = -> { half_carry_result = Bit.low_4bits(registers.l) + 1 > 0x0F; registers.l = registers.l + 1; registers.set_flags(zero: registers.l == 0, negative: false, half_carry: half_carry_result); 4 } # INC L
-    table[0x34] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) + 1 > 0x0F; write_at_hl(byte + 1); registers.set_flags(zero: byte == 0, negative: false, half_carry: half_carry_result); 12 } # INC (HL)
+    table[0x34] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) + 1 > 0x0F; result = Bit.wrap_u8(byte + 1); write_at_hl(result); registers.set_flags(zero: result == 0, negative: false, half_carry: half_carry_result); 12 } # INC (HL)
     table[0x3C] = -> { half_carry_result = Bit.low_4bits(registers.a) + 1 > 0x0F; registers.a = registers.a + 1; registers.set_flags(zero: registers.a == 0, negative: false, half_carry: half_carry_result); 4 } # INC A
 
     # ============================================================
@@ -442,7 +458,7 @@ class CPU
     table[0x1D] = -> { half_carry_result = Bit.low_4bits(registers.e) == 0; registers.e = registers.e - 1; registers.set_flags(zero: registers.e == 0, negative: true, half_carry: half_carry_result); 4 } # DEC E
     table[0x25] = -> { half_carry_result = Bit.low_4bits(registers.h) == 0; registers.h = registers.h - 1; registers.set_flags(zero: registers.h == 0, negative: true, half_carry: half_carry_result); 4 } # DEC H
     table[0x2D] = -> { half_carry_result = Bit.low_4bits(registers.l) == 0; registers.l = registers.l - 1; registers.set_flags(zero: registers.l == 0, negative: true, half_carry: half_carry_result); 4 } # DEC L
-    table[0x35] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) == 0; write_at_hl(byte - 1); registers.set_flags(zero: byte == 0, negative: true, half_carry: half_carry_result); 12 } # DEC (HL)
+    table[0x35] = -> { byte = read_at_hl; half_carry_result = Bit.low_4bits(byte) == 0; result = byte - 1; write_at_hl(result); registers.set_flags(zero: result == 0, negative: true, half_carry: half_carry_result); 12 } # DEC (HL)
     table[0x3D] = -> { half_carry_result = Bit.low_4bits(registers.a) == 0; registers.a = registers.a - 1; registers.set_flags(zero: registers.a == 0, negative: true, half_carry: half_carry_result); 4 } # DEC A
 
     # ============================================================
@@ -652,17 +668,17 @@ class CPU
     # ============================================================
     # 未使用 (UNUSED) - 実機では実行すると CPU が固まる
     # ============================================================
-    # table[0xD3] = nil # UNUSED
-    # table[0xDB] = nil # UNUSED
-    # table[0xDD] = nil # UNUSED
-    # table[0xE3] = nil # UNUSED
-    # table[0xE4] = nil # UNUSED
-    # table[0xEB] = nil # UNUSED
-    # table[0xEC] = nil # UNUSED
-    # table[0xED] = nil # UNUSED
-    # table[0xF4] = nil # UNUSED
-    # table[0xFC] = nil # UNUSED
-    # table[0xFD] = nil # UNUSED
+    table[0xD3] = nil # UNUSED
+    table[0xDB] = nil # UNUSED
+    table[0xDD] = nil # UNUSED
+    table[0xE3] = nil # UNUSED
+    table[0xE4] = nil # UNUSED
+    table[0xEB] = nil # UNUSED
+    table[0xEC] = nil # UNUSED
+    table[0xED] = nil # UNUSED
+    table[0xF4] = nil # UNUSED
+    table[0xFC] = nil # UNUSED
+    table[0xFD] = nil # UNUSED
 
     table
   end
@@ -677,26 +693,26 @@ class CPU
     # ============================================================
     # CB-prefix - RLC r (左ローテート、bit7→C/bit0、Z=結果0、N=H=0)
     # ============================================================
-    # cb_table[0x00] = -> { 8 }  # RLC B
-    # cb_table[0x01] = -> { 8 }  # RLC C
-    # cb_table[0x02] = -> { 8 }  # RLC D
-    # cb_table[0x03] = -> { 8 }  # RLC E
-    # cb_table[0x04] = -> { 8 }  # RLC H
-    # cb_table[0x05] = -> { 8 }  # RLC L
-    # cb_table[0x06] = -> { 16 } # RLC (HL)
-    # cb_table[0x07] = -> { 8 }  # RLC A
+    cb_table[0x00] = -> { bit7 = Bit.bit_at(registers.b, 7); registers.carry_flag = bit7; registers.b = registers.b << 1 | bit7; registers.set_flags(zero: registers.b == 0, negative: 0, half_carry: 0); 8 } # RLC B
+    cb_table[0x01] = -> { bit7 = Bit.bit_at(registers.c, 7); registers.carry_flag = bit7; registers.c = registers.c << 1 | bit7; registers.set_flags(zero: registers.c == 0, negative: 0, half_carry: 0); 8 } # RLC C
+    cb_table[0x02] = -> { bit7 = Bit.bit_at(registers.d, 7); registers.carry_flag = bit7; registers.d = registers.d << 1 | bit7; registers.set_flags(zero: registers.d == 0, negative: 0, half_carry: 0); 8 } # RLC D
+    cb_table[0x03] = -> { bit7 = Bit.bit_at(registers.e, 7); registers.carry_flag = bit7; registers.e = registers.e << 1 | bit7; registers.set_flags(zero: registers.e == 0, negative: 0, half_carry: 0); 8 } # RLC E
+    cb_table[0x04] = -> { bit7 = Bit.bit_at(registers.h, 7); registers.carry_flag = bit7; registers.h = registers.h << 1 | bit7; registers.set_flags(zero: registers.h == 0, negative: 0, half_carry: 0); 8 } # RLC H
+    cb_table[0x05] = -> { bit7 = Bit.bit_at(registers.l, 7); registers.carry_flag = bit7; registers.l = registers.l << 1 | bit7; registers.set_flags(zero: registers.l == 0, negative: 0, half_carry: 0); 8 } # RLC L
+    cb_table[0x06] = -> { byte = read_at_hl; bit7 = Bit.bit_at(byte, 7); registers.carry_flag = bit7; result = Bit.wrap_u8(byte << 1 | bit7); write_at_hl(result); registers.set_flags(zero: result == 0, negative: 0, half_carry: 0); 16 } # RLC (HL)
+    cb_table[0x07] = -> { bit7 = Bit.bit_at(registers.a, 7); registers.carry_flag = bit7; registers.a = registers.a << 1 | bit7; registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0); 8 } # RLC A
 
     # ============================================================
     # CB-prefix - RRC r (右ローテート、bit0→C/bit7、Z=結果0、N=H=0)
     # ============================================================
-    # cb_table[0x08] = -> { 8 }  # RRC B
-    # cb_table[0x09] = -> { 8 }  # RRC C
-    # cb_table[0x0A] = -> { 8 }  # RRC D
-    # cb_table[0x0B] = -> { 8 }  # RRC E
-    # cb_table[0x0C] = -> { 8 }  # RRC H
-    # cb_table[0x0D] = -> { 8 }  # RRC L
-    # cb_table[0x0E] = -> { 16 } # RRC (HL)
-    # cb_table[0x0F] = -> { 8 }  # RRC A
+    cb_table[0x08] = -> { bit0 = Bit.bit_at(registers.b, 0); registers.b = Bit.set_bit(registers.b >> 1, 7, bit0); registers.set_flags(zero: registers.b == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC B
+    cb_table[0x09] = -> { bit0 = Bit.bit_at(registers.c, 0); registers.c = Bit.set_bit(registers.c >> 1, 7, bit0); registers.set_flags(zero: registers.c == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC C
+    cb_table[0x0A] = -> { bit0 = Bit.bit_at(registers.d, 0); registers.d = Bit.set_bit(registers.d >> 1, 7, bit0); registers.set_flags(zero: registers.d == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC D
+    cb_table[0x0B] = -> { bit0 = Bit.bit_at(registers.e, 0); registers.e = Bit.set_bit(registers.e >> 1, 7, bit0); registers.set_flags(zero: registers.e == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC E
+    cb_table[0x0C] = -> { bit0 = Bit.bit_at(registers.h, 0); registers.h = Bit.set_bit(registers.h >> 1, 7, bit0); registers.set_flags(zero: registers.h == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC H
+    cb_table[0x0D] = -> { bit0 = Bit.bit_at(registers.l, 0); registers.l = Bit.set_bit(registers.l >> 1, 7, bit0); registers.set_flags(zero: registers.l == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC L
+    cb_table[0x0E] = -> { byte = read_at_hl; bit0 = Bit.bit_at(byte, 0); result = Bit.set_bit(byte >> 1, 7, bit0); write_at_hl(result); registers.set_flags(zero: result == 0, negative: 0, half_carry: 0, carry: bit0); 16 } # RRC (HL)
+    cb_table[0x0F] = -> { bit0 = Bit.bit_at(registers.a, 0); registers.a = Bit.set_bit(registers.a >> 1, 7, bit0); registers.set_flags(zero: registers.a == 0, negative: 0, half_carry: 0, carry: bit0); 8 } # RRC A
 
     # ============================================================
     # CB-prefix - RL r (Carry 経由の左ローテート、Z=結果0、N=H=0)

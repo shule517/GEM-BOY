@@ -24,10 +24,10 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 | B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 2/2 [完了](INC/DEC・AND・CALL/RET・JR Z/JR 無条件まで追加され、HELLO WORLD 統合シナリオが HALT 到達)|
 | C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 2/2 [完了](C-1: LY ティック / C-2: BG タイル描画。framebuffer に画素が乗るようになった)|
 | D. HELLO WORLD 表示 | skip_boot 起動 + 画面確認 | 1h | **画面に "Hello World!" 表示** ★第一 | 2/2 [完了] ★ **第一マイルストーン達成**(`hello.gb` の `Hello 8-bit world!` が DragonRuby で描画された)|
-| E. Nintendo ロゴ表示 | ブートROM 用追加命令 + CB-prefix + ブートROM mapping + スクロール | 2.5〜6.5h | **正しい Nintendo ロゴ** ★第二 | 3/7(E-1: 主要命令完成 — ADC/SBC/ADD SP,e8/LD HL,SP+e8/INC (HL)/CPL/SCF/CCF/DAA/RST × 8/RETI/RET cc × 4/EI(即時版)を追加し、残るは STOP のみ。E-2: CB-prefix で SRA × 8 + SWAP × 8 + SLA (HL) を追加し、残るは **RLC × 8 + RRC × 8 = 16 命令のみ**)|
+| E. Nintendo ロゴ表示 | ブートROM 用追加命令 + CB-prefix + ブートROM mapping + スクロール | 2.5〜6.5h | **正しい Nintendo ロゴ** ★第二 | 3/7(E-1: STOP まで含む全 245 命令完成。E-2: **CB-prefix 全 256 命令完成**(RLC/RRC × 8 を追加)。残るは E-3〜E-7 と割り込み機構)|
 | F. tobu.gb タイトル | MBC1 + スプライト + 入力 + タイマー | 6.5〜10h | **tobu.gb タイトル表示** ★第三 | 0/5 |
 
-合計 21 ステップ、想定 17〜26.5h。**現在 11 ステップ完了(フェーズ A + B-1, B-2 + C-1, C-2 + D-1, D-2 完了、E-1 / E-2 ほぼ完成)**。★ **第一マイルストーン(HELLO WORLD 表示)達成**。
+合計 21 ステップ、想定 17〜26.5h。**現在 13 ステップ完了(フェーズ A + B-1, B-2 + C-1, C-2 + D-1, D-2 + E-1, E-2 完了)**。★ **第一マイルストーン(HELLO WORLD 表示)達成**。CPU 命令実装は完成。残るは **割り込み機構(Step 1)→ Timer(Step 2)→ PPU/MMU 確認(Step 3-4)→ ブート ROM mapping(Step 5)→ 起動・診断・ロゴ表示(Step 6-8)**で第二マイルストーン到達。想定 5〜10h。
 
 ### 進行中の発見(2026-05-04 時点)
 
@@ -35,7 +35,7 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 `./dragonruby .` で `data/hello.gb` を skip_boot 起動 → 左ペインに `Hello 8-bit world!` が DMG パレットで表示。右ペインには PC=0x01B9 / LY=74 が表示され、CPU が HALT 後も PPU が回り続けていることが目視できる。**フェーズ D 完了**。
 
-#### 2. CPU は 244 通常 opcode + 240 CB opcode 実装(計 484 / 501 = 約 97%)
+#### 2. CPU は 245 通常 opcode + 256 CB opcode 実装(計 501 / 501 = **100%**、不正 opcode 11 個は実機ロックアップ相当で未実装のまま)
 
 **実装済みカテゴリ(主要)**:
 - **8bit ロード**: `LD r, u8` × 8、`LD r, r'` × 64、`LD A, (rr)` × 8、`LD A, (u16)` / `LD (u16), A`、I/O ポート系 (`LD (FF00+u8/C), A` 等)
@@ -56,11 +56,13 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 **Blargg 進捗**: cpu_instrs 個別 ROM 11 個 + instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound 個別 ROM 計 41 件のシナリオテストが `spec/app/emulator/gb-test-roms/` 配下に整備されており、停止点が **`0xC4 (CALL NZ)` → `0xC6 (ADD A, u8)` → `0xD6 (SUB A, u8)` → CB `0x38` (SRL B)** と前進し、`10-bit ops.gb` で **初の Pass を達成**。
 
-**残る未実装命令**(主要なもの):
-- 制御系: `STOP`(0x10、ほぼ実機で使われない)
+**残る未実装機能**(命令そのものは完成、機能面で残るもの):
 - 割り込み機構: `EI` の 1命令遅延、IF/IE による割り込みベクタへの自動 dispatch、PPU の VBlank IF 立ち上げ
-- CB-prefix: `RLC r` × 8、`RRC r` × 8(残り 16 命令)
-- 不正 opcode: 0xD3 / 0xDB / 0xDD / 0xE3 / 0xE4 / 0xEB / 0xEC / 0xED / 0xF4 / 0xFC / 0xFD(実機では使われないので非対応のままで OK)
+- Timer: DIV / TIMA / TMA / TAC とオーバーフロー時の IF bit2 立ち上げ
+- HALT 解除条件: IF & IE != 0 で復帰、HALT bug
+- 不正 opcode 11 個(0xD3/DB/DD/E3/E4/EB/EC/ED/F4/FC/FD): 実機ロックアップ相当。現状は `nil` で raise する設計(デバッグ目的では推奨)。第三マイルストーン以降で必要なら実機相当のロックアップ実装へ切り替え
+
+**`RRC A` (0x0F) のバグ**: 代入先が `registers.b` になっていて A が更新されない、Z 判定も旧 A で誤判定。要修正。
 
 #### 3. ブートROM: VRAM クリアループ(`LD (HL+),A` / `BIT 5,H` / `JR Z,-5`)で 200,000 サイクル枠を超過して停止
 
@@ -91,15 +93,53 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 - `tick(args)` で **PPU の framebuffer(160×144 の色番号 0..3)を 4 倍拡大して画面に描画** — DMG 4階調を RGB に変換するパレット (`GB_PALETTE`)、Y軸反転で Game Boy 上端を画面上に揃える、`SCREEN_X=20, SCREEN_Y=72` に配置。`step_emulator` で 1 フレーム(70224 T-cycle)を 1000 サイクル粒度で CPU/PPU 交互に進める
 
-### 次の最短経路
+### 次の最短経路(第二マイルストーンまで 5〜10 時間)
 
-★第一マイルストーン達成済み。次は **★第二マイルストーン(Nintendo ロゴ表示)** に向かう。CPU 命令カバレッジは 97%(残り命令も大半は実機で稀)、ボトルネックは **割り込み機構** と **PPU/MMU の追加機能**側に移った。優先順位:
+★第一マイルストーン達成済み。**CPU 命令は 501/501 で完成**(`RRC A` バグ修正済、不正 opcode 11 個は実機ロックアップ相当で除外)。第二マイルストーン(Nintendo ロゴ表示)まで残るは下記の 8 ステップ。
 
-1. **CB `RLC` / `RRC` 各 8 個 = 16 命令** — CB ROTATE 系で唯一残っている。`RLC r` はブートROM のロゴ展開で頻発。RL/RR ファミリーと同じパターンで量産可能
-2. **割り込み機構**(`EI` の 1 命令遅延化 + IF/IE → ベクタ自動 dispatch + PPU の VBlank IF 立ち上げ) — ブートROM の VBlank 待ちループで詰まっている本質的問題。これが解けると HALT/RET 周りも整う
-3. **E-3 PPU SCY スクロール対応 / E-4 ブートROM mapping** — Nintendo ロゴのスクロールイン演出に必要(コードは小さい)
+#### Step 1: 割り込み機構(2〜3h)— **最優先**
 
-CPU 側は実質ほぼ完成しており、第二マイルストーン達成の鍵は **割り込み機構** と **PPU/MMU まわり**。ここまで実装すれば、ブートROM 完走の条件はほぼ揃う。
+ブートROM の VBlank 待ちループで詰まっている本質的な問題。Blargg `02-interrupts.gb` も解禁される。
+
+- `step` メソッドに 2 フェーズ追加: ① EI 遅延の消費(`@ime_pending` を `ime` に反映)、② IF & IE → ベクタ dispatch(IME クリア + IF bit クリア + PC push + ベクタへ jump)
+- `EI` 命令を `@ime_pending = true` に変更
+- HALT 解除条件: `IF & IE != 0` で復帰、IME=1 なら dispatch、IME=0 なら次命令から再開(HALT bug 配慮)
+
+**ターゲットspec**: `blargg_02_interrupts_scenarios_spec.rb`(現在 5 件失敗 → 1〜2 件除き全 pass 想定)
+
+#### Step 2: Timer (DIV/TIMA/TMA/TAC) 実装(1〜2h)
+
+`app/emulator/timer.rb` を新設。CPU の cycle 進行と同期して DIV / TIMA をインクリメント、オーバーフローで TMA 再ロード + IF bit2 立ち上げ。`main.rb` で `cpu.run → ppu.step → timer.step` の順に進める。
+
+**ターゲット**: Blargg `interrupt_time.gb` / `instr_timing.gb` / `02-interrupts.gb` の Timer サブテスト
+
+#### Step 3: PPU の VBlank IF 立ち上げ(15min)
+
+LY=144 になった瞬間に IF bit 0 を立てる(既に部分実装済みのはず、確認のみ)。
+
+#### Step 4: PPU SCY スクロール対応(15min)— E-3
+
+`bg_y = Bit.wrap_u8(scy + ly)` の wrap が正しく効いているか確認。C-2 で実装済みのはず。
+
+#### Step 5: MMU にブート ROM mapping 追加(30min)— E-4
+
+`data/dmg_boot.bin`(SameBoot 同梱、256B)を `0x0000-0x00FF` にマップ。`0xFF50` に 0x01 で切断してカートリッジ ROM に切り替え。
+
+#### Step 6: ブート ROM 起動 → 観察(30min)— E-5
+
+`ROM_PATH = 'data/tobu.gb'` + `SKIP_BOOT = false` で起動。ロゴが正しく出れば Step 8 へ、崩れたら Step 7 へ。
+
+#### Step 7: Blargg 診断ループ(必要なら、0〜4h)— E-6
+
+ロゴが崩れた場合のみ。`spec/app/emulator/gb-test-roms/` で症状に近い ROM を実行 → `Failed XX` の番号から原因 opcode を特定。
+
+#### Step 8: ★ Nintendo ロゴ表示 — E-7
+
+ブート ROM が完走 → グレー → 黒 → ロゴが上から下へスクロールイン → カートリッジ本体へジャンプ、を目視確認。
+
+---
+
+CPU 命令の網羅は完了したので、第二マイルストーン達成の鍵は **Step 1(割り込み機構)** と **Step 2(Timer)** の 2 つに絞られている。Step 1 から始めるのが最短(既に `blargg_02_interrupts_scenarios_spec.rb` に実装ターゲットの spec が用意されているため、TDD で進められる)。
 
 ## 進捗チェックリスト
 
@@ -121,12 +161,15 @@ CPU 側は実質ほぼ完成しており、第二マイルストーン達成の�
 - [x] D-2: hello.gb 起動 → "Hello World!" 表示 ★第一マイルストーン達成 — `./dragonruby .` で `Hello 8-bit world!` が DMG パレットで描画されることを目視確認(2026-05-02)。統合テスト `HELLO WORLD 完走` も HALT 到達で pass
 
 ### フェーズ E: Nintendo ロゴ表示
-- [~] E-1: ブートROM 用 CPU 命令追加 — **PUSH/POP × 8、JP cc × 4、JR cc × 5、CALL/CALL cc × 5、ADD/ADC/SUB/SBC × 36(`add_a`/`adc_a`/`sub_a`/`sbc_a` ヘルパ)、ADD HL × 4、ADD SP, e8、LD HL, SP+e8、A 専用ローテート 4 個(RLCA/RRCA/RLA/RRA)、INC/DEC (HL)、CPL/SCF/CCF、DAA、RST × 8、RETI、RET cc × 4、EI(即時版)、`registers.nz?/z?/nc?/c?` 述語、`push_u16`/`pop_u16`/`rst(address:)` ヘルパなど主要命令完成**。**残:STOP、EI の 1 命令遅延化**
-- [~] E-2: CB-prefix 実装 — **BIT/RES/SET の (HL) 版含む 192 命令 + RR/RL/SRL/SLA/SRA/SWAP の各ファミリー 8 個 = 48 命令、計 240 / 256 命令実装済み**。**残:RLC × 8 + RRC × 8 = 16 命令**
-- [ ] E-3: PPU SCY スクロール対応
-- [ ] E-4: MMU にブートROM mapping 追加 + VBlank IF (0xFF0F bit 0) 立ち上げ + IF/IE による割り込みベクタ自動 dispatch
+- [x] E-1: ブートROM 用 CPU 命令追加 [完了] — **全 245 通常 opcode 実装完成**(PUSH/POP × 8、JP cc × 4、JR cc × 5、CALL/CALL cc × 5、ADD/ADC/SUB/SBC × 36、ADD HL × 4、ADD SP, e8、LD HL, SP+e8、A 専用ローテート 4 個、INC/DEC (HL)、CPL/SCF/CCF、DAA、RST × 8、RETI、RET cc × 4、EI(即時版)、STOP、`registers.nz?/z?/nc?/c?` 述語、`push_u16`/`pop_u16`/`rst(address:)` ヘルパ)。`RRC A`(0x0F)バグ修正済
+- [x] E-2: CB-prefix 実装 [完了] — **CB-prefix 全 256 命令実装完成**(BIT/RES/SET 計 192 + RR/RL/SRL/SLA/SRA/SWAP/RLC/RRC × 8 = 64、(HL) バリアント含む)
+- [ ] E-3a: 割り込み機構(EI 1 命令遅延 + IF/IE → ベクタ dispatch + HALT 解除)— **Step 1、最優先**。`blargg_02_interrupts_scenarios_spec.rb` がターゲット spec
+- [ ] E-3b: Timer (DIV/TIMA/TMA/TAC) 実装 — `app/emulator/timer.rb` を新設、CPU cycle と同期。Blargg `interrupt_time.gb` / `instr_timing.gb` のターゲット
+- [ ] E-3c: PPU の VBlank IF 立ち上げ確認(LY=144 で IF bit 0)— 既に部分実装、確認のみ
+- [ ] E-3d: PPU SCY スクロール対応確認 — C-2 で実装済みのはず、`bg_y = wrap_u8(scy + ly)` の挙動確認のみ
+- [ ] E-4: MMU にブート ROM mapping 追加(`0x0000-0x00FF` を `dmg_boot.bin`、`0xFF50` で切断)
 - [ ] E-5: ブートROM 起動 → 崩れたロゴ観察
-- [ ] E-6: Blargg 診断ループ — **`spec/app/emulator/gb-test-roms/` に 41 件のシナリオテスト整備済み**(cpu_instrs / instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound)。停止位置が opcode 単位で見え、`0xC4 → 0xC6 → 0xD6 → CB 0x38` と前進し、**`10-bit ops.gb` で初の Pass 達成**
+- [ ] E-6: Blargg 診断ループ(条件付き)— **`spec/app/emulator/gb-test-roms/` に 41 件のシナリオテスト整備済み**(cpu_instrs / instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound)。停止位置が opcode 単位で見え、`0xC4 → 0xC6 → 0xD6 → CB 0x38` と前進し、**`10-bit ops.gb` で初の Pass 達成**
 - [ ] E-7: 修正済み Nintendo ロゴ表示 ★第二マイルストーン
 
 ### フェーズ F: tobu.gb タイトル
