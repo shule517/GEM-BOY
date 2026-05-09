@@ -20,7 +20,6 @@ require 'app/emulator/ppu'
 RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテスト' do
   context '02-interrupts.gb を実行したとき' do
     instr_address = 0xC000
-    ie_address = 0xFFFF
     timer_vector = 0x0050
 
     let(:cpu) { CPU.new(mmu, skip_boot: false, trace: false) }
@@ -66,8 +65,9 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
     context 'IF & IE & 0x1F が真かつ IME=1 のとき割り込み dispatch される(Test 2)' do
       it 'IE=0x04 (Timer)、IF=0x04 をセットして次の step で 0x50 にジャンプし、IF bit 2 がクリアされる' do
-        mmu.write_u8(address: ie_address, value: 0x04)
-        mmu.write_u8(address: PPU::IF, value: 0x04)
+        # https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
+        mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: PPU::IF, value: 0b00000100) # TimerフラグをON
         cpu.ime = true
         cpu.registers.sp = 0xDFFE
         cpu.registers.pc = 0xC100
@@ -108,8 +108,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     context 'IME=0 のとき IF が立っても dispatch されない(Test 3)' do
       it 'IE=0x04, IF=0x04 でも PC は変化せず、IF bit 2 は立ったまま' do
         cpu.ime = false
-        mmu.write_u8(address: ie_address, value: 0x04)
-        mmu.write_u8(address: PPU::IF, value: 0x04)
+        mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: PPU::IF, value: 0b00000100) # TimerフラグをON
         cpu.registers.pc = 0xC100
         original_pc = cpu.registers.pc
 
@@ -147,7 +147,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.write_u8(address: 0xFF07, value: 0x05) # TAC: enable + rate 01 (16 T-cycles per TIMA tick)
         mmu.write_u8(address: 0xFF05, value: 0xFF) # TIMA: 次の tick でオーバーフロー
         mmu.write_u8(address: 0xFF06, value: 0x42) # TMA: オーバーフロー時の再ロード値
-        mmu.write_u8(address: PPU::IF, value: 0x00)
+        mmu.write_u8(address: PPU::IF, value: 0b00000000) # IF を全クリア(Timer overflow で bit 2 が立つことを後段で検証するため事前にゼロに揃える)
         cpu.registers.pc = 0xC100
         # NOP を 5 個 (20 T-cycles) 並べる: 16 T-cycles 目で overflow、+1 M-cycle (4 T-cycles) で TMA を TIMA に reload
         5.times { |i| mmu.write_u8(address: 0xC100 + i, value: CPU::NOP) }
@@ -195,8 +195,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.halted = true
         cpu.registers.pc = 0xC100
         cpu.registers.sp = 0xDFFE
-        mmu.write_u8(address: ie_address, value: 0x04)
-        mmu.write_u8(address: PPU::IF, value: 0x04)
+        mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: PPU::IF, value: 0b00000100) # TimerフラグをON
 
         cpu.step
 
@@ -211,8 +211,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.halted = true
         cpu.registers.pc = 0xC100
         mmu.write_u8(address: 0xC100, value: CPU::NOP)
-        mmu.write_u8(address: ie_address, value: 0x04)
-        mmu.write_u8(address: PPU::IF, value: 0x04)
+        mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: PPU::IF, value: 0b00000100) # TimerフラグをON
 
         cpu.step
 

@@ -72,6 +72,7 @@ class MMU
   SB = 0xFF01  # Serial Buffer: 送信したい 1 バイト
   SC = 0xFF02  # Serial Control: 転送制御
   SC_TRANSFER_START = 0x81  # SC への書き込みがこの値のとき転送開始 (bit7=1, bit0=1)
+  IE = 0xFFFF  # Interrupt Enable: 各割り込みの有効/無効ビット https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable
 
   def initialize(cartridge, skip_boot: false)
     @cartridge = cartridge
@@ -108,7 +109,7 @@ class MMU
     when 0xFE00..0xFE9F then @oam[address - 0xFE00]
     when 0xFF00..0xFF7F then @io[address - 0xFF00]
     when 0xFF80..0xFFFE then @hram[address - 0xFF80]
-    when 0xFFFF then @ie
+    when IE then @ie
     else 0xFF
     end
   end
@@ -126,7 +127,7 @@ class MMU
     when 0xFE00..0xFE9F then @oam[address - 0xFE00] = value
     when 0xFF00..0xFF7F then @io[address - 0xFF00] = value; handle_serial(address, value)
     when 0xFF80..0xFFFE then @hram[address - 0xFF80] = value
-    when 0xFFFF then @ie = value
+    when IE then @ie = value
     end
   end
 
