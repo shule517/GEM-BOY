@@ -33,7 +33,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     ie_address = 0xFFFF
     timer_vector = 0x0050
 
-    let(:cpu) { CPU.new(mmu, skip_boot: false, trace: false) }
+    let(:cpu) { CPU.new(mmu, skip_boot: false, trace: true) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: false) }
     let(:rom_data) { Array.new(0x8000, 0) }
     let(:instr_bytes) { [] }
@@ -60,7 +60,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     # ==========================================================================
 
     context 'EI で IME を立てる' do
-      let(:instr_bytes) { [0xFB] } # EI
+      let(:instr_bytes) { [0xFB, 0x00] } # 0xC000: EI(0xFB), 0xC001: NOP(0x00)
+      before { cpu.ime = false }
 
       it 'IME=true になる' do
         cpu.step
@@ -68,9 +69,6 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       end
 
       it 'EI の 1 命令遅延仕様: EI 直後の 1 命令を実行した後に IME=1 になる(現状は即時 EI のため失敗想定)' do
-        # 配置: 0xC000 = EI, 0xC001 = NOP
-        mmu.write_u8(address: 0xC001, value: 0x00) # NOP
-        cpu.ime = false
         cpu.step # EI を実行 → 仕様上はまだ IME=0(次命令後に IME=1)
         expect(cpu.ime).to eq false # ← 現状は即時 EI なので失敗(true になる)
         cpu.step # NOP を実行 → ここで IME=1 になるべき
