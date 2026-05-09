@@ -53,7 +53,6 @@ class CPU
 
   # １つ命令を実行する
   def step
-    puts "step---------------"
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
 
     # IMEの有効が予約されてたら、有効にする

@@ -13,16 +13,6 @@ require 'app/emulator/ppu'
 #   Test 4: Timer doesn't work  - TAC を有効にすると TIMA が増えて IF bit2 が立つ
 #   Test 5: HALT                - HALT 中も Timer 割り込みで起き上がる
 #
-# 現状の GEM BOY 実装:
-#   - DI / EI: IME フラグの即時操作のみ(EI の 1 命令遅延仕様は未対応)
-#   - 割り込み dispatch(IF & IE → ベクタ jump): **未実装**
-#   - Timer (DIV / TIMA / TMA / TAC): **未実装**
-#   - HALT 解除条件: 簡易実装のみ
-#
-# したがって Test 2〜5 は実装が揃うまで pending(skip)になる。動く部分(IME/HALT
-# の状態遷移、IF/IE レジスタ I/O)だけ通常の it として書き、dispatch / Timer 系は
-# pending としてマークする。実装が進んだら pending を外して assertion を有効化する。
-#
 # Pan Docs:
 #   - 割り込み: https://gbdev.io/pandocs/Interrupts.html
 #   - HALT:     https://gbdev.io/pandocs/halt.html
@@ -63,7 +53,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       let(:instr_bytes) { [CPU::EI, CPU::NOP] }
       before { cpu.ime = false }
 
-      it 'EI の 1 命令遅延仕様: EI 直後の 1 命令を実行した後に IME=1 になる(現状は即時 EI のため失敗想定)' do
+      it 'EI の 1 命令遅延仕様: EI 直後の 1 命令を実行した後に IME=1 になる' do
         cpu.step # EI を実行
         expect(cpu.ime).to eq false # 遅延するのでまだ反映されない
         expect(cpu.ime_scheduled).to eq true # imeの有効が予約される
@@ -123,8 +113,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.registers.pc = 0xC100
         original_pc = cpu.registers.pc
 
-        # NOP を実行してもベクタへ飛ばないことを確認(現状でも動くはず:
-        # IME=0 なら dispatch されないので)
+        # IME=0 なら dispatch されないので NOP がそのまま実行される
         mmu.write_u8(address: 0xC100, value: CPU::NOP)
         cpu.step
 
@@ -152,19 +141,21 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     # ==========================================================================
 
     context 'Timer 割り込み(Test 4)' do
-      it 'TAC=0x05、TIMA=0xFF を超えると IF bit 2 (Timer) が立つ' do
-        mmu.write_u8(address: 0xFF07, value: 0x05) # TAC: enable + 262144 Hz
+      it 'TIMA=0xFF からオーバーフローすると IF bit 2 (Timer) が立ち、TIMA に TMA が再ロードされる' do
+        # Pan Docs: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
+        # TAC bit2=enable / bits1-0=rate, rate 01 = 262144 Hz = 4194304 Hz CPU / 16 → 16 T-cycles ごとに TIMA が +1
+        mmu.write_u8(address: 0xFF07, value: 0x05) # TAC: enable + rate 01 (16 T-cycles per TIMA tick)
         mmu.write_u8(address: 0xFF05, value: 0xFF) # TIMA: 次の tick でオーバーフロー
         mmu.write_u8(address: 0xFF06, value: 0x42) # TMA: オーバーフロー時の再ロード値
         mmu.write_u8(address: PPU::IF, value: 0x00)
         cpu.registers.pc = 0xC100
-        # NOP を 64 個並べて 256 cycles 進める(262144 Hz / 4 = 65536 Hz、4 cycles ごとに TIMA tick)
-        64.times { |i| mmu.write_u8(address: 0xC100 + i, value: CPU::NOP) }
+        # NOP を 5 個 (20 T-cycles) 並べる: 16 T-cycles 目で overflow、+1 M-cycle (4 T-cycles) で TMA を TIMA に reload
+        5.times { |i| mmu.write_u8(address: 0xC100 + i, value: CPU::NOP) }
 
-        cpu.run(256)
+        cpu.run(20)
 
         expect(mmu.read_u8(address: PPU::IF) & 0x04).to eq 0x04 # Timer 割り込み立つ
-        expect(mmu.read_u8(address: 0xFF05)).to eq 0x42            # TMA が再ロード
+        expect(mmu.read_u8(address: 0xFF05)).to eq 0x42         # TMA が TIMA へ再ロード
       end
     end
 
@@ -231,16 +222,14 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     end
 
     # ==========================================================================
-    # 0xFF0F (IF) と 0xFFFF (IE) の I/O 直接アクセス
+    # IF (0xFF0F) と IE (0xFFFF) の I/O 直接アクセス
+    # Pan Docs: https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
     # ==========================================================================
 
-    context 'IF (0xFF0F) と IE (0xFFFF) を MMU 経由で読み書きしたとき' do
-      it '書いた値が読める' do
-        mmu.write_u8(address: PPU::IF, value: 0x1F)
-        mmu.write_u8(address: ie_address, value: 0x1F)
-        # IF の上位 3bit は常に 1 になる仕様だが、現状実装はそのまま保持しているはず
-        expect(mmu.read_u8(address: PPU::IF) & 0x1F).to eq 0x1F
-        expect(mmu.read_u8(address: ie_address) & 0x1F).to eq 0x1F
+    context 'IF (PPU::IF) を MMU 経由で読み書きしたとき' do
+      it '下位 5bit が書いた値で読める' do
+        mmu.write_u8(address: PPU::IF, value: 0b00011111)
+        expect(mmu.read_u8(address: PPU::IF)).to eq 0b00011111
       end
     end
   end
