@@ -72,6 +72,7 @@ class MMU
   SB = 0xFF01  # Serial Buffer: 送信したい 1 バイト
   SC = 0xFF02  # Serial Control: 転送制御
   SC_TRANSFER_START = 0x81  # SC への書き込みがこの値のとき転送開始 (bit7=1, bit0=1)
+  IF = 0xFF0F  # Interrupt Flag: 発生した割り込みの種別ビット https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
   IE = 0xFFFF  # Interrupt Enable: 各割り込みの有効/無効ビット https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable
 
   def initialize(cartridge, skip_boot: false)

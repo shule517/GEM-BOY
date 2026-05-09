@@ -67,7 +67,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'IE=0x04 (Timer)、IF=0x04 をセットして次の step で 0x50 にジャンプし、IF bit 2 がクリアされる' do
         # https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
         mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
-        mmu.write_u8(address: PPU::IF, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
         cpu.ime = true
         cpu.registers.sp = 0xDFFE
         cpu.registers.pc = 0xC100
@@ -77,7 +77,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
         expect(cpu.registers.pc).to eq timer_vector # 0x50 へ jump
         expect(cpu.ime).to eq false                  # IME クリア
-        expect(mmu.read_u8(address: PPU::IF) & 0x04).to eq 0 # IF bit 2 クリア
+        expect(mmu.read_u8(address: MMU::IF) & 0x04).to eq 0 # IF bit 2 クリア
         expect(cpu.registers.sp).to eq 0xDFFC        # 2 バイト push
         expect(mmu.read_u8(address: 0xDFFD)).to eq 0xC1 # 戻り先 high
         expect(mmu.read_u8(address: 0xDFFC)).to eq 0x00 # 戻り先 low
@@ -109,7 +109,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'IE=0x04, IF=0x04 でも PC は変化せず、IF bit 2 は立ったまま' do
         cpu.ime = false
         mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
-        mmu.write_u8(address: PPU::IF, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
         cpu.registers.pc = 0xC100
         original_pc = cpu.registers.pc
 
@@ -118,7 +118,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.step
 
         expect(cpu.registers.pc).to eq original_pc + 1 # NOP 1 byte 進むだけ
-        expect(mmu.read_u8(address: PPU::IF) & 0x04).to eq 0x04 # IF bit 2 はクリアされない
+        expect(mmu.read_u8(address: MMU::IF) & 0x04).to eq 0x04 # IF bit 2 はクリアされない
       end
     end
 
@@ -147,14 +147,14 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.write_u8(address: 0xFF07, value: 0x05) # TAC: enable + rate 01 (16 T-cycles per TIMA tick)
         mmu.write_u8(address: 0xFF05, value: 0xFF) # TIMA: 次の tick でオーバーフロー
         mmu.write_u8(address: 0xFF06, value: 0x42) # TMA: オーバーフロー時の再ロード値
-        mmu.write_u8(address: PPU::IF, value: 0b00000000) # IF を全クリア(Timer overflow で bit 2 が立つことを後段で検証するため事前にゼロに揃える)
+        mmu.write_u8(address: MMU::IF, value: 0b00000000) # IF を全クリア(Timer overflow で bit 2 が立つことを後段で検証するため事前にゼロに揃える)
         cpu.registers.pc = 0xC100
         # NOP を 5 個 (20 T-cycles) 並べる: 16 T-cycles 目で overflow、+1 M-cycle (4 T-cycles) で TMA を TIMA に reload
         5.times { |i| mmu.write_u8(address: 0xC100 + i, value: CPU::NOP) }
 
         cpu.run(20)
 
-        expect(mmu.read_u8(address: PPU::IF) & 0x04).to eq 0x04 # Timer 割り込み立つ
+        expect(mmu.read_u8(address: MMU::IF) & 0x04).to eq 0x04 # Timer 割り込み立つ
         expect(mmu.read_u8(address: 0xFF05)).to eq 0x42         # TMA が TIMA へ再ロード
       end
     end
@@ -196,7 +196,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.registers.pc = 0xC100
         cpu.registers.sp = 0xDFFE
         mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
-        mmu.write_u8(address: PPU::IF, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
 
         cpu.step
 
@@ -212,7 +212,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.registers.pc = 0xC100
         mmu.write_u8(address: 0xC100, value: CPU::NOP)
         mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
-        mmu.write_u8(address: PPU::IF, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
 
         cpu.step
 
@@ -226,10 +226,10 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     # Pan Docs: https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
     # ==========================================================================
 
-    context 'IF (PPU::IF) を MMU 経由で読み書きしたとき' do
+    context 'IF (MMU::IF) を MMU 経由で読み書きしたとき' do
       it '下位 5bit が書いた値で読める' do
-        mmu.write_u8(address: PPU::IF, value: 0b00011111)
-        expect(mmu.read_u8(address: PPU::IF)).to eq 0b00011111
+        mmu.write_u8(address: MMU::IF, value: 0b00011111)
+        expect(mmu.read_u8(address: MMU::IF)).to eq 0b00011111
       end
     end
   end

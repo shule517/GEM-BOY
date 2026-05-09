@@ -10,7 +10,6 @@ class PPU
   STAT = 0xFF41 # LCD Status https://gbdev.io/pandocs/STAT.html#ff41--stat-lcd-status
   LY   = 0xFF44 # LCDの現在のY座標 https://gbdev.io/pandocs/STAT.html#ff44--ly-lcd-y-coordinate-read-only
   LYC  = 0xFF45 # LYCとLYを比較する(一致するとSTATに反映) https://gbdev.io/pandocs/STAT.html#ff45--lyc-ly-compare
-  IF   = 0xFF0F # Interrupt flag https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
 
   SCREEN_WIDTH  = 160 # 画面の横ピクセル数 https://gbdev.io/pandocs/Specifications.html#specifications
   SCREEN_HEIGHT = 144 # 画面の縦ピクセル数
@@ -46,7 +45,7 @@ class PPU
         render_scanline
       end
       if ly == VBLANK_START_LY # VBlankに入った瞬間
-        @mmu.write_io_direct(address: IF, value: Bit.set_bit(@mmu.read_u8(address: IF), 0, 1))
+        @mmu.write_io_direct(address: MMU::IF, value: Bit.set_bit(@mmu.read_u8(address: MMU::IF), 0, 1))
       end
 
       # LYを+1
