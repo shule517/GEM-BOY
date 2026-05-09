@@ -69,8 +69,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
         mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
         cpu.ime = true
-        cpu.registers.sp = 0xDFFE
-        cpu.registers.pc = 0xC100
+        cpu.registers.sp = 0xDFFE # SP を WRAM 末尾に置き、dispatch で PC が push される先を検証可能な領域(0xDFFC/DFFD)に固定する
+        cpu.registers.pc = 0xC100 # 割り込み発生時に stack へ push される「戻り先 PC」を既知の値にして、push されたバイトを後段で確認できるようにする
         mmu.write_u8(address: 0xC100, value: CPU::NOP) # dispatch されなければこれが実行される
 
         cpu.step
@@ -144,9 +144,9 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'TIMA=0xFF からオーバーフローすると IF bit 2 (Timer) が立ち、TIMA に TMA が再ロードされる' do
         # Pan Docs: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
         # TAC bit2=enable / bits1-0=rate, rate 01 = 262144 Hz = 4194304 Hz CPU / 16 → 16 T-cycles ごとに TIMA が +1
-        mmu.write_u8(address: 0xFF07, value: 0x05) # TAC: enable + rate 01 (16 T-cycles per TIMA tick)
-        mmu.write_u8(address: 0xFF05, value: 0xFF) # TIMA: 次の tick でオーバーフロー
-        mmu.write_u8(address: 0xFF06, value: 0x42) # TMA: オーバーフロー時の再ロード値
+        mmu.write_u8(address: MMU::TAC,  value: 0x05) # TAC: enable + rate 01 (16 T-cycles per TIMA tick)
+        mmu.write_u8(address: MMU::TIMA, value: 0xFF) # TIMA: 次の tick でオーバーフロー
+        mmu.write_u8(address: MMU::TMA,  value: 0x42) # TMA: オーバーフロー時の再ロード値
         mmu.write_u8(address: MMU::IF, value: 0b00000000) # IF を全クリア(Timer overflow で bit 2 が立つことを後段で検証するため事前にゼロに揃える)
         cpu.registers.pc = 0xC100
         # NOP を 5 個 (20 T-cycles) 並べる: 16 T-cycles 目で overflow、+1 M-cycle (4 T-cycles) で TMA を TIMA に reload
@@ -155,7 +155,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.run(20)
 
         expect(mmu.read_u8(address: MMU::IF) & 0x04).to eq 0x04 # Timer 割り込み立つ
-        expect(mmu.read_u8(address: 0xFF05)).to eq 0x42         # TMA が TIMA へ再ロード
+        expect(mmu.read_u8(address: MMU::TIMA)).to eq 0x42 # TMA が TIMA へ再ロード
       end
     end
 
@@ -193,8 +193,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'halted=false に戻り、ベクタ 0x50 へ dispatch される' do
         cpu.ime = true
         cpu.halted = true
-        cpu.registers.pc = 0xC100
-        cpu.registers.sp = 0xDFFE
+        cpu.registers.pc = 0xC100 # HALT復帰後に stack へ push される戻り先 PC を既知の値にしておく
+        cpu.registers.sp = 0xDFFE # SP を WRAM 末尾に置き、dispatch の PC push が WRAM 内に収まるようにする
         mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
         mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
 

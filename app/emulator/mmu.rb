@@ -72,6 +72,11 @@ class MMU
   SB = 0xFF01  # Serial Buffer: 送信したい 1 バイト
   SC = 0xFF02  # Serial Control: 転送制御
   SC_TRANSFER_START = 0x81  # SC への書き込みがこの値のとき転送開始 (bit7=1, bit0=1)
+  # Timer 関連 https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
+  DIV  = 0xFF04 # Divider Register: 16384 Hz でインクリメント
+  TIMA = 0xFF05 # Timer Counter: TAC で指定した周期でインクリメントし、オーバーフローで TMA を再ロード + IF bit2 をセット
+  TMA  = 0xFF06 # Timer Modulo: TIMA オーバーフロー時にロードされる値
+  TAC  = 0xFF07 # Timer Control: bit2=enable, bits1-0=rate (00:4096Hz / 01:262144Hz / 10:65536Hz / 11:16384Hz)
   IF = 0xFF0F  # Interrupt Flag: 発生した割り込みの種別ビット https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
   IE = 0xFFFF  # Interrupt Enable: 各割り込みの有効/無効ビット https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable
 
