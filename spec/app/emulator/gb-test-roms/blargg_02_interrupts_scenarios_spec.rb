@@ -22,8 +22,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     instr_address = 0xC000
     timer_vector = 0x0050
 
-    let(:cpu) { CPU.new(mmu, skip_boot: false, trace: false) }
-    let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: false) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }  # 初期 SP=0xFFFE 等を取りたいので post-boot 状態で起動
+    let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:rom_data) { Array.new(0x8000, 0) }
     let(:instr_bytes) { [] }
 
@@ -71,16 +71,16 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
         mmu.write_u8(address: MMU::IF, value: 0b00000100) # Timerの割り込みが発生した
         cpu.ime = true
-        cpu.registers.sp = 0xDFFE # SP を WRAM 末尾に置き、dispatch で PC が push される先を検証可能な領域(0xDFFC/DFFD)に固定する
+        initial_sp = cpu.registers.sp # post-boot 初期値 (0xFFFE)
 
         cpu.step
 
         expect(cpu.registers.pc).to eq timer_vector # 0x50 へ jump
         expect(cpu.ime).to eq false                  # IME クリア
         expect(mmu.read_u8(address: MMU::IF) & 0b00000100).to eq 0 # IF bit 2 クリア
-        expect(cpu.registers.sp).to eq 0xDFFC        # 2 バイト push
-        expect(mmu.read_u8(address: 0xDFFD)).to eq 0xC0 # 戻り先 high (instr_address=0xC000 の上位)
-        expect(mmu.read_u8(address: 0xDFFC)).to eq 0x00 # 戻り先 low  (instr_address=0xC000 の下位)
+        expect(cpu.registers.sp).to eq initial_sp - 2        # 2 バイト push で SP が 2 減る
+        expect(mmu.read_u8(address: initial_sp - 1)).to eq 0xC0 # 戻り先 high (instr_address=0xC000 の上位)
+        expect(mmu.read_u8(address: initial_sp - 2)).to eq 0x00 # 戻り先 low  (instr_address=0xC000 の下位)
       end
     end
 
@@ -191,7 +191,6 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'halted=false に戻り、ベクタ 0x50 へ dispatch される' do
         cpu.ime = true
         cpu.halted = true
-        cpu.registers.sp = 0xDFFE # SP を WRAM 末尾に置き、dispatch の PC push が WRAM 内に収まるようにする
         mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
         mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
 
