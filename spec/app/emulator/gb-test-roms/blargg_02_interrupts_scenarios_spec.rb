@@ -145,15 +145,16 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'TIMA=0xFF からオーバーフローすると Timer flag が立ち、TIMA に TMA が再ロードされる' do
         # Pan Docs: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
         # TAC bit2=enable / bits1-0=rate, rate 01 = 262144 Hz = 4194304 Hz CPU / 16 → 16 T-cycles ごとに TIMA が +1
+        tma_reload_value = 0b01000010 # オーバーフロー時に TIMA に再ロードされる任意の値(0x42)
         mmu.write_u8(address: MMU::TAC,  value: 0b00000101) # TAC: bit2=enable + bits1-0=01 (rate 01 = 16 T-cycles per TIMA tick)
         mmu.write_u8(address: MMU::TIMA, value: 0b11111111) # TIMA: 次の tick でオーバーフロー (0xFF)
-        mmu.write_u8(address: MMU::TMA,  value: 0b01000010) # TMA: オーバーフロー時の再ロード値 (0x42)
+        mmu.write_u8(address: MMU::TMA,  value: tma_reload_value)
         mmu.interrupt_flag.timer = false # Timer overflow で Timer flag が立つことを検証するため事前にクリア
 
         cpu.run(20)
 
         expect(mmu.interrupt_flag.timer?).to eq true # TIMA overflow により Timer 割り込みが立つ
-        expect(mmu.read_u8(address: MMU::TIMA)).to eq 0b01000010 # TMA が TIMA へ再ロード (0x42)
+        expect(mmu.read_u8(address: MMU::TIMA)).to eq tma_reload_value # TMA が TIMA へ再ロード
       end
     end
 
