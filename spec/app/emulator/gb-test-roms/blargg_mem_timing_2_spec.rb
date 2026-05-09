@@ -14,7 +14,7 @@ require 'app/emulator/ppu'
 # まで踏み込まないと通らない。現状の「1命令を1度に処理する」実装ではほぼ通らない想定。
 RSpec.describe 'Blargg mem_timing-2 個別 ROM 完走 (シリアルに "Passed" が出るまで)' do
   context '01-read_timing.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/mem_timing-2/01-read_timing.gb', __FILE__)).bytes }
@@ -32,7 +32,7 @@ RSpec.describe 'Blargg mem_timing-2 個別 ROM 完走 (シリアルに "Passed" 
   end
 
   context '02-write_timing.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/mem_timing-2/02-write_timing.gb', __FILE__)).bytes }
@@ -50,7 +50,7 @@ RSpec.describe 'Blargg mem_timing-2 個別 ROM 完走 (シリアルに "Passed" 
   end
 
   context '03-modify_timing.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/mem_timing-2/03-modify_timing.gb', __FILE__)).bytes }

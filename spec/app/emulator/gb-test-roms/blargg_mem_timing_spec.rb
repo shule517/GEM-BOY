@@ -13,7 +13,7 @@ require 'app/emulator/ppu'
 # 個別 ROM は 32KB で MBC を使わないので現状の実装で動かせる。
 RSpec.describe 'Blargg mem_timing 個別 ROM 完走 (シリアルに "Passed" が出るまで)' do
   context '01-read_timing.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/mem_timing/01-read_timing.gb', __FILE__)).bytes }
@@ -31,7 +31,7 @@ RSpec.describe 'Blargg mem_timing 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '02-write_timing.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/mem_timing/02-write_timing.gb', __FILE__)).bytes }
@@ -49,7 +49,7 @@ RSpec.describe 'Blargg mem_timing 個別 ROM 完走 (シリアルに "Passed" �
   end
 
   context '03-modify_timing.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/mem_timing/03-modify_timing.gb', __FILE__)).bytes }

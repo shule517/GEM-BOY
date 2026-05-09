@@ -108,6 +108,7 @@ ROM の切り替えは `app/main.rb` トップレベルの `ROM_PATH` 定数を�
 - emudev.de: https://emudev.de/gameboy-emulator/testing-our-cpu/
 - gameboy-doctor: https://github.com/robert/gameboy-doctor
 - ブートROM逆アセンブリ: https://github.com/ISSOtm/gb-bootroms
+- RGBDS gbz80(7) 命令リファレンス: https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
 
 ## デバッグの優先順位
 

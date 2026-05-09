@@ -147,7 +147,7 @@ class MMU
 
   # 内部状態として I/O を直接触りたいとき用(タイマー割り込み等で使う)。
   # write_u8() を経由するとシリアル判定が走ってしまうので、その副作用を避ける裏口。
-  def write_io_direct(address, value)
+  def write_io_direct(address:, value:)
     @io[address - 0xFF00] = Bit.wrap_u8(value)
   end
 
@@ -156,8 +156,8 @@ class MMU
   # ブートROM 完走後の I/O レジスタ初期値を設定する(skip_boot 起動でブートROM をスキップするため)
   # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
   def setup_post_boot_io
-    write_io_direct(0xFF40, 0x91) # LCDC: LCD ON + BG ON + unsigned addressing
-    write_io_direct(0xFF47, 0xFC) # BGP : 標準パレット(色0=白、色1〜3=黒)
+    write_io_direct(address: 0xFF40, value: 0x91) # LCDC: LCD ON + BG ON + unsigned addressing
+    write_io_direct(address: 0xFF47, value: 0xFC) # BGP : 標準パレット(色0=白、色1〜3=黒)
   end
 
   # シリアルポートの送信プロトコル

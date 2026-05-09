@@ -24,7 +24,7 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 | B. CPU 基本命令 | hello.gb が使う命令一式(CB-prefix なし) | 2〜2.5h | HELLO WORLD に必要な命令を踏める | 2/2 [完了](INC/DEC・AND・CALL/RET・JR Z/JR 無条件まで追加され、HELLO WORLD 統合シナリオが HALT 到達)|
 | C. PPU 最小実装 | LCDC + LY + BG タイル描画(SCY=0 固定) | 2〜2.5h | タイルが描ける | 2/2 [完了](C-1: LY ティック / C-2: BG タイル描画。framebuffer に画素が乗るようになった)|
 | D. HELLO WORLD 表示 | skip_boot 起動 + 画面確認 | 1h | **画面に "Hello World!" 表示** ★第一 | 2/2 [完了] ★ **第一マイルストーン達成**(`hello.gb` の `Hello 8-bit world!` が DragonRuby で描画された)|
-| E. Nintendo ロゴ表示 | ブートROM 用追加命令 + CB-prefix + ブートROM mapping + スクロール | 2.5〜6.5h | **正しい Nintendo ロゴ** ★第二 | 3/7(E-1 で PUSH/POP/JP cc/JR cc/CALL cc/ADD/SUB/ADD HL/RLCA/RRCA/RLA/RRA/DEC (HL) など主要命令完成、E-2 で BIT/RES/SET 系 + RR/RL/SRL ファミリー完成。**残りは ADC/SBC/RLC/RRC/SRA/SWAP の量産 + RST/RETI/EI/RET cc/DAA/CPL/SCF/CCF + INC (HL) + ADD SP,e8 など**)|
+| E. Nintendo ロゴ表示 | ブートROM 用追加命令 + CB-prefix + ブートROM mapping + スクロール | 2.5〜6.5h | **正しい Nintendo ロゴ** ★第二 | 3/7(E-1: 主要命令完成 — ADC/SBC/ADD SP,e8/LD HL,SP+e8/INC (HL)/CPL/SCF/CCF/DAA/RST × 8/RETI/RET cc × 4/EI(即時版)を追加し、残るは STOP のみ。E-2: CB-prefix で SRA × 8 + SWAP × 8 + SLA (HL) を追加し、残るは **RLC × 8 + RRC × 8 = 16 命令のみ**)|
 | F. tobu.gb タイトル | MBC1 + スプライト + 入力 + タイマー | 6.5〜10h | **tobu.gb タイトル表示** ★第三 | 0/5 |
 
 合計 21 ステップ、想定 17〜26.5h。**現在 11 ステップ完了(フェーズ A + B-1, B-2 + C-1, C-2 + D-1, D-2 完了、E-1 / E-2 ほぼ完成)**。★ **第一マイルストーン(HELLO WORLD 表示)達成**。
@@ -35,33 +35,32 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 `./dragonruby .` で `data/hello.gb` を skip_boot 起動 → 左ペインに `Hello 8-bit world!` が DMG パレットで表示。右ペインには PC=0x01B9 / LY=74 が表示され、CPU が HALT 後も PPU が回り続けていることが目視できる。**フェーズ D 完了**。
 
-#### 2. CPU は 207 通常 opcode + 223 CB opcode 実装(計 430 / 501 = 約 86%)
+#### 2. CPU は 244 通常 opcode + 240 CB opcode 実装(計 484 / 501 = 約 97%)
 
 **実装済みカテゴリ(主要)**:
 - **8bit ロード**: `LD r, u8` × 8、`LD r, r'` × 64、`LD A, (rr)` × 8、`LD A, (u16)` / `LD (u16), A`、I/O ポート系 (`LD (FF00+u8/C), A` 等)
-- **16bit ロード**: `LD rr, u16` × 4、`LD (u16), SP`、`LD SP, HL`
+- **16bit ロード**: `LD rr, u16` × 4、`LD (u16), SP`、`LD SP, HL`、`LD HL, SP+e8`(下位ニブル/バイトでフラグ計算)
 - **PUSH / POP**: BC/DE/HL/AF 全 8 個(`push_u16` / `pop_u16` ヘルパで対称配置、`af` getter/setter も追加)
 - **8bit 論理演算**: `AND/XOR/OR/CP r` × 32 + 即値 4 個 = 36 個
-- **8bit 算術**: `ADD A, r/u8` × 9、`SUB A, r/u8` × 9(`add_a` / `sub_a` ヘルパでフラグ計算を集約)
-- **16bit 算術**: `ADD HL, rr` × 4(下位 12bit ハーフキャリー判定対応、Z 保持)
-- **INC / DEC**: 8bit レジスタ系 14 個 + 16bit ペア 8 個 + `DEC (HL)` 1 個
-- **条件分岐**: JR cc × 5、JP cc × 6、CALL cc × 5(`jp(cc:)` / `jr(cc:)` / `call(cc:)` ヘルパで対称配置、`registers.nz?` / `z?` / `nc?` / `c?` 述語も追加)
-- **RET**: 無条件 RET のみ(`pop_u16` ヘルパ経由)
+- **8bit 算術**: `ADD A, r/u8` × 9、`ADC A, r/u8` × 9、`SUB A, r/u8` × 9、`SBC A, r/u8` × 9(`add_a` / `adc_a` / `sub_a` / `sbc_a` ヘルパでフラグ計算を集約)
+- **16bit 算術**: `ADD HL, rr` × 4(下位 12bit ハーフキャリー判定対応、Z 保持)、`ADD SP, e8` × 1(下位ニブル/バイトでフラグ計算)
+- **INC / DEC**: 8bit レジスタ系 14 個 + 16bit ペア 8 個 + `INC (HL)` / `DEC (HL)` × 2
+- **条件分岐**: JR cc × 5、JP cc × 6、CALL cc × 5、RET cc × 4(`jp(cc:)` / `jr(cc:)` / `call(cc:)` / `ret(condition:)` ヘルパで対称配置、`registers.nz?` / `z?` / `nc?` / `c?` 述語も追加)
+- **コール/リターン**: 無条件 CALL / RET、**RST 00H〜38H × 8**(`rst(address:)` ヘルパ)、**RETI**(IME=1 して RET)
+- **割り込み制御**: `DI` / `EI`(EI は即時版。1命令遅延仕様は TODO)
 - **A 専用ローテート**: `RLCA` / `RRCA` / `RLA` / `RRA`(Z=0 固定の高速版、CB 経由の汎用版とは独立)
-- **CB-prefix**: BIT/RES/SET 計 192 個(レジスタ版 + (HL) 版を含む) + RR ファミリー 8 個 + RL ファミリー 8 個 + SRL ファミリー 8 個 + SLA レジスタ版 7 個
+- **A 単項演算**: `CPL`(全ビット反転、N=H=1)、`SCF`(C=1)、`CCF`(C 反転)、`DAA`(BCD 補正)
+- **CB-prefix**: BIT/RES/SET 計 192 個 + RR ファミリー 8 個 + RL ファミリー 8 個 + SRL ファミリー 8 個 + **SLA ファミリー 8 個**(`SLA (HL)` 含む)+ **SRA ファミリー 8 個** + **SWAP ファミリー 8 個**
 
 **PPU(C-1, C-2)** 完了済み(LY ティック + BG タイル描画)。**HELLO WORLD** は HALT(PC=0x01B8)到達で halted=true、実機でも文字描画確認済み(2026-05-02)。
 
-**Blargg 進捗**: cpu_instrs 個別 ROM 11 個 + instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound 個別 ROM 計 41 件のシナリオテストが `spec/app/emulator/gb-test-roms/` 配下に整備されており、停止点が **`0xC4 (CALL NZ)` → `0xC6 (ADD A, u8)` → `0xD6 (SUB A, u8)` → CB `0x38` (SRL B)** と着実に前進中。現状は ROM ごとに異なる未実装命令(`ADC` / `SBC` / `CB SRA` / `CB RLC` 等)で停止する段階。
+**Blargg 進捗**: cpu_instrs 個別 ROM 11 個 + instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound 個別 ROM 計 41 件のシナリオテストが `spec/app/emulator/gb-test-roms/` 配下に整備されており、停止点が **`0xC4 (CALL NZ)` → `0xC6 (ADD A, u8)` → `0xD6 (SUB A, u8)` → CB `0x38` (SRL B)** と前進し、`10-bit ops.gb` で **初の Pass を達成**。
 
 **残る未実装命令**(主要なもの):
-- ALU 系: `ADC A, r/u8` × 9、`SBC A, r/u8` × 9
-- CB-prefix: `RLC r` × 8、`RRC r` × 8、`SRA r` × 8、`SWAP r` × 8、`SLA (HL)` × 1
-- 制御系: `RST 00H〜38H` × 8、`RETI`、`EI`、`RET cc` × 4
-- 演算: `DAA` / `CPL` / `SCF` / `CCF`
-- メモリ: `INC (HL)` × 1
-- SP系: `ADD SP, e8` × 1、`LD HL, SP+e8` のフラグ計算修正
-- その他: `STOP`
+- 制御系: `STOP`(0x10、ほぼ実機で使われない)
+- 割り込み機構: `EI` の 1命令遅延、IF/IE による割り込みベクタへの自動 dispatch、PPU の VBlank IF 立ち上げ
+- CB-prefix: `RLC r` × 8、`RRC r` × 8(残り 16 命令)
+- 不正 opcode: 0xD3 / 0xDB / 0xDD / 0xE3 / 0xE4 / 0xEB / 0xEC / 0xED / 0xF4 / 0xFC / 0xFD(実機では使われないので非対応のままで OK)
 
 #### 3. ブートROM: VRAM クリアループ(`LD (HL+),A` / `BIT 5,H` / `JR Z,-5`)で 200,000 サイクル枠を超過して停止
 
@@ -94,17 +93,13 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 
 ### 次の最短経路
 
-★第一マイルストーン達成済み。次は **★第二マイルストーン(Nintendo ロゴ表示)** に向かう。優先順位:
+★第一マイルストーン達成済み。次は **★第二マイルストーン(Nintendo ロゴ表示)** に向かう。CPU 命令カバレッジは 97%(残り命令も大半は実機で稀)、ボトルネックは **割り込み機構** と **PPU/MMU の追加機能**側に移った。優先順位:
 
-1. **CB ROTATE 系の残り(`RLC / RRC / SRA / SWAP` × 8 + `SLA (HL)` = 33 個)** — `RLC r` がブートROM 起動直後のロゴ展開で頻発するので最優先。RL/RR/SRL/BIT/RES/SET の量産パターンに乗せて 1 行ずつで書ける
-2. **ALU 系の残り(`ADC A, r/u8` × 9 + `SBC A, r/u8` × 9 = 18 個)** — Blargg cpu_instrs の各 ROM が ALU 系で停止しているので、ここを埋めると一気に進む。`add_a` / `sub_a` ヘルパに `+ carry_flag` / `- carry_flag` を加えるだけで派生可能
-3. **割り込み関連(`EI` + `RETI` + `RET cc` × 4 + VBlank IF 立ち上げ)** — ブートROM の VBlank 待ちで詰まっている本質的問題。PPU の `LY=144 → IF |= 0x01` を実装すると一気に抜ける
-4. **`RST 00H〜38H` × 8** — `call(cc:)` ヘルパに固定アドレス引数を渡す形で書ける。割り込みベクタ(`RST 38H` 等)で必要
-5. **`DAA / CPL / SCF / CCF` × 4** — Blargg `08-misc instrs.gb` が検証する。DAA は BCD 補正で複雑、他の 3 つは単純
-6. **`INC (HL)` × 1**(`DEC (HL)` のペア)、**`ADD SP, e8`**、**`LD HL, SP+e8` のフラグ修正** — 残るアウトライアー
-7. **E-3 PPU SCY スクロール対応 / E-4 ブートROM mapping** — Nintendo ロゴのスクロールイン演出に必要
+1. **CB `RLC` / `RRC` 各 8 個 = 16 命令** — CB ROTATE 系で唯一残っている。`RLC r` はブートROM のロゴ展開で頻発。RL/RR ファミリーと同じパターンで量産可能
+2. **割り込み機構**(`EI` の 1 命令遅延化 + IF/IE → ベクタ自動 dispatch + PPU の VBlank IF 立ち上げ) — ブートROM の VBlank 待ちループで詰まっている本質的問題。これが解けると HALT/RET 周りも整う
+3. **E-3 PPU SCY スクロール対応 / E-4 ブートROM mapping** — Nintendo ロゴのスクロールイン演出に必要(コードは小さい)
 
-ここまで実装すれば、CPU 命令カバレッジ 86% → 99%+ に達し、ブートROM が完走する条件がほぼ揃う。あとは **PPU のスクロールイン演出**(E-3)と **ブートROM mapping**(E-4)で第二マイルストーン達成。
+CPU 側は実質ほぼ完成しており、第二マイルストーン達成の鍵は **割り込み機構** と **PPU/MMU まわり**。ここまで実装すれば、ブートROM 完走の条件はほぼ揃う。
 
 ## 進捗チェックリスト
 
@@ -126,12 +121,12 @@ DragonRuby Game Toolkit で Ruby 製 Game Boy エミュレータ「**GEM BOY**�
 - [x] D-2: hello.gb 起動 → "Hello World!" 表示 ★第一マイルストーン達成 — `./dragonruby .` で `Hello 8-bit world!` が DMG パレットで描画されることを目視確認(2026-05-02)。統合テスト `HELLO WORLD 完走` も HALT 到達で pass
 
 ### フェーズ E: Nintendo ロゴ表示
-- [~] E-1: ブートROM 用 CPU 命令追加 — **PUSH/POP × 8、JP cc × 4、JR cc × 5、CALL/CALL cc × 5、ADD/SUB × 18(`add_a`/`sub_a` ヘルパ)、ADD HL × 4、A 専用ローテート 4 個(RLCA/RRCA/RLA/RRA)、DEC (HL)、`registers.nz?/z?/nc?/c?` 述語、`push_u16`/`pop_u16` ヘルパなど主要命令完成**。**残:ADC/SBC(計 18 個)、RST × 8、RETI、EI、RET cc × 4、DAA/CPL/SCF/CCF、INC (HL)、ADD SP, e8、LD HL, SP+e8 のフラグ計算修正**
-- [~] E-2: CB-prefix 実装 — **BIT/RES/SET の (HL) 版含む 192 命令 + RR/RL/SRL ファミリー(8 個 × 3 = 24 命令) + SLA レジスタ版 7 個 = 計 223 命令実装済み**。**残:RLC × 8 + RRC × 8 + SRA × 8 + SWAP × 8 + SLA (HL) × 1 = 33 命令**
+- [~] E-1: ブートROM 用 CPU 命令追加 — **PUSH/POP × 8、JP cc × 4、JR cc × 5、CALL/CALL cc × 5、ADD/ADC/SUB/SBC × 36(`add_a`/`adc_a`/`sub_a`/`sbc_a` ヘルパ)、ADD HL × 4、ADD SP, e8、LD HL, SP+e8、A 専用ローテート 4 個(RLCA/RRCA/RLA/RRA)、INC/DEC (HL)、CPL/SCF/CCF、DAA、RST × 8、RETI、RET cc × 4、EI(即時版)、`registers.nz?/z?/nc?/c?` 述語、`push_u16`/`pop_u16`/`rst(address:)` ヘルパなど主要命令完成**。**残:STOP、EI の 1 命令遅延化**
+- [~] E-2: CB-prefix 実装 — **BIT/RES/SET の (HL) 版含む 192 命令 + RR/RL/SRL/SLA/SRA/SWAP の各ファミリー 8 個 = 48 命令、計 240 / 256 命令実装済み**。**残:RLC × 8 + RRC × 8 = 16 命令**
 - [ ] E-3: PPU SCY スクロール対応
-- [ ] E-4: MMU にブートROM mapping 追加 + VBlank IF (0xFF0F bit 0) 立ち上げ
+- [ ] E-4: MMU にブートROM mapping 追加 + VBlank IF (0xFF0F bit 0) 立ち上げ + IF/IE による割り込みベクタ自動 dispatch
 - [ ] E-5: ブートROM 起動 → 崩れたロゴ観察
-- [ ] E-6: Blargg 診断ループ — **`spec/app/emulator/gb-test-roms/` に 41 件のシナリオテスト整備済み**(cpu_instrs / instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound)。停止位置が opcode 単位で見え、`0xC4 → 0xC6 → 0xD6 → CB 0x38` と着実に前進
+- [ ] E-6: Blargg 診断ループ — **`spec/app/emulator/gb-test-roms/` に 41 件のシナリオテスト整備済み**(cpu_instrs / instr_timing / mem_timing / mem_timing-2 / halt_bug / interrupt_time / oam_bug / dmg_sound)。停止位置が opcode 単位で見え、`0xC4 → 0xC6 → 0xD6 → CB 0x38` と前進し、**`10-bit ops.gb` で初の Pass 達成**
 - [ ] E-7: 修正済み Nintendo ロゴ表示 ★第二マイルストーン
 
 ### フェーズ F: tobu.gb タイトル
@@ -469,28 +464,29 @@ skip_boot 起動で `hello.gb` を直接実行し、画面に "Hello World!" を
 
 **目標**: ブートROM が使うが hello.gb では使わなかった命令を追加する。
 
-### 実装済み(B-2 で前倒し)
+### 実装済み
 
 - **メモリ間接 LD**: `LD A,(BC)` / `LD A,(DE)` / `LD (BC),A` / `LD (DE),A` / `LD (HL+),A` / `LD A,(HL+)` / `LD (HL-),A` / `LD A,(HL-)` / `LD (u16),A` / `LD A,(u16)`
 - **論理演算 (HL) 経由**: `AND A,(HL)` / `XOR A,(HL)` / `OR A,(HL)` / `CP A,(HL)`
-- **絶対ジャンプ**: `JP u16` / `JP HL`
-- **コール/リターン**: `CALL u16`(0xCD)/ `RET`(0xC9)
+- **絶対ジャンプ**: `JP u16` / `JP HL` / `JP cc,u16` × 4
+- **相対ジャンプ**: `JR i8` / `JR cc,i8` × 4
+- **コール/リターン**: `CALL u16` / `CALL cc,u16` × 4 / `RET` / `RET cc` × 4 / `RETI` / `RST 0x00〜0x38` × 8
+- **スタック**: `PUSH/POP BC/DE/HL/AF` 全 8 個
+- **メモリ間接 ALU**: `ADD/ADC/SUB/SBC A,(HL)` / `INC (HL)` / `DEC (HL)`
+- **算術**: `ADD/ADC/SUB/SBC A,r/(HL)/u8` 計 36 個 / `ADD HL,rr` × 4 / `ADD SP,e8` / `LD HL, SP+e8`
+- **A 専用ローテート(非 CB)**: `RLCA` / `RLA` / `RRCA` / `RRA`(Z=0 固定)
+- **A 単項演算**: `CPL` / `SCF` / `CCF` / `DAA`(BCD 補正)
 - **8bit INC/DEC**: B/C/D/E/H/L/A
 - **16bit INC/DEC**: BC/DE/HL/SP
-- **DI**(0xF3)
+- **割り込み制御**: `DI` / `EI`(EI は即時版、1 命令遅延は未対応)
 
 ### 残タスク
 
 | カテゴリ | 命令 |
 |---|---|
-| **メモリ間接 ALU(残り)** | `ADD A,(HL)` / `ADC A,(HL)` / `SUB A,(HL)` / `SBC A,(HL)` / `INC (HL)` / `DEC (HL)` |
-| **スタック** | `PUSH BC/DE/HL/AF`(0xC5/D5/E5/F5)/ `POP BC/DE/HL/AF`(0xC1/D1/E1/F1) |
-| **コール/リターン残り** | `CALL cc,u16` / `RET cc` / `RETI` / `RST 0x00/0x08/0x10/0x18/0x20/0x28/0x30/0x38` |
-| **絶対ジャンプ残り** | `JP cc,u16`(0xC2/0xCA/0xD2/0xDA) |
-| **相対ジャンプ残り** | `JR NC,i8`(0x30)/ `JR C,i8`(0x38) |
-| **ローテート(非 CB)** | `RLCA` / `RLA` / `RRCA` / `RRA` |
-| **算術** | `ADD A,r` / `ADC A,r` / `SUB A,r` / `SBC A,r` 系(0x80-0x9F、0xC6/D6/CE/DE)/ `ADD HL,rr`(0x09/0x19/0x29/0x39)/ `ADD SP,i8`(0xE8) |
-| **その他** | `EI`(0xFB)/ `STOP`(0x10)/ `DAA`(0x27)/ `CPL`(0x2F)/ `SCF`(0x37)/ `CCF`(0x3F) |
+| **割り込み機構** | `EI` の 1 命令遅延化 / IF/IE による割り込みベクタ自動 dispatch / PPU の VBlank IF 立ち上げ(E-4 と一緒に) |
+| **その他** | `STOP`(0x10、実機では稀)|
+| **不正 opcode** | 0xD3 / 0xDB / 0xDD / 0xE3 / 0xE4 / 0xEB / 0xEC / 0xED / 0xF4 / 0xFC / 0xFD(11 個、実機では使われないので未実装でも問題なし)|
 
 ### 進め方
 
@@ -502,17 +498,22 @@ B-2 と同じ「動かしながら必要分だけ追加」の流れで進める�
 
 **目標**: 0xCB に続く 8bit でオペコードを解釈する CB 系命令を実装。ブートROM のロゴ展開で使われる。
 
-### 実装済み
+### 実装済み(計 240 / 256 命令)
 
-- **`BIT n,r`**(0x40-0x7F、56 命令)— 1 ビット検査(Z = !bit_n(r), N=0, H=1, C 保持)
-- **`RES n,r`**(0x80-0xBF、56 命令)— 指定ビットを 0 にクリア(フラグ変化なし)
-- **`SET n,r`**(0xC0-0xFF、56 命令)— 指定ビットを 1 にセット(フラグ変化なし)
+- **`BIT n,r`**(0x40-0x7F、64 命令、(HL) 版含む)— 1 ビット検査(Z = !bit_n(r), N=0, H=1, C 保持)
+- **`RES n,r`**(0x80-0xBF、64 命令、(HL) 版含む)— 指定ビットを 0 にクリア(フラグ変化なし)
+- **`SET n,r`**(0xC0-0xFF、64 命令、(HL) 版含む)— 指定ビットを 1 にセット(フラグ変化なし)
+- **`RL r`** / **`RR r`**(0x10-0x1F、16 命令、(HL) 版含む)— C を経由した左/右ローテート
+- **`SLA r`** / **`SRA r`**(0x20-0x2F、16 命令、(HL) 版含む)— 算術左/右シフト(SRA は bit 7 保持)
+- **`SWAP r`**(0x30-0x37、8 命令、(HL) 版含む)— 上位 4bit / 下位 4bit を入れ替え
+- **`SRL r`**(0x38-0x3F、8 命令、(HL) 版含む)— 論理右シフト
 
 ### 残タスク
 
-- **ROTATE 系**(0x00-0x3F): `RLC` / `RRC` / `RL` / `RR` / `SLA` / `SRA` / `SWAP` / `SRL` の各 8 命令(計 64 命令)
-  - 特に **`RL r`(0x10-0x17)はブートROM のロゴ展開で頻発するので最優先**
-- **各 CB 命令の (HL) バリアント**: 0x06 / 0x0E / 0x16 / 0x1E / 0x26 / 0x2E / 0x36 / 0x3E(ROTATE 系)、0x46 / 0x4E / 0x56 / 0x5E / 0x66 / 0x6E / 0x76 / 0x7E(BIT)、0x86 〜 0xBE(RES)、0xC6 〜 0xFE(SET)
+- **`RLC r`**(0x00-0x07、8 命令)— C を経由しない左ローテート(bit 7 → bit 0 + C)
+- **`RRC r`**(0x08-0x0F、8 命令)— C を経由しない右ローテート(bit 0 → bit 7 + C)
+
+`RLC r` はブートROM のロゴ展開で頻発するので優先度が高い。RL/RR と類似のパターンで量産可能。
 
 ### 実装方針
 

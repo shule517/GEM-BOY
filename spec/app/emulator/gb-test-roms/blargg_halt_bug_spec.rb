@@ -13,7 +13,7 @@ require 'app/emulator/ppu'
 # halt_bug.gb は 32KB で MBC を使わないので現状の実装で動かせる。
 RSpec.describe 'Blargg halt_bug 完走 (シリアルに "Passed" が出るまで)' do
   context 'halt_bug.gb を実行したとき' do
-    let(:cpu) { CPU.new(mmu, skip_boot: true) }
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../../data/gb-test-roms/halt_bug.gb', __FILE__)).bytes }

@@ -33,6 +33,17 @@ module Bit
     (high << 8) | low
   end
 
+  def self.make_u8(high:, low:)
+    (high << 4) | low
+  end
+
+  # SWAP A https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7#SWAP_r8
+  def self.swap_u8(u8)
+    high = Bit.high_4bits(u8)
+    low = Bit.low_4bits(u8)
+    Bit.make_u8(high: low, low: high)
+  end
+
   # 8bit にマスクして wrap させる(下位 8bit のみ残す)。
   # ADD A,B のキャリーアウト、INC r / DEC r のラップなど、
   # 8bit 演算結果を 8bit レジスタ(A/B/C/D/E/H/L)の範囲に正規化するときに使う。
@@ -54,6 +65,10 @@ module Bit
   # 例: Bit.low_4bits(0x34) #=> 0x4
   def self.low_4bits(value)
     value & 0x0F
+  end
+
+  def self.high_4bits(value)
+    (value & 0xF0) >> 4
   end
 
   # u8 (0..255) を i8 (-128..127) として再解釈する(2 の補数)。

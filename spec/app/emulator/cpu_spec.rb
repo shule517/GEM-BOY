@@ -8,7 +8,7 @@ RSpec.describe CPU do
     let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
 
     context 'skip_boot を指定しないとき(ブートROM 経由起動)' do
-      subject { described_class.new(mmu) }
+      subject { described_class.new(mmu, skip_boot: false, trace: false) }
 
       it 'IME=false, halted=false' do
         expect(subject.ime).to eq false
@@ -27,7 +27,7 @@ RSpec.describe CPU do
     context 'skip_boot: true を指定したとき(ブートROM をスキップして起動)' do
       # Pan Docs: https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
       # ブートROM 完走後の DMG 実機値を最初からセットして起動する
-      subject { described_class.new(mmu, skip_boot: true) }
+      subject { described_class.new(mmu, skip_boot: true, trace: false) }
 
       it 'IME=false, halted=false' do
         expect(subject.ime).to eq false
@@ -48,7 +48,7 @@ RSpec.describe CPU do
 
   describe '#step' do
     subject { cpu.step }
-    let(:cpu) { described_class.new(mmu) }
+    let(:cpu) { described_class.new(mmu, skip_boot: false, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
     let(:rom_data) do
       data = Array.new(0x8000, 0)
@@ -97,7 +97,7 @@ RSpec.describe CPU do
 
   describe '#run' do
     subject { cpu.run(cycles_target) }
-    let(:cpu) { described_class.new(mmu) }
+    let(:cpu) { described_class.new(mmu, skip_boot: false, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
     let(:rom_data) { Array.new(0x8000, 0x00) }  # 全部 NOP
     let(:cycles_target) { 16 }
@@ -113,7 +113,7 @@ RSpec.describe CPU do
     # 2 の補数表現: bit7 が 1 の値(0x80〜0xFF)を負数として解釈する。
     # JR i8 / ADD SP,i8 / LD HL,SP+i8 で使う。
     subject { cpu.fetch_i8 }
-    let(:cpu) { described_class.new(mmu) }
+    let(:cpu) { described_class.new(mmu, skip_boot: false, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
     let(:rom_data) do
       data = Array.new(0x8000, 0)
@@ -193,7 +193,7 @@ RSpec.describe CPU do
     # step が消費するオペコード分の fetch_u8 は通っていない状態で lambda を呼ぶので、
     # 即値オペランドは PC=0x0000 から読まれる点に注意。
     subject { cpu.opcodes }
-    let(:cpu) { described_class.new(mmu) }
+    let(:cpu) { described_class.new(mmu, skip_boot: false, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
     let(:rom_data) do
       data = Array.new(0x8000, 0)
@@ -454,7 +454,7 @@ RSpec.describe CPU do
     #
     # PPU は C-1 で実装済み。VBlank 待ちループ(LY=144 で抜ける)を成立させるため、
     # CPU が消費したサイクル数を PPU.step に渡して LY を進める必要がある。
-    let(:cpu) { described_class.new(mmu, skip_boot: true) }
+    let(:cpu) { described_class.new(mmu, skip_boot: true, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:ppu) { PPU.new(mmu) }
     let(:rom_data) { File.binread(File.expand_path('../../../../data/hello.gb', __FILE__)).bytes }
@@ -489,7 +489,7 @@ RSpec.describe CPU do
     # PPU を並走させるのは、ブートROM が LCD 有効化後に LY(0xFF44)を見てロゴを
     # スクロールさせるため。PPU が止まっていると VBlank 待ちループで永遠に詰まる
     # (HELLO WORLD 完走テストと同じ理由)。
-    let(:cpu) { described_class.new(mmu) }
+    let(:cpu) { described_class.new(mmu, skip_boot: false, trace: false) }
     let(:mmu) { MMU.new(Cartridge.new(rom_data)) }
     let(:ppu) { PPU.new(mmu) }
     let(:boot_rom) { File.binread(File.expand_path('../../../../data/dmg_boot.bin', __FILE__)).bytes }
