@@ -77,7 +77,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
         expect(cpu.registers.pc).to eq timer_vector # 0x50 へ jump
         expect(cpu.ime).to eq false                  # IME クリア
-        expect(mmu.read_u8(address: MMU::IF) & 0x04).to eq 0 # IF bit 2 クリア
+        expect(mmu.read_u8(address: MMU::IF) & 0b00000100).to eq 0 # IF bit 2 クリア
         expect(cpu.registers.sp).to eq 0xDFFC        # 2 バイト push
         expect(mmu.read_u8(address: 0xDFFD)).to eq 0xC1 # 戻り先 high
         expect(mmu.read_u8(address: 0xDFFC)).to eq 0x00 # 戻り先 low
@@ -118,7 +118,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.step
 
         expect(cpu.registers.pc).to eq original_pc + 1 # NOP 1 byte 進むだけ
-        expect(mmu.read_u8(address: MMU::IF) & 0x04).to eq 0x04 # IF bit 2 はクリアされない
+        expect(mmu.read_u8(address: MMU::IF) & 0b00000100).to eq 0b00000100 # IF bit 2 はクリアされない
       end
     end
 
@@ -144,7 +144,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'TIMA=0xFF からオーバーフローすると IF bit 2 (Timer) が立ち、TIMA に TMA が再ロードされる' do
         # Pan Docs: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
         # TAC bit2=enable / bits1-0=rate, rate 01 = 262144 Hz = 4194304 Hz CPU / 16 → 16 T-cycles ごとに TIMA が +1
-        mmu.write_u8(address: MMU::TAC,  value: 0x05) # TAC: enable + rate 01 (16 T-cycles per TIMA tick)
+        mmu.write_u8(address: MMU::TAC,  value: 0b00000101) # TAC: bit2=enable + bits1-0=01 (rate 01 = 16 T-cycles per TIMA tick)
         mmu.write_u8(address: MMU::TIMA, value: 0xFF) # TIMA: 次の tick でオーバーフロー
         mmu.write_u8(address: MMU::TMA,  value: 0x42) # TMA: オーバーフロー時の再ロード値
         mmu.write_u8(address: MMU::IF, value: 0b00000000) # IF を全クリア(Timer overflow で bit 2 が立つことを後段で検証するため事前にゼロに揃える)
@@ -154,7 +154,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
         cpu.run(20)
 
-        expect(mmu.read_u8(address: MMU::IF) & 0x04).to eq 0x04 # Timer 割り込み立つ
+        expect(mmu.read_u8(address: MMU::IF) & 0b00000100).to eq 0b00000100 # Timer 割り込み立つ
         expect(mmu.read_u8(address: MMU::TIMA)).to eq 0x42 # TMA が TIMA へ再ロード
       end
     end
