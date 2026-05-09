@@ -69,15 +69,15 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'IE と IF の Timer bit を立てて次の step で 0x50 にジャンプし、IF bit 2 がクリアされる' do
         # https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
         mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
-        mmu.write_u8(address: MMU::IF, value: 0b00000100) # Timerの割り込みが発生した
+        mmu.interrupt_flag.timer = true                   # Timerの割り込みが発生した
         cpu.ime = true
         initial_sp = cpu.registers.sp # post-boot 初期値 (0xFFFE)
 
         cpu.step
 
-        expect(cpu.registers.pc).to eq timer_vector # 0x50 へ jump
-        expect(cpu.ime).to eq false                  # IME クリア
-        expect(mmu.read_u8(address: MMU::IF) & 0b00000100).to eq 0 # IF bit 2 クリア
+        expect(cpu.registers.pc).to eq timer_vector       # 0x50 へ jump
+        expect(cpu.ime).to eq false                       # IME クリア
+        expect(mmu.interrupt_flag.timer?).to eq false    # dispatch で flag が自動クリアされる
         expect(cpu.registers.sp).to eq initial_sp - 2        # 2 バイト push で SP が 2 減る
         expect(mmu.read_u8(address: initial_sp - 1)).to eq 0xC0 # 戻り先 high (instr_address=0xC000 の上位)
         expect(mmu.read_u8(address: initial_sp - 2)).to eq 0x00 # 戻り先 low  (instr_address=0xC000 の下位)
@@ -110,13 +110,13 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
       it 'IE と IF の Timer bit が立っていても PC は NOP 1 byte 分しか進まず、IF bit 2 は立ったまま' do
         cpu.ime = false
-        mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
-        mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
+        mmu.interrupt_flag.timer = true                   # Timerの割り込みが発生した
 
         cpu.step
 
-        expect(cpu.registers.pc).to eq instr_address + 1 # NOP 1 byte 進むだけ
-        expect(mmu.read_u8(address: MMU::IF) & 0b00000100).to eq 0b00000100 # IF bit 2 はクリアされない
+        expect(cpu.registers.pc).to eq instr_address + 1  # NOP 1 byte 進むだけ
+        expect(mmu.interrupt_flag.timer?).to eq true     # IME=0 では dispatch しないので flag は保持される
       end
     end
 
@@ -148,11 +148,11 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.write_u8(address: MMU::TAC,  value: 0b00000101) # TAC: bit2=enable + bits1-0=01 (rate 01 = 16 T-cycles per TIMA tick)
         mmu.write_u8(address: MMU::TIMA, value: 0b11111111) # TIMA: 次の tick でオーバーフロー (0xFF)
         mmu.write_u8(address: MMU::TMA,  value: 0b01000010) # TMA: オーバーフロー時の再ロード値 (0x42)
-        mmu.write_u8(address: MMU::IF, value: 0b00000000) # IF を全クリア(Timer overflow で bit 2 が立つことを後段で検証するため事前にゼロに揃える)
+        mmu.interrupt_flag.timer = false                  # Timer overflow で bit 2 が立つことを検証するため事前にクリア
 
         cpu.run(20)
 
-        expect(mmu.read_u8(address: MMU::IF) & 0b00000100).to eq 0b00000100 # Timer 割り込み立つ
+        expect(mmu.interrupt_flag.timer?).to eq true     # TIMA overflow により Timer 割り込みが立つ
         expect(mmu.read_u8(address: MMU::TIMA)).to eq 0b01000010 # TMA が TIMA へ再ロード (0x42)
       end
     end
@@ -191,8 +191,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'halted=false に戻り、ベクタ 0x50 へ dispatch される' do
         cpu.ime = true
         cpu.halted = true
-        mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
-        mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
+        mmu.interrupt_flag.timer = true                   # Timerの割り込みが発生した
 
         cpu.step
 
@@ -207,8 +207,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'halted=false に戻り、HALT の次の命令から再開する(dispatch されない)' do
         cpu.ime = false
         cpu.halted = true
-        mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
-        mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
+        mmu.interrupt_flag.timer = true                   # Timerの割り込みが発生した
 
         cpu.step
 

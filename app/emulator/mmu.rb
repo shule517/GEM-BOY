@@ -1,5 +1,6 @@
 require 'app/core_ext/last'
 require 'app/emulator/bit'
+require 'app/emulator/interrupt_flag'
 
 # MMU (Memory Management Unit)
 #
@@ -66,7 +67,8 @@ require 'app/emulator/bit'
 #     +3  属性 (パレット / 反転 / 優先度)
 class MMU
   attr_reader :serial_buffer,
-              :write_log # 1命令分の書き込み履歴 [[address, value], ...]。CPU が step ごとに reset_write_log で初期化
+              :write_log, # 1命令分の書き込み履歴 [[address, value], ...]。CPU が step ごとに reset_write_log で初期化
+              :interrupt_flag # IF (0xFF0F) のビット名アクセサ。`mmu.interrupt_flag.timer?` などで参照する
 
   # メモリマップの各領域(Pan Docs: https://gbdev.io/pandocs/Memory_Map.html)
   ROM_START  = 0x0000
@@ -110,6 +112,7 @@ class MMU
     @serial_buffer = ''
 
     @write_log = [] # ログ用書き込み履歴。step 開始時に reset_write_log で初期化
+    @interrupt_flag = InterruptFlag.new(self)
 
     setup_post_boot_io if skip_boot
   end
