@@ -44,6 +44,7 @@ class CPU
 
   # １つ命令を実行する
   def step
+    puts "step---------------"
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
 
     context = @disassembler.before_step(registers.pc) if @trace # trace 有効時のみ命令前の状態を取って disasm 行を作る
