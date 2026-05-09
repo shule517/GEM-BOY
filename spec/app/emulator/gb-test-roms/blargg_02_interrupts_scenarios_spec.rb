@@ -65,7 +65,6 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
     context 'IE と IF が立ち IME=1 のとき割り込み dispatch される(Test 2)' do
       let(:instr_bytes) { [CPU::NOP] } # dispatch されなければ実行されるフォールバック命令
-      let(:initial_sp) { 0xFFFE } # post-boot 初期値
 
       before do
         # https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
@@ -75,6 +74,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       end
 
       it 'Timer 割り込みベクタへ jump し、IME と Timer flag がクリアされ、戻り先が SP に積まれる' do
+        initial_sp = cpu.registers.sp
         cpu.step
         expect(cpu.registers.pc).to eq timer_vector # ベクタ 0x50 へ jump
         expect(cpu.ime).to eq false # IME がクリアされる
