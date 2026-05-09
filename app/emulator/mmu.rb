@@ -77,8 +77,8 @@ class MMU
   TIMA = 0xFF05 # Timer Counter: TAC で指定した周期でインクリメントし、オーバーフローで TMA を再ロード + IF bit2 をセット
   TMA  = 0xFF06 # Timer Modulo: TIMA オーバーフロー時にロードされる値
   TAC  = 0xFF07 # Timer Control: bit2=enable, bits1-0=rate (00:4096Hz / 01:262144Hz / 10:65536Hz / 11:16384Hz)
-  IF = 0xFF0F  # Interrupt Flag: 発生した割り込みの種別ビット https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
-  IE = 0xFFFF  # Interrupt Enable: 各割り込みの有効/無効ビット https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable
+  IF = 0xFF0F  # 割り込みが発生した(Interrupt Flag): 発生した割り込みの種別ビット https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
+  IE = 0xFFFF  # 割り込みを有効にした(Interrupt Enable): 各割り込みの有効/無効ビット https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable
 
   def initialize(cartridge, skip_boot: false)
     @cartridge = cartridge

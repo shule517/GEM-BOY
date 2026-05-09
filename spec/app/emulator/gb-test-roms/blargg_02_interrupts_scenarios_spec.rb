@@ -66,8 +66,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     context 'IF & IE & 0x1F が真かつ IME=1 のとき割り込み dispatch される(Test 2)' do
       it 'IE=0x04 (Timer)、IF=0x04 をセットして次の step で 0x50 にジャンプし、IF bit 2 がクリアされる' do
         # https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
-        mmu.write_u8(address: MMU::IE, value: 0b00000100) # TimerフラグをON
-        mmu.write_u8(address: MMU::IF, value: 0b00000100) # TimerフラグをON
+        mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
+        mmu.write_u8(address: MMU::IF, value: 0b00000100) # Timerの割り込みが発生した
         cpu.ime = true
         cpu.registers.sp = 0xDFFE # SP を WRAM 末尾に置き、dispatch で PC が push される先を検証可能な領域(0xDFFC/DFFD)に固定する
         cpu.registers.pc = 0xC100 # 割り込み発生時に stack へ push される「戻り先 PC」を既知の値にして、push されたバイトを後段で確認できるようにする
