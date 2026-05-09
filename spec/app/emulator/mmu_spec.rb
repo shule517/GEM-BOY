@@ -1,5 +1,6 @@
 require 'app/emulator/cartridge'
 require 'app/emulator/mmu'
+require 'app/emulator/lcd_registers'
 
 RSpec.describe MMU do
   describe '#read' do
@@ -101,8 +102,8 @@ RSpec.describe MMU do
 
     context 'WRAM領域に書き込んだとき' do
       subject do
-        mmu.write_u8(address: 0xC000, value: 0x42)
-        mmu.read_u8(address: 0xC000)
+        mmu.write_u8(address: MMU::WRAM_START, value: 0x42)
+        mmu.read_u8(address: MMU::WRAM_START)
       end
       it '読み戻すと 0x42 になる' do
         is_expected.to eq 0x42
@@ -111,8 +112,8 @@ RSpec.describe MMU do
 
     context 'HRAM領域に書き込んだとき' do
       subject do
-        mmu.write_u8(address: 0xFF80, value: 0x42)
-        mmu.read_u8(address: 0xFF80)
+        mmu.write_u8(address: MMU::HRAM_START, value: 0x42)
+        mmu.read_u8(address: MMU::HRAM_START)
       end
       it '読み戻すと 0x42 になる' do
         is_expected.to eq 0x42
@@ -121,8 +122,8 @@ RSpec.describe MMU do
 
     context 'IEレジスタに書き込んだとき' do
       subject do
-        mmu.write_u8(address: 0xFFFF, value: 0x1F)
-        mmu.read_u8(address: 0xFFFF)
+        mmu.write_u8(address: MMU::IE, value: 0x1F)
+        mmu.read_u8(address: MMU::IE)
       end
       it '読み戻すと 0x1F になる' do
         is_expected.to eq 0x1F
@@ -131,8 +132,8 @@ RSpec.describe MMU do
 
     context '0xFF を超える値を書き込んだとき' do
       subject do
-        mmu.write_u8(address: 0xC000, value: 0x1FF)
-        mmu.read_u8(address: 0xC000)
+        mmu.write_u8(address: MMU::WRAM_START, value: 0x1FF)
+        mmu.read_u8(address: MMU::WRAM_START)
       end
       it '下位 8bit に切り詰められた 0xFF になる' do
         is_expected.to eq 0xFF
@@ -218,8 +219,8 @@ RSpec.describe MMU do
       subject { described_class.new(cartridge) }
 
       it 'I/O レジスタは 0 で初期化される(LCDC=0, BGP=0)' do
-        expect(subject.read_u8(address: 0xFF40)).to eq 0
-        expect(subject.read_u8(address: 0xFF47)).to eq 0
+        expect(subject.read_u8(address: LcdRegisters::LCDC)).to eq 0
+        expect(subject.read_u8(address: LcdRegisters::BGP)).to eq 0
       end
     end
 
@@ -229,11 +230,11 @@ RSpec.describe MMU do
       subject { described_class.new(cartridge, skip_boot: true) }
 
       it 'LCDC=0x91(LCD ON + BG ON + unsigned addressing)' do
-        expect(subject.read_u8(address: 0xFF40)).to eq 0x91
+        expect(subject.read_u8(address: LcdRegisters::LCDC)).to eq 0x91
       end
 
       it 'BGP=0xFC(標準パレット)' do
-        expect(subject.read_u8(address: 0xFF47)).to eq 0xFC
+        expect(subject.read_u8(address: LcdRegisters::BGP)).to eq 0xFC
       end
     end
   end

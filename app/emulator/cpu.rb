@@ -398,12 +398,12 @@ class CPU
     table[0xFA] = -> { registers.a = mmu.read_u8(address: fetch_u16); 16 } # LD A,(u16) → ()はそのアドレスの先という意味
 
     # ============================================================
-    # 8bit ロード - I/O ポート (0xFF00 + offset)
+    # 8bit ロード - I/O ポート (MMU::IO_START + offset)
     # ============================================================
-    table[0xE0] = -> { mmu.write_u8(address: 0xFF00 + fetch_u8, value: registers.a); 12 } # LD (FF00+u8),A
-    table[0xE2] = -> { mmu.write_u8(address: 0xFF00 + registers.c, value: registers.a); 8 } # LD (FF00+C),A
-    table[0xF0] = -> { registers.a = mmu.read_u8(address: 0xFF00 + fetch_u8); 12 } # LD A,(FF00+u8)
-    table[0xF2] = -> { registers.a = mmu.read_u8(address: 0xFF00 + registers.c); 8 } # LD A,(FF00+C)
+    table[0xE0] = -> { mmu.write_u8(address: MMU::IO_START + fetch_u8, value: registers.a); 12 } # LD (FF00+u8),A
+    table[0xE2] = -> { mmu.write_u8(address: MMU::IO_START + registers.c, value: registers.a); 8 } # LD (FF00+C),A
+    table[0xF0] = -> { registers.a = mmu.read_u8(address: MMU::IO_START + fetch_u8); 12 } # LD A,(FF00+u8)
+    table[0xF2] = -> { registers.a = mmu.read_u8(address: MMU::IO_START + registers.c); 8 } # LD A,(FF00+C)
 
     # ============================================================
     # 16bit ロード - LD rr,u16
