@@ -66,9 +66,11 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'EI の 1 命令遅延仕様: EI 直後の 1 命令を実行した後に IME=1 になる(現状は即時 EI のため失敗想定)' do
         cpu.step # EI を実行
         expect(cpu.ime).to eq false # 遅延するのでまだ反映されない
+        expect(cpu.ime_scheduled).to eq true # imeの有効が予約される
 
         cpu.step # NOP を実行
         expect(cpu.ime).to eq true # 遅延してここで有効になる
+        expect(cpu.ime_scheduled).to eq false # 完了
       end
     end
 

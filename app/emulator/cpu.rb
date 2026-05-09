@@ -29,6 +29,7 @@ class CPU
   EI        = 0xFB # Enable Interrupts: IMEを有効化(本来は次の命令を実行してから反映)
 
   attr_accessor :ime, # Interrupt Master Enable(割り込みマスタ有効フラグ) 1の時に処理を割り込む https://gbdev.io/pandocs/Interrupts.html
+                :ime_scheduled, # IMEの有効を予約した
                 :halted, # CPUの一時停止中フラグ https://gbdev.io/pandocs/halt.html
                 :opcodes, # CPUの命令一覧 https://izik1.github.io/gbops/
                 :cb_opcodes, # CB-prefix 命令一覧 (0xCB の次のバイトでルックアップ) https://gbdev.io/pandocs/CPU_Instruction_Set.html#cb-prefix-instructions
@@ -54,6 +55,12 @@ class CPU
   def step
     puts "step---------------"
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
+
+    # IMEの有効が予約されてたら、有効にする
+    if ime_scheduled
+      self.ime_scheduled = false
+      self.ime = true
+    end
 
     context = @disassembler.before_step(registers.pc) if @trace # trace 有効時のみ命令前の状態を取って disasm 行を作る
     opcode = fetch_u8
@@ -291,7 +298,7 @@ class CPU
     table[STOP]      = -> { 4 } # STOP: TODO: これで良いのか？
     table[HALT]      = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
     table[DI]        = -> { self.ime = false; 4 } # DI: IMEフラグを無効にして、割り込みを無効
-    table[EI]        = -> { self.ime = true; 4 } # EI: IMEフラグを有効にして、割り込みを有効
+    table[EI]        = -> { self.ime_scheduled = true; 4 } # EI: IMEフラグの有効を予約する
     table[PREFIX_CB] = -> { dispatch_cb } # PREFIX CB (次バイトを CB-prefix table で解釈)
 
     # ============================================================
