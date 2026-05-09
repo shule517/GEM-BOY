@@ -20,6 +20,14 @@ require 'app/emulator/disassembler'
 # `@opcodes` は 256 要素の配列で、各要素が「その命令を実行して消費サイクル数を返す lambda」
 # CB-prefix 命令(0xCB に続く 2 バイト目)は B-3 で別テーブルとして追加する
 class CPU
+  # 制御/システム命令の opcode https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7
+  NOP       = 0x00 # 何もしない
+  STOP      = 0x10 # CPU/LCDを停止
+  HALT      = 0x76 # 割り込みが入るまで停止
+  PREFIX_CB = 0xCB # CB-prefix(次バイトを CB-table で解釈)
+  DI        = 0xF3 # Disable Interrupts: IMEを無効化
+  EI        = 0xFB # Enable Interrupts: IMEを有効化(本来は次の命令を実行してから反映)
+
   attr_accessor :ime, # Interrupt Master Enable(割り込みマスタ有効フラグ) 1の時に処理を割り込む https://gbdev.io/pandocs/Interrupts.html
                 :halted, # CPUの一時停止中フラグ https://gbdev.io/pandocs/halt.html
                 :opcodes, # CPUの命令一覧 https://izik1.github.io/gbops/
@@ -279,12 +287,12 @@ class CPU
     # ============================================================
     # 制御 / システム (Control / System)
     # ============================================================
-    table[0x00] = -> { 4 } # NOP: 何もしない。4サイクル進む。
-    table[0x10] = -> { 4 } # STOP: TODO: これで良いのか？
-    table[0x76] = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
-    table[0xF3] = -> { self.ime = false; 4 } # DI: IMEフラグを無効にして、割り込みを無効
-    table[0xFB] = -> { self.ime = true; 4 } # EI: IMEフラグを有効にして、割り込みを有効
-    table[0xCB] = -> { dispatch_cb } # PREFIX CB (次バイトを CB-prefix table で解釈)
+    table[NOP]       = -> { 4 } # NOP: 何もしない。4サイクル進む。
+    table[STOP]      = -> { 4 } # STOP: TODO: これで良いのか？
+    table[HALT]      = -> { self.halted = true; 4 } # HALT: CPUを停止状態に。割り込みが入るまでstep()は4サイクルだけ消費(命令fetch しない)https://gbdev.io/pandocs/halt.html
+    table[DI]        = -> { self.ime = false; 4 } # DI: IMEフラグを無効にして、割り込みを無効
+    table[EI]        = -> { self.ime = true; 4 } # EI: IMEフラグを有効にして、割り込みを有効
+    table[PREFIX_CB] = -> { dispatch_cb } # PREFIX CB (次バイトを CB-prefix table で解釈)
 
     # ============================================================
     # 8bit ロード - LD r,u8 (即値ロード)

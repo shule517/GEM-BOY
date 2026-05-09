@@ -60,11 +60,11 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     # ==========================================================================
 
     context 'EI で IME を立てる' do
-      let(:instr_bytes) { [0xFB, 0x00] } # 0xC000: EI(0xFB), 0xC001: NOP(0x00)
+      let(:instr_bytes) { [CPU::EI, CPU::NOP] }
       before { cpu.ime = false }
 
       it 'EI の 1 命令遅延仕様: EI 直後の 1 命令を実行した後に IME=1 になる(現状は即時 EI のため失敗想定)' do
-        cpu.step # EI を実行 → 仕様上はまだ IME=0(次命令後に IME=1)
+        cpu.step # EI を実行
         expect(cpu.ime).to eq false # 遅延するのでまだ反映されない
 
         cpu.step # NOP を実行
@@ -79,7 +79,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.ime = true
         cpu.registers.sp = 0xDFFE
         cpu.registers.pc = 0xC100
-        mmu.write_u8(address: 0xC100, value: 0x00) # NOP(dispatch されなければこれが実行される)
+        mmu.write_u8(address: 0xC100, value: CPU::NOP) # dispatch されなければこれが実行される
 
         cpu.step
 
@@ -104,7 +104,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     # ==========================================================================
 
     context 'DI で IME をクリア' do
-      let(:instr_bytes) { [0xF3] } # DI
+      let(:instr_bytes) { [CPU::DI] }
       before { cpu.ime = true }
 
       it 'IME=false になる' do
@@ -123,7 +123,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
         # NOP を実行してもベクタへ飛ばないことを確認(現状でも動くはず:
         # IME=0 なら dispatch されないので)
-        mmu.write_u8(address: 0xC100, value: 0x00) # NOP
+        mmu.write_u8(address: 0xC100, value: CPU::NOP)
         cpu.step
 
         expect(cpu.registers.pc).to eq original_pc + 1 # NOP 1 byte 進むだけ
@@ -157,7 +157,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.write_u8(address: PPU::IF, value: 0x00)
         cpu.registers.pc = 0xC100
         # NOP を 64 個並べて 256 cycles 進める(262144 Hz / 4 = 65536 Hz、4 cycles ごとに TIMA tick)
-        64.times { |i| mmu.write_u8(address: 0xC100 + i, value: 0x00) }
+        64.times { |i| mmu.write_u8(address: 0xC100 + i, value: CPU::NOP) }
 
         cpu.run(256)
 
@@ -180,7 +180,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     # ==========================================================================
 
     context 'HALT 命令で halted 状態になる' do
-      let(:instr_bytes) { [0x76] } # HALT
+      let(:instr_bytes) { [CPU::HALT] }
 
       it 'halted=true' do
         cpu.step
@@ -217,7 +217,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.ime = false
         cpu.halted = true
         cpu.registers.pc = 0xC100
-        mmu.write_u8(address: 0xC100, value: 0x00) # NOP
+        mmu.write_u8(address: 0xC100, value: CPU::NOP)
         mmu.write_u8(address: ie_address, value: 0x04)
         mmu.write_u8(address: PPU::IF, value: 0x04)
 
