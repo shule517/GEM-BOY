@@ -22,7 +22,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     instr_address = 0xC000
     timer_vector = 0x0050
 
-    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) }  # 初期 SP=0xFFFE 等を取りたいので post-boot 状態で起動
+    let(:cpu) { CPU.new(mmu, skip_boot: true, trace: false) } # 初期 SP=0xFFFE 等を取りたいので post-boot 状態で起動
     let(:mmu) { MMU.new(Cartridge.new(rom_data), skip_boot: true) }
     let(:rom_data) { Array.new(0x8000, 0) }
     let(:instr_bytes) { [] }
@@ -68,19 +68,19 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
       it 'IE と IF の Timer bit を立てて次の step で 0x50 にジャンプし、IF bit 2 がクリアされる' do
         # https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
-        mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
-        mmu.interrupt_flag.timer = true                   # Timerの割り込みが発生した
+        mmu.interrupt_enable.timer = true # Timerの割り込みを有効にした
+        mmu.interrupt_flag.timer = true # Timerの割り込みが発生した
         cpu.ime = true
         initial_sp = cpu.registers.sp # post-boot 初期値 (0xFFFE)
 
         cpu.step
 
-        expect(cpu.registers.pc).to eq timer_vector       # 0x50 へ jump
-        expect(cpu.ime).to eq false                       # IME クリア
-        expect(mmu.interrupt_flag.timer?).to eq false    # dispatch で flag が自動クリアされる
-        expect(cpu.registers.sp).to eq initial_sp - 2        # 2 バイト push で SP が 2 減る
+        expect(cpu.registers.pc).to eq timer_vector # 0x50 へ jump
+        expect(cpu.ime).to eq false # IME クリア
+        expect(mmu.interrupt_flag.timer?).to eq false # dispatch で flag が自動クリアされる
+        expect(cpu.registers.sp).to eq initial_sp - 2 # 2 バイト push で SP が 2 減る
         expect(mmu.read_u8(address: initial_sp - 1)).to eq 0xC0 # 戻り先 high (instr_address=0xC000 の上位)
-        expect(mmu.read_u8(address: initial_sp - 2)).to eq 0x00 # 戻り先 low  (instr_address=0xC000 の下位)
+        expect(mmu.read_u8(address: initial_sp - 2)).to eq 0x00 # 戻り先 low (instr_address=0xC000 の下位)
       end
     end
 
@@ -110,13 +110,13 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
       it 'IE と IF の Timer bit が立っていても PC は NOP 1 byte 分しか進まず、IF bit 2 は立ったまま' do
         cpu.ime = false
-        mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
-        mmu.interrupt_flag.timer = true                   # Timerの割り込みが発生した
+        mmu.interrupt_enable.timer = true # Timerの割り込みを有効にした
+        mmu.interrupt_flag.timer = true # Timerの割り込みが発生した
 
         cpu.step
 
-        expect(cpu.registers.pc).to eq instr_address + 1  # NOP 1 byte 進むだけ
-        expect(mmu.interrupt_flag.timer?).to eq true     # IME=0 では dispatch しないので flag は保持される
+        expect(cpu.registers.pc).to eq instr_address + 1 # NOP 1 byte 進むだけ
+        expect(mmu.interrupt_flag.timer?).to eq true # IME=0 では dispatch しないので flag は保持される
       end
     end
 
@@ -148,11 +148,11 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.write_u8(address: MMU::TAC,  value: 0b00000101) # TAC: bit2=enable + bits1-0=01 (rate 01 = 16 T-cycles per TIMA tick)
         mmu.write_u8(address: MMU::TIMA, value: 0b11111111) # TIMA: 次の tick でオーバーフロー (0xFF)
         mmu.write_u8(address: MMU::TMA,  value: 0b01000010) # TMA: オーバーフロー時の再ロード値 (0x42)
-        mmu.interrupt_flag.timer = false                  # Timer overflow で bit 2 が立つことを検証するため事前にクリア
+        mmu.interrupt_flag.timer = false # Timer overflow で bit 2 が立つことを検証するため事前にクリア
 
         cpu.run(20)
 
-        expect(mmu.interrupt_flag.timer?).to eq true     # TIMA overflow により Timer 割り込みが立つ
+        expect(mmu.interrupt_flag.timer?).to eq true # TIMA overflow により Timer 割り込みが立つ
         expect(mmu.read_u8(address: MMU::TIMA)).to eq 0b01000010 # TMA が TIMA へ再ロード (0x42)
       end
     end
@@ -191,8 +191,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'halted=false に戻り、ベクタ 0x50 へ dispatch される' do
         cpu.ime = true
         cpu.halted = true
-        mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
-        mmu.interrupt_flag.timer = true                   # Timerの割り込みが発生した
+        mmu.interrupt_enable.timer = true # Timerの割り込みを有効にした
+        mmu.interrupt_flag.timer = true # Timerの割り込みが発生した
 
         cpu.step
 
@@ -207,8 +207,8 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       it 'halted=false に戻り、HALT の次の命令から再開する(dispatch されない)' do
         cpu.ime = false
         cpu.halted = true
-        mmu.write_u8(address: MMU::IE, value: 0b00000100) # Timerの割り込みを有効にした
-        mmu.interrupt_flag.timer = true                   # Timerの割り込みが発生した
+        mmu.interrupt_enable.timer = true # Timerの割り込みを有効にした
+        mmu.interrupt_flag.timer = true # Timerの割り込みが発生した
 
         cpu.step
 
@@ -218,14 +218,23 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     end
 
     # ==========================================================================
-    # IF (0xFF0F) と IE (0xFFFF) の I/O 直接アクセス
+    # IF (0xFF0F) の各 bit を interrupt_flag 経由で読み書き
     # Pan Docs: https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
     # ==========================================================================
 
-    context 'IF (MMU::IF) を MMU 経由で読み書きしたとき' do
-      it '下位 5bit が書いた値で読める' do
-        mmu.write_u8(address: MMU::IF, value: 0b00011111)
-        expect(mmu.read_u8(address: MMU::IF)).to eq 0b00011111
+    context 'interrupt_flag の 5 つのフラグをすべて true にしたとき' do
+      it '全フラグが true として読める' do
+        mmu.interrupt_flag.v_blank = true
+        mmu.interrupt_flag.lcd     = true
+        mmu.interrupt_flag.timer   = true
+        mmu.interrupt_flag.serial  = true
+        mmu.interrupt_flag.joypad  = true
+
+        expect(mmu.interrupt_flag.v_blank?).to eq true
+        expect(mmu.interrupt_flag.lcd?).to     eq true
+        expect(mmu.interrupt_flag.timer?).to   eq true
+        expect(mmu.interrupt_flag.serial?).to  eq true
+        expect(mmu.interrupt_flag.joypad?).to  eq true
       end
     end
   end

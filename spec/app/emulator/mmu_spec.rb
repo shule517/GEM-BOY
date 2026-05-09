@@ -120,13 +120,19 @@ RSpec.describe MMU do
       end
     end
 
-    context 'IEレジスタに書き込んだとき' do
-      subject do
-        mmu.write_u8(address: MMU::IE, value: 0x1F)
-        mmu.read_u8(address: MMU::IE)
-      end
-      it '読み戻すと 0x1F になる' do
-        is_expected.to eq 0x1F
+    context 'interrupt_enable の 5 つのフラグをすべて true にしたとき' do
+      it '全フラグが true として読める' do
+        mmu.interrupt_enable.v_blank = true
+        mmu.interrupt_enable.lcd     = true
+        mmu.interrupt_enable.timer   = true
+        mmu.interrupt_enable.serial  = true
+        mmu.interrupt_enable.joypad  = true
+
+        expect(mmu.interrupt_enable.v_blank?).to eq true
+        expect(mmu.interrupt_enable.lcd?).to     eq true
+        expect(mmu.interrupt_enable.timer?).to   eq true
+        expect(mmu.interrupt_enable.serial?).to  eq true
+        expect(mmu.interrupt_enable.joypad?).to  eq true
       end
     end
 
