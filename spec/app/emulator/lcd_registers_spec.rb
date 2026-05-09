@@ -11,7 +11,7 @@ RSpec.describe LcdRegisters do
     let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
 
     context 'LCDC bit7=1 (0x80) のとき' do
-      before { mmu.write_u8(address: 0xFF40, value: 0x80) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0x80) }
 
       it 'true を返す' do
         is_expected.to eq true
@@ -19,7 +19,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'LCDC bit7=0 (0x00) のとき' do
-      before { mmu.write_u8(address: 0xFF40, value: 0x00) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0x00) }
 
       it 'false を返す' do
         is_expected.to eq false
@@ -28,7 +28,7 @@ RSpec.describe LcdRegisters do
 
     context 'LCDC=0x7F (bit7=0, 他全部1) のとき' do
       # bit7だけを見て他のビットには影響されないことを確認
-      before { mmu.write_u8(address: 0xFF40, value: 0x7F) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0x7F) }
 
       it 'false を返す' do
         is_expected.to eq false
@@ -44,7 +44,7 @@ RSpec.describe LcdRegisters do
     let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
 
     context 'LCDC bit0=1 (0x01) のとき' do
-      before { mmu.write_u8(address: 0xFF40, value: 0x01) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0x01) }
 
       it 'true を返す' do
         is_expected.to eq true
@@ -52,7 +52,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'LCDC bit0=0 (0x00) のとき' do
-      before { mmu.write_u8(address: 0xFF40, value: 0x00) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0x00) }
 
       it 'false を返す' do
         is_expected.to eq false
@@ -60,7 +60,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'LCDC=0xFE (bit0=0, 他全部1) のとき' do
-      before { mmu.write_u8(address: 0xFF40, value: 0xFE) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0xFE) }
 
       it 'false を返す' do
         is_expected.to eq false
@@ -76,7 +76,7 @@ RSpec.describe LcdRegisters do
     let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
 
     context 'LCDC bit3=0 のとき' do
-      before { mmu.write_u8(address: 0xFF40, value: 0x00) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0x00) }
 
       it '0x9800 を返す' do
         is_expected.to eq 0x9800
@@ -84,7 +84,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'LCDC bit3=1 (0x08) のとき' do
-      before { mmu.write_u8(address: 0xFF40, value: 0x08) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0x08) }
 
       it '0x9C00 を返す' do
         is_expected.to eq 0x9C00
@@ -100,7 +100,7 @@ RSpec.describe LcdRegisters do
     let(:mmu) { MMU.new(Cartridge.new(Array.new(0x8000, 0))) }
 
     context 'LCDC bit4=1 (0x10) のとき(unsigned アドレッシング、0x8000基点)' do
-      before { mmu.write_u8(address: 0xFF40, value: 0x10) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0x10) }
 
       it 'true を返す' do
         is_expected.to eq true
@@ -108,7 +108,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'LCDC bit4=0 のとき(signed アドレッシング、0x9000基点)' do
-      before { mmu.write_u8(address: 0xFF40, value: 0x00) }
+      before { mmu.write_u8(address: LcdRegisters::LCDC, value: 0x00) }
 
       it 'false を返す' do
         is_expected.to eq false
@@ -130,7 +130,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'SCY=0x42 のとき' do
-      before { mmu.write_u8(address: 0xFF42, value: 0x42) }
+      before { mmu.write_u8(address: LcdRegisters::SCY, value: 0x42) }
 
       it '0x42 を返す' do
         is_expected.to eq 0x42
@@ -138,7 +138,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'SCY=0xFF のとき' do
-      before { mmu.write_u8(address: 0xFF42, value: 0xFF) }
+      before { mmu.write_u8(address: LcdRegisters::SCY, value: 0xFF) }
 
       it '0xFF を返す' do
         is_expected.to eq 0xFF
@@ -159,7 +159,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'SCX=0x42 のとき' do
-      before { mmu.write_u8(address: 0xFF43, value: 0x42) }
+      before { mmu.write_u8(address: LcdRegisters::SCX, value: 0x42) }
 
       it '0x42 を返す' do
         is_expected.to eq 0x42
@@ -167,7 +167,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'SCX=0xFF のとき' do
-      before { mmu.write_u8(address: 0xFF43, value: 0xFF) }
+      before { mmu.write_u8(address: LcdRegisters::SCX, value: 0xFF) }
 
       it '0xFF を返す' do
         is_expected.to eq 0xFF
@@ -189,7 +189,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'BGP=0xFC (色0=白、色1〜3=黒) のとき' do
-      before { mmu.write_u8(address: 0xFF47, value: 0xFC) }
+      before { mmu.write_u8(address: LcdRegisters::BGP, value: 0xFC) }
 
       it '0xFC を返す' do
         is_expected.to eq 0xFC
@@ -197,7 +197,7 @@ RSpec.describe LcdRegisters do
     end
 
     context 'BGP=0xE4 (恒等パレット 0b11_10_01_00) のとき' do
-      before { mmu.write_u8(address: 0xFF47, value: 0xE4) }
+      before { mmu.write_u8(address: LcdRegisters::BGP, value: 0xE4) }
 
       it '0xE4 を返す' do
         is_expected.to eq 0xE4

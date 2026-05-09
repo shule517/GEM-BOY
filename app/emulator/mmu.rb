@@ -1,5 +1,7 @@
 require 'app/core_ext/last'
 require 'app/emulator/bit'
+require 'app/emulator/interrupt_flag'
+require 'app/emulator/interrupt_enable'
 
 # MMU (Memory Management Unit)
 #
@@ -66,12 +68,35 @@ require 'app/emulator/bit'
 #     +3  属性 (パレット / 反転 / 優先度)
 class MMU
   attr_reader :serial_buffer,
-              :write_log # 1命令分の書き込み履歴 [[address, value], ...]。CPU が step ごとに reset_write_log で初期化
+              :write_log, # 1命令分の書き込み履歴 [[address, value], ...]。CPU が step ごとに reset_write_log で初期化
+              :interrupt_flag,   # IF (0xFF0F) のビット名アクセサ。`mmu.interrupt_flag.timer?` などで参照する
+              :interrupt_enable  # IE (0xFFFF) のビット名アクセサ。`mmu.interrupt_enable.timer = true` などで参照する
+
+  # メモリマップの各領域(Pan Docs: https://gbdev.io/pandocs/Memory_Map.html)
+  ROM_START  = 0x0000
+  ROM_END    = 0x7FFF
+  VRAM_START = 0x8000
+  VRAM_END   = 0x9FFF
+  WRAM_START = 0xC000
+  WRAM_END   = 0xDFFF
+  OAM_START  = 0xFE00
+  OAM_END    = 0xFE9F
+  IO_START   = 0xFF00
+  IO_END     = 0xFF7F
+  HRAM_START = 0xFF80
+  HRAM_END   = 0xFFFE
 
   # I/O レジスタアドレス(Pan Docs の慣用名と同じ)
   SB = 0xFF01  # Serial Buffer: 送信したい 1 バイト
   SC = 0xFF02  # Serial Control: 転送制御
   SC_TRANSFER_START = 0x81  # SC への書き込みがこの値のとき転送開始 (bit7=1, bit0=1)
+  # Timer 関連 https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
+  DIV  = 0xFF04 # Divider Register: 16384 Hz でインクリメント
+  TIMA = 0xFF05 # Timer Counter: TAC で指定した周期でインクリメントし、オーバーフローで TMA を再ロード + IF bit2 をセット
+  TMA  = 0xFF06 # Timer Modulo: TIMA オーバーフロー時にロードされる値
+  TAC  = 0xFF07 # Timer Control: bit2=enable, bits1-0=rate (00:4096Hz / 01:262144Hz / 10:65536Hz / 11:16384Hz)
+  IF = 0xFF0F  # 割り込みが発生した(Interrupt Flag): 発生した割り込みの種別ビット https://gbdev.io/pandocs/Interrupts.html#ff0f--if-interrupt-flag
+  IE = 0xFFFF  # 割り込みを有効にした(Interrupt Enable): 各割り込みの有効/無効ビット https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable
 
   def initialize(cartridge, skip_boot: false)
     @cartridge = cartridge
@@ -89,6 +114,8 @@ class MMU
     @serial_buffer = ''
 
     @write_log = [] # ログ用書き込み履歴。step 開始時に reset_write_log で初期化
+    @interrupt_flag   = InterruptFlag.new(self)
+    @interrupt_enable = InterruptEnable.new(self)
 
     setup_post_boot_io if skip_boot
   end
@@ -102,13 +129,13 @@ class MMU
   # 未対応・使用禁止領域は 0xFF(実機の挙動)。CPU 側で nil 演算事故を防ぐ意図もある。
   def read_u8(address:)
     case address
-    when 0x0000..0x7FFF then @cartridge.read(address)
-    when 0x8000..0x9FFF then @vram[address - 0x8000]
-    when 0xC000..0xDFFF then @wram[address - 0xC000]
-    when 0xFE00..0xFE9F then @oam[address - 0xFE00]
-    when 0xFF00..0xFF7F then @io[address - 0xFF00]
-    when 0xFF80..0xFFFE then @hram[address - 0xFF80]
-    when 0xFFFF then @ie
+    when ROM_START..ROM_END   then @cartridge.read(address)
+    when VRAM_START..VRAM_END then @vram[address - VRAM_START]
+    when WRAM_START..WRAM_END then @wram[address - WRAM_START]
+    when OAM_START..OAM_END   then @oam[address - OAM_START]
+    when IO_START..IO_END     then @io[address - IO_START]
+    when HRAM_START..HRAM_END then @hram[address - HRAM_START]
+    when IE then @ie
     else 0xFF
     end
   end
@@ -121,12 +148,12 @@ class MMU
       @write_log << [address, read_u8(address: address), value] # before/after を disassembler のログ用に記録
 
     case address
-    when 0x8000..0x9FFF then @vram[address - 0x8000] = value
-    when 0xC000..0xDFFF then @wram[address - 0xC000] = value
-    when 0xFE00..0xFE9F then @oam[address - 0xFE00] = value
-    when 0xFF00..0xFF7F then @io[address - 0xFF00] = value; handle_serial(address, value)
-    when 0xFF80..0xFFFE then @hram[address - 0xFF80] = value
-    when 0xFFFF then @ie = value
+    when VRAM_START..VRAM_END then @vram[address - VRAM_START] = value
+    when WRAM_START..WRAM_END then @wram[address - WRAM_START] = value
+    when OAM_START..OAM_END   then @oam[address - OAM_START] = value
+    when IO_START..IO_END     then @io[address - IO_START] = value; handle_serial(address, value)
+    when HRAM_START..HRAM_END then @hram[address - HRAM_START] = value
+    when IE then @ie = value
     end
   end
 
@@ -148,7 +175,7 @@ class MMU
   # 内部状態として I/O を直接触りたいとき用(タイマー割り込み等で使う)。
   # write_u8() を経由するとシリアル判定が走ってしまうので、その副作用を避ける裏口。
   def write_io_direct(address:, value:)
-    @io[address - 0xFF00] = Bit.wrap_u8(value)
+    @io[address - IO_START] = Bit.wrap_u8(value)
   end
 
   private
@@ -175,7 +202,7 @@ class MMU
     return if address != SC || value != SC_TRANSFER_START
 
     # SB に置かれた 1 バイトを ASCII 文字として取り出す。
-    char = @io[SB - 0xFF00].chr
+    char = @io[SB - IO_START].chr
 
     # ターミナルへ即時出力。Blargg のリアルタイム進捗を見るのに必要。
     $stdout.print char
@@ -187,6 +214,6 @@ class MMU
 
     # bit7(Transfer Start Flag)を落として「転送完了」を Blargg に通知する。
     # ここを忘れると Blargg は 1 文字目で永久ループに入る。
-    @io[SC - 0xFF00] = 0x01
+    @io[SC - IO_START] = 0x01
   end
 end
