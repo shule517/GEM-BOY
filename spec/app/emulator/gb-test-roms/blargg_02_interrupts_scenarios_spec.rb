@@ -150,8 +150,9 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       end
 
       it 'NOP がそのまま実行されて PC が 1 進む' do
+        initial_pc = cpu.registers.pc
         cpu.step
-        expect(cpu.registers.pc).to eq instr_address + 1
+        expect(cpu.registers.pc).to eq initial_pc + 1
       end
 
       it 'IME=0 では dispatch しないので Timer flag は保持される' do
