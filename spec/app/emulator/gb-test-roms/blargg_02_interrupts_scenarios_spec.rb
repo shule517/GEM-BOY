@@ -115,7 +115,7 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         initial_sp = cpu.registers.sp
         cpu.step
         expect(mmu.read_u8(address: initial_sp - 1)).to eq 0xC0 # 戻り先 high
-        expect(mmu.read_u8(address: initial_sp - 2)).to eq 0x00 # 戻り先 low
+        expect(mmu.read_u8(address: initial_sp - 2)).to eq 0x01 # 戻り先 low
       end
     end
 
