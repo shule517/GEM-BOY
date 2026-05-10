@@ -21,25 +21,53 @@ class Timer
     @mmu = mmu
   end
 
-  # TAC bit2 (Enable): TIMAをインクリメントするかどうか。DIVは常に動くので無関係
-  def tac_enable = Bit.bit_at(read_tac, ENABLE_BIT)
-  def tac_enable? = tac_enable == 1
-  def tac_enable=(value); write_tac(Bit.set_bit(read_tac, ENABLE_BIT, value)); end
+  # TAC (Timer Control) bit2 (Enable): TIMAをインクリメントするかどうか。DIVは常に動くので無関係
+  def timer_control_enabled
+    Bit.bit_at(read_tac, ENABLE_BIT)
+  end
 
-  # TAC bits1-0 (Clock select): TIMAを+1する間隔
-  def tac_clock = read_tac & CLOCK_MASK
-  def tac_clock=(value); write_tac((read_tac & ~CLOCK_MASK) | (value & CLOCK_MASK)); end
+  def timer_control_enabled?
+    timer_control_enabled == 1
+  end
+
+  def timer_control_enabled=(value)
+    write_tac(Bit.set_bit(read_tac, ENABLE_BIT, value))
+  end
+
+  # TAC (Timer Control) bits1-0 (Clock select): TIMAを+1する間隔
+  def timer_control_clock
+    read_tac & CLOCK_MASK
+  end
+
+  def timer_control_clock=(value)
+    write_tac((read_tac & ~CLOCK_MASK) | (value & CLOCK_MASK))
+  end
 
   # TIMA (Timer Counter): 現在のカウンタ値
-  def tima = @mmu.read_u8(address: MMU::TIMA)
-  def tima=(value); @mmu.write_io_direct(address: MMU::TIMA, value: value); end
+  def timer_counter
+    @mmu.read_u8(address: MMU::TIMA)
+  end
+
+  def timer_counter=(value)
+    @mmu.write_io_direct(address: MMU::TIMA, value: value)
+  end
 
   # TMA (Timer Modulo): TIMA がオーバーフローしたときに再ロードされる値
-  def tma = @mmu.read_u8(address: MMU::TMA)
-  def tma=(value); @mmu.write_io_direct(address: MMU::TMA, value: value); end
+  def timer_modulo
+    @mmu.read_u8(address: MMU::TMA)
+  end
+
+  def timer_modulo=(value)
+    @mmu.write_io_direct(address: MMU::TMA, value: value)
+  end
 
   private
 
-  def read_tac = @mmu.read_u8(address: MMU::TAC)
-  def write_tac(value); @mmu.write_io_direct(address: MMU::TAC, value: value); end
+  def read_tac
+    @mmu.read_u8(address: MMU::TAC)
+  end
+
+  def write_tac(value)
+    @mmu.write_io_direct(address: MMU::TAC, value: value)
+  end
 end

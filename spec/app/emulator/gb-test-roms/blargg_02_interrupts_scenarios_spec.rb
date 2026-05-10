@@ -187,9 +187,10 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       before do
         # Pan Docs: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
         # TAC bit2=enable / bits1-0=rate, rate 01 = 262144 Hz = 4194304 Hz CPU / 16 → 16 T-cycles ごとに TIMA が +1
-        mmu.write_u8(address: MMU::TAC,  value: 0b00000101) # TAC: bit2=enable + bits1-0=01 (rate 01 = 16 T-cycles per TIMA tick)
-        mmu.write_u8(address: MMU::TIMA, value: 0b11111111) # TIMA: 次の tick でオーバーフロー (0xFF)
-        mmu.write_u8(address: MMU::TMA,  value: tma_reload_value)
+        mmu.timer.timer_control_enabled = true # Timerをenable
+        mmu.timer.timer_control_clock = 0b01 # rate 01 = 16 T-cycles per TIMA tick
+        mmu.timer.timer_counter = 0xFF # TIMA: 次の tick でオーバーフロー
+        mmu.timer.timer_modulo = tma_reload_value # TMA: オーバーフロー時に TIMA に再ロードされる値
         mmu.interrupt_flag.timer = false # Timer overflow で Timer flag が立つことを検証するため事前にクリア
       end
 
@@ -200,7 +201,75 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
 
       it 'TMA が TIMA へ再ロードされる' do
         cpu.run(20)
-        expect(mmu.read_u8(address: MMU::TIMA)).to eq tma_reload_value
+        expect(mmu.timer.timer_counter).to eq tma_reload_value
+      end
+    end
+
+    # ==========================================================================
+    # TIMA のカウントアップ仕様
+    # Pan Docs: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
+    #
+    # TAC bit2=Enable, bits1-0=Clock select(rate 00:1024 / 01:16 / 10:64 / 11:256 T-cycle/tick)
+    # CPU clock = 4194304 Hz、1 M-cycle = 4 T-cycle、NOP = 4 T-cycle
+    # ==========================================================================
+
+    context 'TAC enable=true、rate=01(16 T-cycle ごとに +1)で命令を実行したとき' do
+      let(:instr_bytes) { Array.new(8, CPU::NOP) } # NOP×8 = 32 T-cycle 用意
+
+      before do
+        mmu.timer.timer_control_enabled = true
+        mmu.timer.timer_control_clock = 0b01
+        mmu.timer.timer_counter = 0x00
+      end
+
+      it '15 T-cycle(NOP×3=12)では TIMA は変化しない' do
+        cpu.run(12)
+        expect(mmu.timer.timer_counter).to eq 0x00
+      end
+
+      it '16 T-cycle(NOP×4)で TIMA が +1 される' do
+        cpu.run(16)
+        expect(mmu.timer.timer_counter).to eq 0x01
+      end
+
+      it '32 T-cycle(NOP×8)で TIMA が +2 される' do
+        cpu.run(32)
+        expect(mmu.timer.timer_counter).to eq 0x02
+      end
+    end
+
+    context 'TAC enable=false のとき' do
+      let(:instr_bytes) { Array.new(8, CPU::NOP) }
+
+      before do
+        mmu.timer.timer_control_enabled = false
+        mmu.timer.timer_control_clock = 0b01
+        mmu.timer.timer_counter = 0x00
+      end
+
+      it '何 T-cycle 経過しても TIMA は +1 されない' do
+        cpu.run(32)
+        expect(mmu.timer.timer_counter).to eq 0x00
+      end
+    end
+
+    context 'TAC rate=10(64 T-cycle ごとに +1)で命令を実行したとき' do
+      let(:instr_bytes) { Array.new(20, CPU::NOP) } # NOP×20 = 80 T-cycle 用意
+
+      before do
+        mmu.timer.timer_control_enabled = true
+        mmu.timer.timer_control_clock = 0b10
+        mmu.timer.timer_counter = 0x00
+      end
+
+      it '60 T-cycle(NOP×15)では TIMA は変化しない' do
+        cpu.run(60)
+        expect(mmu.timer.timer_counter).to eq 0x00
+      end
+
+      it '64 T-cycle(NOP×16)で TIMA が +1 される' do
+        cpu.run(64)
+        expect(mmu.timer.timer_counter).to eq 0x01
       end
     end
 
