@@ -71,7 +71,7 @@ class CPU
   def step
     # タイマーの割り込み
     if mmu.interrupt_enable.timer? && mmu.interrupt_flag.timer?
-      self.halted = false
+      self.halted = false # Timer割り込みがあれば、haltedをOFFにする（imeフラグに関係なく）
       if ime?
         self.ime = false # 割り込みを終了
         mmu.interrupt_flag.timer = false # Timer割り込み完了
