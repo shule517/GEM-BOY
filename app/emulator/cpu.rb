@@ -71,6 +71,16 @@ class CPU
   def step
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
 
+    # タイマーの割り込み
+    if ime? && mmu.interrupt_enable.timer? && mmu.interrupt_flag.timer?
+      puts "タイマーの割り込み"
+      self.ime = false # 割り込みを終了
+      mmu.interrupt_flag.timer = false # Timer割り込み完了
+      push_u16(registers.pc) # pcをpushする
+      registers.pc = INTERRUPT_VECTORS[:timer] # pcをジャンプ
+      return
+    end
+
     # IMEの有効が予約されてたら、有効にする
     if ime_scheduled
       self.ime_scheduled = false
@@ -86,14 +96,6 @@ class CPU
     end
     cycles = handler.call
     puts @disassembler.after_step(context, opcode, cycles) if @trace # trace 有効時のみ命令後の差分を出力
-
-    # タイマーの割り込み
-    if ime? && mmu.interrupt_enable.timer? && mmu.interrupt_flag.timer?
-      self.ime = false # 割り込みを終了
-      mmu.interrupt_flag.timer = false # Timer割り込み完了
-      push_u16(registers.pc) # pcをpushする
-      registers.pc = INTERRUPT_VECTORS[:timer] # pcをジャンプ
-    end
 
     cycles
   end
