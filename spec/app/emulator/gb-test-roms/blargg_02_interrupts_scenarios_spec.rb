@@ -48,18 +48,35 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
     #       スタックに interrupt_addr が積まれる
     # ==========================================================================
 
-    context 'EI で IME を立てる(1命令遅延仕様)' do
+    context 'EI を実行した直後(1命令遅延仕様)' do
+      let(:instr_bytes) { [CPU::EI] }
+      before { cpu.ime = false }
+
+      it 'IME はまだ反映されない' do
+        cpu.step
+        expect(cpu.ime).to eq false
+      end
+
+      it 'ime_scheduled で IME の有効化が予約される' do
+        cpu.step
+        expect(cpu.ime_scheduled).to eq true
+      end
+    end
+
+    context 'EI の次の命令を実行した後' do
       let(:instr_bytes) { [CPU::EI, CPU::NOP] }
       before { cpu.ime = false }
 
-      it 'EI 直後はまだ反映されず、次の命令を実行した後に IME が有効になる' do
-        cpu.step # EI を実行
-        expect(cpu.ime).to eq false # EI 直後は IME はまだ反映されない
-        expect(cpu.ime_scheduled).to eq true # ime_scheduled で IME の有効化が予約される
+      it 'IME が有効になる' do
+        cpu.step # EI
+        cpu.step # NOP
+        expect(cpu.ime).to eq true
+      end
 
-        cpu.step # NOP を実行
-        expect(cpu.ime).to eq true # 次の命令を実行した後に IME が有効になる
-        expect(cpu.ime_scheduled).to eq false # ime_scheduled は解除される
+      it 'ime_scheduled が解除される' do
+        cpu.step # EI
+        cpu.step # NOP
+        expect(cpu.ime_scheduled).to eq false
       end
     end
 
@@ -73,15 +90,32 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         cpu.ime = true
       end
 
-      it 'Timer 割り込みベクタへ jump し、IME と Timer flag がクリアされ、戻り先が SP に積まれる' do
+      it 'ベクタ 0x50 へ jump する' do
+        cpu.step
+        expect(cpu.registers.pc).to eq timer_vector
+      end
+
+      it 'IME がクリアされる' do
+        cpu.step
+        expect(cpu.ime).to eq false
+      end
+
+      it 'dispatch で Timer flag が自動クリアされる' do
+        cpu.step
+        expect(mmu.interrupt_flag.timer?).to eq false
+      end
+
+      it '2バイト push で SP が 2 減る' do
         initial_sp = cpu.registers.sp
         cpu.step
-        expect(cpu.registers.pc).to eq timer_vector # ベクタ 0x50 へ jump
-        expect(cpu.ime).to eq false # IME がクリアされる
-        expect(mmu.interrupt_flag.timer?).to eq false # dispatch で Timer flag が自動クリアされる
-        expect(cpu.registers.sp).to eq initial_sp - 2 # 2バイト push で SP が 2 減る
-        expect(mmu.read_u8(address: initial_sp - 1)).to eq 0xC0 # 戻り先 high (instr_address=0xC000 の上位)
-        expect(mmu.read_u8(address: initial_sp - 2)).to eq 0x00 # 戻り先 low (instr_address=0xC000 の下位)
+        expect(cpu.registers.sp).to eq initial_sp - 2
+      end
+
+      it '戻り先アドレス(instr_address=0xC000)が SP に積まれる' do
+        initial_sp = cpu.registers.sp
+        cpu.step
+        expect(mmu.read_u8(address: initial_sp - 1)).to eq 0xC0 # 戻り先 high
+        expect(mmu.read_u8(address: initial_sp - 2)).to eq 0x00 # 戻り先 low
       end
     end
 
@@ -115,10 +149,15 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.interrupt_flag.timer = true # Timerの割り込みが発生した
       end
 
-      it 'NOP がそのまま実行されて Timer flag は保持される' do
+      it 'NOP がそのまま実行されて PC が 1 進む' do
+        initial_pc = cpu.registers.pc
         cpu.step
-        expect(cpu.registers.pc).to eq instr_address + 1 # NOP 1 byte 進むだけ
-        expect(mmu.interrupt_flag.timer?).to eq true # IME=0 では dispatch しないので Timer flag は保持される
+        expect(cpu.registers.pc).to eq initial_pc + 1
+      end
+
+      it 'IME=0 では dispatch しないので Timer flag は保持される' do
+        cpu.step
+        expect(mmu.interrupt_flag.timer?).to eq true
       end
     end
 
@@ -148,16 +187,89 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       before do
         # Pan Docs: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
         # TAC bit2=enable / bits1-0=rate, rate 01 = 262144 Hz = 4194304 Hz CPU / 16 → 16 T-cycles ごとに TIMA が +1
-        mmu.write_u8(address: MMU::TAC,  value: 0b00000101) # TAC: bit2=enable + bits1-0=01 (rate 01 = 16 T-cycles per TIMA tick)
-        mmu.write_u8(address: MMU::TIMA, value: 0b11111111) # TIMA: 次の tick でオーバーフロー (0xFF)
-        mmu.write_u8(address: MMU::TMA,  value: tma_reload_value)
+        mmu.timer.timer_control_enabled = true # Timerをenable
+        mmu.timer.timer_control_clock = 0b01 # rate 01 = 16 T-cycles per TIMA tick
+        mmu.timer.timer_counter = 0xFF # TIMA: 次の tick でオーバーフロー
+        mmu.timer.timer_modulo = tma_reload_value # TMA: オーバーフロー時に TIMA に再ロードされる値
         mmu.interrupt_flag.timer = false # Timer overflow で Timer flag が立つことを検証するため事前にクリア
       end
 
-      it 'TIMA=0xFF からオーバーフローすると Timer flag が立ち、TMA が TIMA へ再ロードされる' do
+      it 'TIMA overflow により Timer 割り込みが立つ' do
         cpu.run(20)
-        expect(mmu.interrupt_flag.timer?).to eq true # TIMA overflow により Timer 割り込みが立つ
-        expect(mmu.read_u8(address: MMU::TIMA)).to eq tma_reload_value # TMA が TIMA へ再ロードされる
+        expect(mmu.interrupt_flag.timer?).to eq true
+      end
+
+      it 'TMA が TIMA へ再ロードされる' do
+        cpu.run(20)
+        expect(mmu.timer.timer_counter).to eq tma_reload_value
+      end
+    end
+
+    # ==========================================================================
+    # TIMA のカウントアップ仕様
+    # Pan Docs: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
+    #
+    # TAC bit2=Enable, bits1-0=Clock select(rate 00:1024 / 01:16 / 10:64 / 11:256 T-cycle/tick)
+    # CPU clock = 4194304 Hz、1 M-cycle = 4 T-cycle、NOP = 4 T-cycle
+    # ==========================================================================
+
+    context 'TAC enable=true、rate=01(16 T-cycle ごとに +1)で命令を実行したとき' do
+      let(:instr_bytes) { Array.new(8, CPU::NOP) } # NOP×8 = 32 T-cycle 用意
+
+      before do
+        mmu.timer.timer_control_enabled = true
+        mmu.timer.timer_control_clock = 0b01
+        mmu.timer.timer_counter = 0x00
+      end
+
+      it '15 T-cycle(NOP×3=12)では TIMA は変化しない' do
+        cpu.run(12)
+        expect(mmu.timer.timer_counter).to eq 0x00
+      end
+
+      it '16 T-cycle(NOP×4)で TIMA が +1 される' do
+        cpu.run(16)
+        expect(mmu.timer.timer_counter).to eq 0x01
+      end
+
+      it '32 T-cycle(NOP×8)で TIMA が +2 される' do
+        cpu.run(32)
+        expect(mmu.timer.timer_counter).to eq 0x02
+      end
+    end
+
+    context 'TAC enable=false のとき' do
+      let(:instr_bytes) { Array.new(8, CPU::NOP) }
+
+      before do
+        mmu.timer.timer_control_enabled = false
+        mmu.timer.timer_control_clock = 0b01
+        mmu.timer.timer_counter = 0x00
+      end
+
+      it '何 T-cycle 経過しても TIMA は +1 されない' do
+        cpu.run(32)
+        expect(mmu.timer.timer_counter).to eq 0x00
+      end
+    end
+
+    context 'TAC rate=10(64 T-cycle ごとに +1)で命令を実行したとき' do
+      let(:instr_bytes) { Array.new(20, CPU::NOP) } # NOP×20 = 80 T-cycle 用意
+
+      before do
+        mmu.timer.timer_control_enabled = true
+        mmu.timer.timer_control_clock = 0b10
+        mmu.timer.timer_counter = 0x00
+      end
+
+      it '60 T-cycle(NOP×15)では TIMA は変化しない' do
+        cpu.run(60)
+        expect(mmu.timer.timer_counter).to eq 0x00
+      end
+
+      it '64 T-cycle(NOP×16)で TIMA が +1 される' do
+        cpu.run(64)
+        expect(mmu.timer.timer_counter).to eq 0x01
       end
     end
 
@@ -187,11 +299,15 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
       let(:instr_bytes) { [CPU::HALT] }
       before { cpu.step } # HALT 実行 → halted=true
 
-      it '4 cycles 消費するだけで PC は進まない' do
-        pc_before = cpu.registers.pc
+      it '4 cycles 消費する' do
         cycles = cpu.step
-        expect(cycles).to eq 4 # halted 中の step は 4 cycles 消費するだけ
-        expect(cpu.registers.pc).to eq pc_before # PC は進まない
+        expect(cycles).to eq 4
+      end
+
+      it 'PC は進まない' do
+        pc_before = cpu.registers.pc
+        cpu.step
+        expect(cpu.registers.pc).to eq pc_before
       end
     end
 
@@ -203,10 +319,14 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.interrupt_flag.timer = true # Timerの割り込みが発生した
       end
 
-      it 'halted=false に戻り、ベクタ 0x50 へ dispatch される' do
+      it 'halted=false に戻る' do
         cpu.step
-        expect(cpu.halted).to eq false # halted=false に戻る
-        expect(cpu.registers.pc).to eq timer_vector # ベクタ 0x50 へ dispatch される
+        expect(cpu.halted).to eq false
+      end
+
+      it 'ベクタ 0x50 へ dispatch される' do
+        cpu.step
+        expect(cpu.registers.pc).to eq timer_vector
       end
     end
 
@@ -220,10 +340,14 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.interrupt_flag.timer = true # Timerの割り込みが発生した
       end
 
-      it 'halted=false に戻り、HALT の次の命令から再開する(dispatch されない)' do
+      it 'halted=false に戻る' do
         cpu.step
-        expect(cpu.halted).to eq false # halted=false に戻る
-        expect(cpu.registers.pc).to eq instr_address + 1 # NOP を踏んだ後
+        expect(cpu.halted).to eq false
+      end
+
+      it 'HALT の次の命令(NOP)から再開する(dispatch されない)' do
+        cpu.step
+        expect(cpu.registers.pc).to eq instr_address + 1
       end
     end
 
@@ -241,12 +365,24 @@ RSpec.describe 'Blargg cpu_instrs/02-interrupts.gb 相当のシナリオテス�
         mmu.interrupt_flag.joypad  = true
       end
 
-      it '全フラグが true として読める' do
+      it 'v_blank? が true として読める' do
         expect(mmu.interrupt_flag.v_blank?).to eq true
-        expect(mmu.interrupt_flag.lcd?).to     eq true
-        expect(mmu.interrupt_flag.timer?).to   eq true
-        expect(mmu.interrupt_flag.serial?).to  eq true
-        expect(mmu.interrupt_flag.joypad?).to  eq true
+      end
+
+      it 'lcd? が true として読める' do
+        expect(mmu.interrupt_flag.lcd?).to eq true
+      end
+
+      it 'timer? が true として読める' do
+        expect(mmu.interrupt_flag.timer?).to eq true
+      end
+
+      it 'serial? が true として読める' do
+        expect(mmu.interrupt_flag.serial?).to eq true
+      end
+
+      it 'joypad? が true として読める' do
+        expect(mmu.interrupt_flag.joypad?).to eq true
       end
     end
   end

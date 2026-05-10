@@ -2,6 +2,7 @@ require 'app/core_ext/last'
 require 'app/emulator/bit'
 require 'app/emulator/interrupt_flag'
 require 'app/emulator/interrupt_enable'
+require 'app/emulator/timer'
 
 # MMU (Memory Management Unit)
 #
@@ -70,7 +71,8 @@ class MMU
   attr_reader :serial_buffer,
               :write_log, # 1命令分の書き込み履歴 [[address, value], ...]。CPU が step ごとに reset_write_log で初期化
               :interrupt_flag,   # IF (0xFF0F) のビット名アクセサ。`mmu.interrupt_flag.timer?` などで参照する
-              :interrupt_enable  # IE (0xFFFF) のビット名アクセサ。`mmu.interrupt_enable.timer = true` などで参照する
+              :interrupt_enable, # IE (0xFFFF) のビット名アクセサ。`mmu.interrupt_enable.timer = true` などで参照する
+              :timer             # Timer (DIV/TIMA/TMA/TAC) のアクセサ。`mmu.timer.tac_enable?` などで参照する
 
   # メモリマップの各領域(Pan Docs: https://gbdev.io/pandocs/Memory_Map.html)
   ROM_START  = 0x0000
@@ -116,6 +118,7 @@ class MMU
     @write_log = [] # ログ用書き込み履歴。step 開始時に reset_write_log で初期化
     @interrupt_flag   = InterruptFlag.new(self)
     @interrupt_enable = InterruptEnable.new(self)
+    @timer            = Timer.new(self)
 
     setup_post_boot_io if skip_boot
   end
