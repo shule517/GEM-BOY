@@ -51,6 +51,22 @@ class CPU
     @disassembler = Disassembler.new(mmu, @registers)
   end
 
+  def ime_scheduled?
+    ime_scheduled
+  end
+
+  def ime?
+    ime
+  end
+
+  INTERRUPT_VECTORS = {
+    v_blank: 0x0040,
+    lcd:     0x0048,
+    timer:   0x0050,
+    serial:  0x0058,
+    joypad:  0x0060,
+  }
+
   # １つ命令を実行する
   def step
     return 4 if halted # CPUが一時停止中。何もせずに4サイクル消費。 https://gbdev.io/pandocs/halt.html
@@ -70,6 +86,15 @@ class CPU
     end
     cycles = handler.call
     puts @disassembler.after_step(context, opcode, cycles) if @trace # trace 有効時のみ命令後の差分を出力
+
+    # タイマーの割り込み
+    if ime? && mmu.interrupt_enable.timer? && mmu.interrupt_flag.timer?
+      self.ime = false # 割り込みを終了
+      mmu.interrupt_flag.timer = false # Timer割り込み完了
+      push_u16(registers.pc) # pcをpushする
+      registers.pc = INTERRUPT_VECTORS[:timer] # pcをジャンプ
+    end
+
     cycles
   end
 
