@@ -1,0 +1,45 @@
+require 'app/emulator/bit'
+
+# Timer (DIV/TIMA/TMA/TAC) のレジスタを名前付きアクセサで操作する
+# Pan Docs: https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
+#
+#   0xFF04  DIV   16384 Hz で +1
+#   0xFF05  TIMA  TAC の周波数で +1。0xFF を超えると TMA を再ロード + IF.timer をセット
+#   0xFF06  TMA   TIMA オーバーフロー時に再ロードされる値
+#   0xFF07  TAC   bit2=Enable / bits1-0=Clock select
+#
+# TAC Clock select:
+#   00 → 1024 T-cycle ごとに +1 (4096 Hz)
+#   01 →   16 T-cycle ごとに +1 (262144 Hz)
+#   10 →   64 T-cycle ごとに +1 (65536 Hz)
+#   11 →  256 T-cycle ごとに +1 (16384 Hz)
+class Timer
+  ENABLE_BIT = 2
+  CLOCK_MASK = 0b11
+
+  def initialize(mmu)
+    @mmu = mmu
+  end
+
+  # TAC bit2 (Enable): TIMAをインクリメントするかどうか。DIVは常に動くので無関係
+  def tac_enable = Bit.bit_at(read_tac, ENABLE_BIT)
+  def tac_enable? = tac_enable == 1
+  def tac_enable=(value); write_tac(Bit.set_bit(read_tac, ENABLE_BIT, value)); end
+
+  # TAC bits1-0 (Clock select): TIMAを+1する間隔
+  def tac_clock = read_tac & CLOCK_MASK
+  def tac_clock=(value); write_tac((read_tac & ~CLOCK_MASK) | (value & CLOCK_MASK)); end
+
+  # TIMA (Timer Counter): 現在のカウンタ値
+  def tima = @mmu.read_u8(address: MMU::TIMA)
+  def tima=(value); @mmu.write_io_direct(address: MMU::TIMA, value: value); end
+
+  # TMA (Timer Modulo): TIMA がオーバーフローしたときに再ロードされる値
+  def tma = @mmu.read_u8(address: MMU::TMA)
+  def tma=(value); @mmu.write_io_direct(address: MMU::TMA, value: value); end
+
+  private
+
+  def read_tac = @mmu.read_u8(address: MMU::TAC)
+  def write_tac(value); @mmu.write_io_direct(address: MMU::TAC, value: value); end
+end
